@@ -126,7 +126,7 @@ def processFlyscans(ListOfScans):
     for scan in ListOfScans:
         path = scan[0]
         filename = scan[1]
-        #print(f"Processing file: {filename}")
+        logging.info(f"Processing file: {filename}")
         try:
             results.append(reduceFlyscanToQR(path, filename))
         except:
@@ -149,6 +149,7 @@ def processStepscans(ListOfScans):
     return results
 
 
+
 def processSASdata(ListOfScans):
     results=[]
     for scan in ListOfScans:
@@ -163,6 +164,7 @@ def processSASdata(ListOfScans):
     return results
 
 def plotUSAXSResults(ListOfresults, isFlyscan=True):  
+    logging.info(f"Plotting")
     # Number of data sets
     num_data_sets = len(ListOfresults)
     # Choose a colormap
@@ -172,6 +174,7 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
 
     # Set the font size to specific size
     plt.rcParams['font.size'] = default_plt_font_size
+    logging.info(f"Will generate figure")
 
     # Plot ydata against xdata
     plt.figure(figsize=(6, 6))
@@ -192,12 +195,15 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
     # Add legend
     plt.legend()
     # Save the plot as a JPEG image
+    logging.info(f"Ready to save")
     current_hostname = socket.gethostname()
     if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
         if isFlyscan:
-            plt.savefig('/share1/local_livedata/usaxs.jpg', format='jpg', dpi=300)
+            #logging.info(f"Ready to savefig") 
+            plt.savefig('/home/joule/WEBUSAXS/www_live/usaxs.jpg', format='jpg', dpi=300)
+            #logging.info(f"After to savefig") 
         else:
-            plt.savefig('/share1/local_livedata/stepusaxs.jpg', format='jpg', dpi=300) # this step scan
+            plt.savefig('/home/joule/WEBUSAXS/www_live/stepusaxs.jpg', format='jpg', dpi=300) # this step scan
     else:
         if isFlyscan:
             plt.savefig('usaxs.jpg', format='jpg', dpi=300)
@@ -237,7 +243,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
         plt.legend()
         current_hostname = socket.gethostname()
         if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-            plt.savefig('/share1/local_livedata/saxs.jpg', format='jpg', dpi=300)
+            plt.savefig('/home/joule/WEBUSAXS/www_live/saxs.jpg', format='jpg', dpi=300)
         else:
             plt.savefig('saxs.jpg', format='jpg', dpi=300)
     else:
@@ -252,7 +258,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
         # Save the plot as a JPEG image
         current_hostname = socket.gethostname()
         if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-            plt.savefig('/share1/local_livedata/waxs.jpg', format='jpg', dpi=300)
+            plt.savefig('/home/joule/WEBUSAXS/www_live/waxs.jpg', format='jpg', dpi=300)
         else:
             plt.savefig('waxs.jpg', format='jpg', dpi=300)
     #plt.show()

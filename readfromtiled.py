@@ -66,7 +66,7 @@ def convert_results(r):
         if server ==  "localhost" :
             md = r["data"][v]["attributes"]["metadata"]["selected"]  #this is for UBUNTU VM, usaxscontrol does not have selected
         else:                                          
-            md = r["data"][v]["attributes"]["metadata"]     #this is for usaxscontrol 
+            md = r["data"][v]["attributes"]["metadata"]["selected"]     #this is for usaxscontrol 
         #print(md)
         #plan_name = md["plan_name"]
         #scan_id = r["data"][v]["id"]

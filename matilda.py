@@ -106,6 +106,7 @@ def GetListOfScans(plan_name):
         #print (FindLastScanData("uascan",10))
         #print (FindLastScanData("SAXS",10))
         #print (FindLastScanData("WAXS",10))
+        logging.info(f"Getting list of files for plan: {plan_name}")
         return FindLastScanData(plan_name,10)
     else:
         if plan_name == 'SAXS':
@@ -131,7 +132,7 @@ def processFlyscans(ListOfScans):
             results.append(reduceFlyscanToQR(path, filename))
         except:
             pass
-    #print("Done processing the Flyscans")
+    print("Done processing the Flyscans")
     return results
 
 # Process the step scan data files
@@ -140,12 +141,12 @@ def processStepscans(ListOfScans):
     for scan in ListOfScans:
         path = scan[0]
         filename = scan[1]
-        #print(f"Processing file: {filename}")
+        print(f"Processing step scan file: {filename}")
         try:
             results.append(reduceStepScanToQR(path, filename))
         except:
             pass
-    #print("Done processing the Step scans")
+    print("Done processing the Step scans")
     return results
 
 
@@ -155,12 +156,12 @@ def processSASdata(ListOfScans):
     for scan in ListOfScans:
         path = scan[0]
         filename = scan[1]
-        #print(f"Processing file: {filename}")
+        print(f"Processing SAXS/WAXS file: {filename}")
         try:
             results.append(reduceADToQR(path, filename))
         except:
             pass
-    #print("Done processing the Flyscans")
+    print("Done processing the SAXS/WAXS")
     return results
 
 def plotUSAXSResults(ListOfresults, isFlyscan=True):  
@@ -233,6 +234,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
     plt.ylabel('Intensity')   
     if isSAXS:
+        logging.info(f"Plotting SAXS results")
         plt.title('Plot of SAXS Intensity vs. Q')   
         plt.xlabel('log(Q) [1/A]')
         plt.xscale('log')
@@ -247,6 +249,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
         else:
             plt.savefig('saxs.jpg', format='jpg', dpi=300)
     else:
+        logging.info(f"Plotting WAXS results")
         plt.title('Plot of WAXS Intensity vs. Q')   
         plt.xlabel('Q [1/A]')
         plt.xscale('linear')
@@ -310,6 +313,7 @@ if __name__ == "__main__":
                 logging.info('No WAXS data found')
 
             # wait for more data, 30s seems reasonable
+            logging.info('Processing the Sleep 30sec')
             time.sleep(30)
     except KeyboardInterrupt:
         print("Keyboard interrupt")

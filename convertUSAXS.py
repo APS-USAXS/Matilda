@@ -92,10 +92,10 @@ def ImportStepScan(path, filename):
         dataset = file['/entry/data/I0_autorange_controls_gain'] 
         I0gain = np.ravel(np.array(dataset)) 
         #I0 - Monitor
-        dataset = file['/entry/data/I0_USAXS'] 
+        dataset = file['/entry/data/I0'] 
         Monitor = np.ravel(np.array(dataset))  
         #UPD
-        dataset = file['/entry/data/PD_USAXS'] 
+        dataset = file['/entry/data/UPD'] 
         UPD_array = np.ravel(np.array(dataset))
         #Arrays for gain changes
         dataset = file['/entry/data/upd_autorange_controls_gain'] 

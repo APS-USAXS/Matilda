@@ -45,7 +45,6 @@ processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFile
                 'label': 'AB3_R_0318',
                 'thickness': np.float64(1.0),
                 'units': '1/cm'}
-                PS C:\Users\ilavsky\Documents\GitHub\Matilda>
 
 
 
@@ -329,9 +328,9 @@ def test_matildaLocal():
     #     print("File found")
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    samplePath = "\\Mac\Home\Desktop\Data\set1"
+    samplePath = r"\\Mac\Home\Desktop\Data\set1"
     sampleName="AB3_R_0318.h5"
-    blankPath="\\Mac\Home\Desktop\Data\set1" 
+    blankPath=r"\\Mac\Home\Desktop\Data\set1" 
     blankFilename="TapeBlank_R_0317.h5"
     Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)    
     
@@ -341,7 +340,7 @@ def test_matildaLocal():
     if (testme):
         # Specify the path and filename
         #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
-        file_path = '\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
+        file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
         # Check if the file exists before attempting to delete it
         if os.path.exists(file_path):
             try:
@@ -353,9 +352,9 @@ def test_matildaLocal():
         else:
             print(f"The file '{file_path}' does not exist.")
         #removed file
-        saveNXcanSAS(Sample,"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
+        saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
-        Data = readNXcanSAS("\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
+        Data = readNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
         pprint.pprint(Data)
         Sample = {}
         Sample['CalibratedData']=Data

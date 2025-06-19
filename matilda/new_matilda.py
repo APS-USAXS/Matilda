@@ -2,9 +2,9 @@
 # it will process them and generate plots
 #!/usr/bin/env python3
 
-from convertUSAXS import reduceFlyscanToQR, reduceStepScanToQR
+from convertUSAXS import reduceStepScanToQR
 from readfromtiled import FindLastScanData, FindLastBlankScan
-from developNewFlyscan import processFlyscan
+from convertFlyscanNew import processFlyscan,reduceFlyscanToQR
 #from developNewStepScan import processStepScan
 from convertSAS import reduceADToQR
 import matplotlib.pyplot as plt
@@ -360,7 +360,10 @@ if __name__ == "__main__":
     print("Processing the Flyscans")
     #ListOfScans = FindLastScanData("Flyscan",1,0)
     ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016HRC_T4_V_1077.h5']]
+                   'R6016HRC_T4_V_1077.h5'],
+    ]
+                   #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   #'AirBlank_1076.h5'],]
     path, filename = ListOfScans[0]
     #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
     listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',

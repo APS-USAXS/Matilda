@@ -68,10 +68,10 @@ from supportFunctions import subtract_data #read_group_to_dict, filter_nested_di
 import os
 from convertUSAXS import rebinData
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readNXcanSAS
-from convertUSAXS import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
+from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
-
+MinQMinFindRatio = 1.05
 
 #develop calibrated flyscan and step scan data routines
 # this will check if NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS
@@ -108,7 +108,7 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
 
             if blankPath is not None and blankFilename is not None:               
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename)
-                Sample["reducedData"].update(normalizeBlank(Sample))          # Normalize sample by dividing by transmission for subtraction
+                Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 #pp.pprint(Sample)
                 # TODO: fix rebinning for 3 input waves returning 4 waves with dQ
@@ -150,14 +150,13 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                             }
             return Sample
 
-def normalizeBlank(Sample):
-    # This is a simple normalization of the blank data to the sample data. 
+def normalizeByTransmission(Sample):
+    # This is a simple normalization of the Sample Intensity by transmission. 
     # It will be used for background subtraction.
     PeakIntensitySample = Sample["reducedData"]["Maximum"]
     PeakIntensityBlank = Sample["BlankData"]["Maximum"]
     PeakToPeakTransmission = PeakIntensitySample/PeakIntensityBlank
-
-
+    #BlankIntensity = Sample["BlankData"]["Intensity"]
     Intensity = Sample["reducedData"]["Intensity"]
     Intensity = Intensity / PeakToPeakTransmission
     Error = Sample["reducedData"]["Error"]
@@ -168,21 +167,48 @@ def normalizeBlank(Sample):
             }
     return result
     
+# TODO: remove deleteExisting=True for operations
+def reduceFlyscanToQR(path, filename, deleteExisting=True):
+    # Open the HDF5 file in read/write mode
+    location = 'entry/displayData/'
+    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+            # Check if the group 'displayData' exists
+            if deleteExisting:
+                # Delete the group
+                del hdf_file[location]
+                print("Deleted existing group 'entry/displayData'.")
+
+            if location in hdf_file:
+                # exists, so lets reuse the data from the file
+                Sample = dict()
+                Sample = load_dict_from_hdf5(hdf_file, location)
+                print("Used existing data")
+                return Sample
+            else:
+                Sample = dict()
+                Sample["RawData"]=importFlyscan(path, filename)         #import data
+                Sample["reducedData"]= calculatePD_Fly(Sample)       # Correct gains
+                Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
+                Sample["reducedData"].update(rebinData(Sample))         #Rebin data
+                # Create the group and dataset for the new data inside the hdf5 file for future use. 
+                # these are not fully reduced data, this is for web plot purpose. 
+                save_dict_to_hdf5(Sample, location, hdf_file)
+                print("Appended new data to 'entry/displayData'.")
+                return Sample
 
 def calibrateAndSubtractFlyscan(Sample):
-    # This is a step wehre we subtract and calibrate the sample and Blank. 
+    # This is a step where we subtract and calibrate the sample and Blank. 
     Intensity = Sample["reducedData"]["Intensity"]
     BL_Intensity = Sample["BlankData"]["Intensity"]
     Error = Sample["reducedData"]["Error"]
     BL_Error = Sample["BlankData"]["Error"]
     Q = Sample["reducedData"]["Q"]
     BL_Q = Sample["BlankData"]["Q"]
-
+        
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
-    # TODO: trim, calibrate, 
-    # find Qmin as the first point where we get above 3% of the background avleu and larger than instrument resolution
+    # find Qmin as the first point where we get above 5% of the background avleu and larger than instrument resolution
     # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
-    # find point where the IntRatio is larger than 1.03
+    # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
     FWHMSample = Sample["reducedData"]["FWHM"]
     FWHMBlank = Sample["BlankData"]["FWHM"]
     wavelength =  Sample["reducedData"]["wavelength"]
@@ -199,39 +225,42 @@ def calibrateAndSubtractFlyscan(Sample):
     MSAXSCorrection = MeasuredTransmission / PeakToPeakTransmission
     QminSample = 4*np.pi*np.sin(np.radians(FWHMSample)/2)/wavelength
     QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
-    indexSample = np.searchsorted(Q, QminSample)
-    indexBlank = np.searchsorted(Q, QminBlank)
-    #we need to set IntRatio values for points up to inndexSample to 1:
-    IntRatio[:indexSample] = 1.0
-    # Find the first index where IntRatio > 1.03
+    indexSample = np.searchsorted(Q, QminSample)+1
+    indexBlank = np.searchsorted(Q, QminBlank)+1
+    # now we need to reproduce the Q correction from Igor. 
+    MaxCorrection = 1
+    PowerCorrection = 3
+    QCorrection =  1 + MaxCorrection*(abs(QminBlank/SMR_Qvec))**PowerCorrection
+    QCorrection = np.where(QCorrection < (MaxCorrection + 1), QCorrection, MaxCorrection + 1)
+    IntRatio = IntRatio/ QCorrection  # apply the Q correction to the IntRatio
+    #we need to set IntRatio values for points up to indexSample to 1:
+    IntRatio[:indexSample] = 1
+    #plot the IntRatio
+    # plt.plot(SMR_Qvec, IntRatio, linestyle='-')  # You can customize the marker and linestyle
+    # plt.title('Plot of IntRatio vs. Q')
+    # plt.xlabel('log(Q) [1/A]')
+    # plt.xlim((1e-5, 0.0005))
+    # plt.show()    
+    # # Find the first index where IntRatio > MinQMinFindRatio
     # np.argmax returns the first index of True. If all are False, it returns 0.
-    potential_first_index_gt_103 = np.argmax(IntRatio > 1.03)
-
-    if IntRatio[potential_first_index_gt_103] > 1.03:
-        indexRatio = potential_first_index_gt_103
+    potential_first_index = np.argmax(IntRatio > MinQMinFindRatio)
+    if IntRatio[potential_first_index] > MinQMinFindRatio:
+        indexRatio = potential_first_index
+        #print(f"First index where IntRatio > {MinQMinFindRatio} is {indexRatio} with value {IntRatio[indexRatio]}.")
     else:
-        # This means no element in IntRatio was > 1.03 (argmax returned 0 and IntRatio[0] was not > 1.03)
+        # This means no element in IntRatio was > MinQMinFindRatio (argmax returned 0 and IntRatio[0] was not > 1.03)
         indexRatio = len(IntRatio) # Default to end of array if no such point is found
-        logging.warning(f"No points found where IntRatio > 1.03. Defaulting indexRatio to end of array ({indexRatio}).")
+        logging.warning(f"No points found where IntRatio > {MinQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
         
     largest_value = max(indexSample, indexBlank, indexRatio)
-
-    # Determine the actual starting index for the data to keep
-    # The original logic implies keeping one point before the determined threshold by using largest_value-1.
-    # If largest_value is 0 (all criteria met at the very first point), then start_index should be 0.
-    if largest_value > 0:
-        start_index_for_data = largest_value - 1
-    else:
-        start_index_for_data = 0
-    
     # Ensure the start_index is within bounds and there's data to slice
-    if start_index_for_data < len(SMR_Qvec):
-        SMR_Qvec = SMR_Qvec[start_index_for_data:]    
-        SMR_Int = SMR_Int[start_index_for_data:]    
-        SMR_Error = SMR_Error[start_index_for_data:]
+    if largest_value < len(SMR_Qvec):
+        SMR_Qvec = SMR_Qvec[largest_value:]    
+        SMR_Int = SMR_Int[largest_value:]    
+        SMR_Error = SMR_Error[largest_value:]
     else:
         # This case means the calculated start index is at or beyond the end of the array
-        logging.warning(f"Calculated start_index_for_data ({start_index_for_data}) is at or beyond array length ({len(SMR_Qvec)}). "
+        logging.warning(f"Calculated start_index_for_data ({largest_value}) is at or beyond array length ({len(SMR_Qvec)}). "
                         "Resulting SMR arrays will be empty. Check Qmin, blank, and IntRatio > 1.03 criteria.")
         SMR_Qvec = np.array([])
         SMR_Int = np.array([])
@@ -336,6 +365,10 @@ def calculatePDError(Sample, isBlank=False):
     A=(UPD_array)/(VToFFactor[0]*UPD_gains)		#without dark current subtraction
     SigmaMonitor= np.sqrt(Monitor)		            #these calculations were done for 10^6 
     ScaledMonitor = Monitor
+    A = np.where(np.isnan(A), 0.0, A)
+    SigmaMonitor = np.where(np.isnan(SigmaMonitor), 0.0, SigmaMonitor)
+    SigmaPDwDC = np.where(np.isnan(SigmaPDwDC), 0.0, SigmaPDwDC)
+    ScaledMonitor = np.where(np.isnan(ScaledMonitor), 0.0, ScaledMonitor)
     SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
     SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
     SigmaRwave=SigmaRwave * I0AmpGain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0AmpGain

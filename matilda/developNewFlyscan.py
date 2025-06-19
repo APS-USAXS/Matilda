@@ -111,11 +111,10 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                 Sample["reducedData"].update(normalizeBlank(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 #pp.pprint(Sample)
-                # TODO: check calibration
                 # TODO: fix rebinning for 3 input waves returning 4 waves with dQ
-                Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
-                # TODO: desmearing here
-                # Create the group and dataset for the new data inside the hdf5 file for future use. 
+                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
+                    Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
                 slitLength=Sample["CalibratedData"]["slitLength"]
                 #DesmearNumberOfIterations = 10
                 SMR_Int =Sample["CalibratedData"]["SMR_Int"]
@@ -179,10 +178,10 @@ def calibrateAndSubtractFlyscan(Sample):
     Q = Sample["reducedData"]["Q"]
     BL_Q = Sample["BlankData"]["Q"]
 
-    SMR_Qvec, SMR_Int, SMR_Error = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
+    SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
     # TODO: trim, calibrate, 
     # find Qmin as the first point where we get above 3% of the background avleu and larger than instrument resolution
-    IntRatio = Intensity / BL_Intensity
+    # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
     # find point where the IntRatio is larger than 1.03
     FWHMSample = Sample["reducedData"]["FWHM"]
     FWHMBlank = Sample["BlankData"]["FWHM"]
@@ -202,11 +201,41 @@ def calibrateAndSubtractFlyscan(Sample):
     QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
     indexSample = np.searchsorted(Q, QminSample)
     indexBlank = np.searchsorted(Q, QminBlank)
-    indexRatio =  np.searchsorted(IntRatio, 1.03)
+    #we need to set IntRatio values for points up to inndexSample to 1:
+    IntRatio[:indexSample] = 1.0
+    # Find the first index where IntRatio > 1.03
+    # np.argmax returns the first index of True. If all are False, it returns 0.
+    potential_first_index_gt_103 = np.argmax(IntRatio > 1.03)
+
+    if IntRatio[potential_first_index_gt_103] > 1.03:
+        indexRatio = potential_first_index_gt_103
+    else:
+        # This means no element in IntRatio was > 1.03 (argmax returned 0 and IntRatio[0] was not > 1.03)
+        indexRatio = len(IntRatio) # Default to end of array if no such point is found
+        logging.warning(f"No points found where IntRatio > 1.03. Defaulting indexRatio to end of array ({indexRatio}).")
+        
     largest_value = max(indexSample, indexBlank, indexRatio)
-    SMR_Qvec = SMR_Qvec[largest_value-1 : ]    
-    SMR_Int = SMR_Int[largest_value-1 : ]    
-    SMR_Error = SMR_Error[largest_value-1 : ]
+
+    # Determine the actual starting index for the data to keep
+    # The original logic implies keeping one point before the determined threshold by using largest_value-1.
+    # If largest_value is 0 (all criteria met at the very first point), then start_index should be 0.
+    if largest_value > 0:
+        start_index_for_data = largest_value - 1
+    else:
+        start_index_for_data = 0
+    
+    # Ensure the start_index is within bounds and there's data to slice
+    if start_index_for_data < len(SMR_Qvec):
+        SMR_Qvec = SMR_Qvec[start_index_for_data:]    
+        SMR_Int = SMR_Int[start_index_for_data:]    
+        SMR_Error = SMR_Error[start_index_for_data:]
+    else:
+        # This case means the calculated start index is at or beyond the end of the array
+        logging.warning(f"Calculated start_index_for_data ({start_index_for_data}) is at or beyond array length ({len(SMR_Qvec)}). "
+                        "Resulting SMR arrays will be empty. Check Qmin, blank, and IntRatio > 1.03 criteria.")
+        SMR_Qvec = np.array([])
+        SMR_Int = np.array([])
+        SMR_Error = np.array([])
     # now calibration... 
     SDD = Sample["RawData"]["metadata"]['detector_distance']
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']

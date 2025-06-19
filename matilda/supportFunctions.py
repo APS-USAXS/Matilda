@@ -23,10 +23,11 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
     E2 (array-like): Uncertainty in Y2.
 
     Returns:
-    tuple: (X1, Ydiff, Esub) where
+    tuple: (X1, Ydiff, Esub, IntRatio) where
         - X1 is the input X1 data points.
         - Ydiff is the difference between Y1 and interpolated Y2.
         - Esub is the propagated uncertainty.
+        - IntRatio is the ratio of Y1 to Y2.
     """
     # Step 1: Interpolate log(Y2) vs X2 to values of X1
     logY2 = np.log(Y2)
@@ -36,9 +37,11 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
     # Convert interpolated logY2 back to Y2interp
     Y2_interp = np.exp(logY2_interp)
 
-    # Step 2: Subtract Y1 - Y2interp to obtain Ydiff
+    # Step 2: Subtract Y1 - Y2interp to obtain Ydiff and divide to get IntRatio
     Ydiff = Y1 - Y2_interp
 
+    IntRatio = Y1 / Y2_interp  # Calculate the intensity ratio
+    
     # Step 3: Linearly interpolate E2 vs X2 to have E2interp vs X1
     E2_interp_func = interp1d(X2, E2, kind='linear', fill_value='extrapolate')
     E2_interp = E2_interp_func(X1)
@@ -47,7 +50,7 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
     Esub = np.sqrt(E1**2 + E2_interp**2)
 
     # Return the three data sets: X1, Ydiff, and Esub
-    return X1, Ydiff, Esub
+    return X1, Ydiff, Esub, IntRatio
 
 # Function to check if all arrays have the same length
 def check_arrays_same_length(*arrays):

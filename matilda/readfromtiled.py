@@ -1,18 +1,15 @@
 '''
     readTiled.py 
-    version 0.2   2025-04-15
-    this code will get last N data sets from tiled database for Flyscan, USAXS, SAXS, and WAXS
-    it will recreate what IR3BS_GetJSONScanData() does in Indra package In3_ClueSkyreader.ipf
-    it wil luse tiled web interface and read data into json.
-    the main purpose is to get list fo filenames and paths for the last N scans
-    and then use this list to download the data from the server
-    the code will aslo remeber when was the last polling and ask for data only since last time. 
-    need to handel gracefully the start
-    code will trigger appropriate data recduction routines for different data sets
-    at the end the code will generate necessary pictures for live data page.
-    the code will be run in background and be checked by a cron job every 5 minutes
+    version
+    0.2   2025-04-15
+    0.3   2025-06-01
 
-    method used buitls on https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
+    useful functions are:
+    readTiled.FindLastScanData(plan_name,NumScans=10, LastNdays=1)
+    readTiled.FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0)
+    readTiled.FindLastBlankScan(plan_name,NumScans=1, lastNdays=0)
+
+    method used builds on https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
     and follows Igor code to get the right data sets
 '''
 
@@ -36,7 +33,9 @@ current_hostname = socket.gethostname()
 if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
     server = "usaxscontrol.xray.aps.anl.gov"
 else:
-    server = "localhost"
+    #server = "localhost"
+    server = "usaxscontrol.xray.aps.anl.gov"
+
 port = 8020
 catalog = "usaxs"
 
@@ -46,10 +45,7 @@ def print_results_summary(r):
     """We'll use this a few times."""
     xref = dict(First=0, Last=-1)
     for k, v in dict(First=0, Last=-1).items():
-        if server ==  "localhost" :
-            md = r["data"][v]["attributes"]["metadata"]["selected"]  #this is for UBUNTU VM, usaxscontrol does not have selected
-        else:                                          
-            md = r["data"][v]["attributes"]["metadata"]     #this is for usaxscontrol 
+        md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled
         #print(md)
         plan_name = md["plan_name"]
         scan_id = r["data"][v]["id"]
@@ -62,10 +58,7 @@ def print_results_summary(r):
 def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
-        if server ==  "localhost" :
-            md = r["data"][v]["attributes"]["metadata"]["selected"]  #this is for UBUNTU VM, usaxscontrol does not have selected
-        else:                                          
-            md = r["data"][v]["attributes"]["metadata"]     #this is for usaxscontrol 
+        md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
         #print(md)
         #plan_name = md["plan_name"]
         #scan_id = r["data"][v]["id"]
@@ -81,23 +74,48 @@ def convert_results(r):
 #print_results_summary(r)
 
 
-def FindScanDataByName(plan_name,scan_title,NumScans=1):
+def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
     #this filters for specific time AND for specific plan_name
-    uri = (
-        f"http://{server}:{port}"
-        "/api/v1/search"
-        f"/{catalog}"
-        f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-        "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-        f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-        "&filter[eq][condition][key]=title"                                 # filter by title
-        f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-        "&sort=-time"                                                       # sort by time, -time gives last scans first
-        "&fields=metadata"                                                  # return metadata
-        "&omit_links=true"                                                  # no links
-        "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-        hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
-        )
+    if lastNdays > 0:
+        # if LastNdays is set, then we will ask for data from the last N days
+        start_time = time.time() - (lastNdays * 86400)
+        end_time = time.time()    #current time in seconds
+        tz = "US/Central"
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+            "&filter[eq][condition][key]=title"                                 # filter by title
+            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
+            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            f"&filter[time_range][condition][timezone]={tz}"                    # time range
+             "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&fields=metadata"                                                  # return metadata
+            "&omit_links=true"                                                  # no links
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            )
+    else:
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+            "&filter[eq][condition][key]=title"                                 # filter by title
+            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
+            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&fields=metadata"                                                  # return metadata
+            "&omit_links=true"                                                  # no links
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            )
+      
     logging.info(f"{uri=}")
     #print(f"{uri=}")
     #additional methods to match data:
@@ -127,23 +145,95 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1):
         return []
     
 
-def FindLastBlankScan(plan_name,NumScans=1):
+def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
     #this filters for last collected Blank for specific plan_name
-    uri = (
-        f"http://{server}:{port}"
-        "/api/v1/search"
-        f"/{catalog}"
-        f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-        "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-        f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-        "&filter[regex][condition][key]=title"                              # filter by title
-        f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-        "&sort=-time"                                                       # sort by time, -time gives last scans first
-        "&fields=metadata"                                                  # return metadata
-        "&omit_links=true"                                                  # no links
-        "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-        hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
-        )
+    if path is None:
+        if lastNdays > 0:
+            # if LastNdays is set, then we will ask for data from the last N days
+            start_time = time.time() - (lastNdays * 86400)
+            end_time = time.time()    #current time in seconds
+            tz = "US/Central"
+            uri = (
+                f"http://{server}:{port}"
+                "/api/v1/search"
+                f"/{catalog}"
+                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                "&filter[regex][condition][key]=title"                              # filter by title
+                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
+                 f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&fields=metadata"                                                  # return metadata
+                "&omit_links=true"                                                  # no links
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                )
+        else:
+            # if LastNdays is not set, then we will ask for all data
+            uri = (
+                f"http://{server}:{port}"
+                "/api/v1/search"
+                f"/{catalog}"
+                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                "&filter[regex][condition][key]=title"                              # filter by title
+                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&fields=metadata"                                                  # return metadata
+                "&omit_links=true"                                                  # no links
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                )
+    else:
+        if lastNdays > 0:
+            # if LastNdays is set, then we will ask for data from the last N days
+            start_time = time.time() - (lastNdays * 86400)
+            end_time = time.time()    #current time in seconds
+            tz = "US/Central"
+            uri = (
+                f"http://{server}:{port}"
+                "/api/v1/search"
+                f"/{catalog}"
+                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                "&filter[regex][condition][key]=title"                              # filter by title
+                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
+                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
+                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
+                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&fields=metadata"                                                  # return metadata
+                "&omit_links=true"                                                  # no links
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                )
+        else:
+            # if LastNdays is not set, then we will ask for all data
+            uri = (
+                f"http://{server}:{port}"
+                "/api/v1/search"
+                f"/{catalog}"
+                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                "&filter[regex][condition][key]=title"                              # filter by title
+                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
+                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
+                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&fields=metadata"                                                  # return metadata
+                "&omit_links=true"                                                  # no links
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                )
+                   
     logging.info(f"{uri=}")
     #print(f"{uri=}")
     #additional methods to match data:
@@ -183,35 +273,55 @@ def FindLastBlankScan(plan_name,NumScans=1):
         return []
  
 
-def FindLastScanData(plan_name,NumScans=10):
-    #print (FindLastScanData("Flyscan",10))
-    #print (FindLastScanData("uascan",10))
-    #print (FindLastScanData("SAXS",10))
-    #print (FindLastScanData("WAXS",10))
+def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
+    #print (FindLastScanData("Flyscan",10,LastNdays=1))
+    #print (FindLastScanData("uascan",10,LastNdays=1))
+    #print (FindLastScanData("SAXS",10,LastNdays=1))
+    #print (FindLastScanData("WAXS",10,LastNdays=1))
     #print(f"Search for {plan_name=}")
     # Find all runs in a catalog between these two ISO8601 dates.
     # TODO - manage the times by rembering last call and only asking for data since last time
     #start_time = time.time()    #current time in seconds
     end_time = time.time()
     tz = "US/Central"
-
+    if LastNdays > 0:
+        # if LastNdays is set, then we will ask for data from the last N days
+        start_time = end_time - (LastNdays * 86400)
+    
     #this filters for specific time AND for specific plan_name
-    uri = (
-        f"http://{server}:{port}"
-        "/api/v1/search"
-        f"/{catalog}"
-        f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-        "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-        f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-        f"&filter[time_range][condition][since]={(end_time-86400)}"         # time range, start time - 24 hours from now
-        f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-        f"&filter[time_range][condition][timezone]={tz}"                    # time range
-        "&sort=-time"                                                       # sort by time, -time gives last scans first
-        "&fields=metadata"                                                  # return metadata
-        "&omit_links=true"                                                  # no links
-        "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-        hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
-        )
+    if LastNdays > 0:
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            f"&filter[time_range][condition][timezone]={tz}"                    # time range
+            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&fields=metadata"                                                  # return metadata
+            "&omit_links=true"                                                  # no links
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            )
+    else:
+        # if LastNdays is not set, then we will ask for all data
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&fields=metadata"                                                  # return metadata
+            "&omit_links=true"                                                  # no links
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            )
+          
     logging.info(f"{uri=}")
     #print(f"{uri=}")
     try:
@@ -232,35 +342,24 @@ def FindLastScanData(plan_name,NumScans=10):
         return []
 
 
+# Example usage of the functions
 
+if __name__ == "__main__":
+    # Example usage
+    #logging.basicConfig(level=logging.INFO)
+    plan_name = "Flyscan"
+    scan_title = "SRM3600"
+    num_scans = 5
 
-#  http://10.211.55.7:8020/api/v1/search//usaxs/?page[offset]=0
-# &page[limit]=100
-# &filter[time_range][condition][since]=1738738800
-# &filter[time_range][condition][timezone]=US/Central
-# &sort=time
-# &fields=metadata
-# &omit_links=true
-# &select_metadata={detectors:start.detectors,motors:start.motors,plan_name:start.plan_name,time:start.time,
-# scan_title:start.plan_args.scan_title,title:start.title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
+    # Find last scans
+    last_scans = FindLastScanData(plan_name, num_scans, 0)
+    print(f"Last {num_scans} scans for {plan_name}: {last_scans}")
 
-#this requests all different records from given time range
-# uri =(
-#     f"http://{server}:{port}"  # standard prefix
-#     "/api/v1/search"    # API command
-#     f"/{catalog}"       # catalog
-#     "?"                 # begin any command options
-#     "page[limit]=10"   # 0: all matching
-#     "&"                 # separator between any additional options
-#     f"filter[time_range][condition][since]={iso_to_ts(start_time)}"
-#     f"&filter[time_range][condition][until]={iso_to_ts(end_time)}"
-#     f"&filter[time_range][condition][timezone]={tz}"
-#     "&sort=time"
-#     "&fields=metadata"
-#     "&omit_links=true"
-#     "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-#                         hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"
-# )
-#print(f"{uri=}")
-#r = requests.get(uri).json()
-#print(r["data"][0])
+    # Find specific scan by name
+    specific_scan = FindScanDataByName(plan_name, scan_title, num_scans, 0)
+    print(f"Specific scan '{scan_title}' for {plan_name}: {specific_scan}")
+
+    # Find last blank scan
+    last_blank_scan = FindLastBlankScan(plan_name, None, num_scans, 0)
+    print(f"Last blank scan for {plan_name}: {last_blank_scan}")
+  

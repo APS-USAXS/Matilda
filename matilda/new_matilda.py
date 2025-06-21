@@ -2,11 +2,7 @@
 # it will process them and generate plots
 #!/usr/bin/env python3
 
-from convertUSAXS import reduceStepScanToQR
-from readfromtiled import FindLastScanData, FindLastBlankScan
-from convertFlyscanNew import processFlyscan,reduceFlyscanToQR
-#from developNewStepScan import processStepScan
-from convertSAS import reduceADToQR
+
 import matplotlib.pyplot as plt
 import pprint as pp
 import numpy as np
@@ -18,6 +14,22 @@ import os
 import re
 import datetime
 
+from convertUSAXS import reduceStepScanToQR
+from readfromtiled import FindLastScanData, FindLastBlankScan
+from convertFlyscanNew import processFlyscan,reduceFlyscanToQR
+#from developNewStepScan import processStepScan
+from convertSAS import reduceADToQR
+from supportFunctions import findProperBlankScan
+
+# define any globals here
+default_plt_font_size = 7
+#imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
+imagePath = '/home/parallels/Desktop/'  # Path to save images
+recalculateAllData = True
+
+    
+    
+    
 # Configure logging
 # Get the directory of the current script
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -43,12 +55,7 @@ logging.basicConfig(
 # logging.critical('This is a critical message')
 
 
-# define any globals here
-default_plt_font_size = 7
-#imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
-imagePath = '/home/parallels/Desktop/'  # Path to save images
 
-    
 # Here we process different types of scans
 # Process the Flyscan data files
 def processFlyscans(ListOfScans):
@@ -258,96 +265,18 @@ def processFlyscans(ListOfScans, ListOfBlanks):
     that is smaller than the sample's number.
     """
     results=[]
-    # for scan in ListOfScans:
-    #     path = scan[0]
-    #     filename = scan[1]
-    #     blankPath=None
-    #     blankFilename=None
-        
+    logging.info("Starting processing of flyscans with blanks")    
     for scan_path, scan_filename in ListOfScans:
-        logging.info(f"Attempting to process scan: {scan_filename} in path: {scan_path}")
-
-        sample_base, sample_num, sample_ext = _parse_filename_info(scan_filename)
-
-        selected_blank_path = None
-        selected_blank_filename = None
-
-        if sample_base is None or sample_num is None:
-            logging.warning(f"Could not parse sample filename: {scan_filename} to find its number. Proceeding without blank.")
-        else:
-            logging.debug(f"Parsed sample {scan_filename}: base='{sample_base}', num={sample_num}, ext='{sample_ext}'")
-            candidate_blanks = []
-            for bl_path, bl_filename in ListOfBlanks:
-                if bl_path == scan_path:  # Blank must be in the same path
-                    blank_base, blank_num, blank_ext = _parse_filename_info(bl_filename)
-                    if blank_base and blank_num is not None and blank_ext == sample_ext:
-                        if blank_num < sample_num:
-                            candidate_blanks.append({
-                                'path': bl_path,
-                                'filename': bl_filename,
-                                'number': blank_num
-                            })
-            
-            if candidate_blanks:
-                # Sort candidates by their number in descending order to get the largest number < sample_num
-                candidate_blanks.sort(key=lambda b: b['number'], reverse=True)
-                best_blank = candidate_blanks[0]
-                selected_blank_path = best_blank['path']
-                selected_blank_filename = best_blank['filename']
-                logging.info(f"Found blank for {scan_filename}: {selected_blank_filename} (num: {best_blank['number']}) in path {selected_blank_path}")
-            else:
-                logging.warning(f"No suitable blank found for sample {scan_filename} (num: {sample_num}) in path '{scan_path}'.")
-
-            # try:
-            #     #    processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
-            #     results.append(processFlyscan(path, filename, blankPath=selected_blank_path,blankFilename=selected_blank_filename,deleteExisting=True))
-            # except:
-            #     pass
-            #     #print("Done processing the Flyscans")
-            # Call the imported processFlyscan (singular) which does the actual data reduction
-        print (f"Processing scan: {scan_filename} with blank: {selected_blank_filename}")
+        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
         result = processFlyscan(scan_path, scan_filename,
                                     blankPath=selected_blank_path,
                                     blankFilename=selected_blank_filename,
-                                    deleteExisting=True) # deleteExisting might be True for reprocessing
+                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
         results.append(result)
         #except Exception as e:
         #    logging.error(f"Error processing scan {scan_filename} with blank {selected_blank_filename}: {e}")
     return results
 
-def findProperBlankScan(samplePath, sampleName, listOfBlanks):
-    blankPath = None
-    blankFilename = None
-    for blank in listOfBlanks:
-        if sampleName in blank[1]:
-            blankPath = blank[0]
-            blankFilename = blank[1]
-            break
-    if blankPath is None or blankFilename is None:
-        print(f'No proper blank found for {sampleName}')
-    return blankPath, blankFilename
-
-
-
-def _parse_filename_info(filename):
-    """
-    Parses a filename like 'name_XYZ.ext' to extract base, number, and extension.
-    Returns (base_prefix, number_int, extension) or (None, None, None) if parsing fails.
-    Example: "Scan_001.h5" -> ("Scan_", 1, ".h5")
-    """
-    name_part, ext_part = os.path.splitext(filename)
-    # Regex to find a base name ending with an underscore, followed by digits
-    match = re.match(r'(.*_)([0-9]+)$', name_part)
-    if match:
-        base_prefix = match.group(1)
-        number_str = match.group(2)
-        try:
-            number_int = int(number_str)
-            return base_prefix, number_int, ext_part
-        except ValueError:
-            # This case should ideally not happen if regex matches digits
-            return None, None, None
-    return None, None, None
 
 
 

@@ -81,7 +81,73 @@ def importFlyscan(path, filename):
     
     return data_dict
 
-# 
+# this finds the best blank scan for any scan.
+# rules: same folder and order number lower than the sample scan., the closest one. 
+def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
+    logging.info(f"Looking for proper Blanks for to process scan: {scan_filename} in path: {scan_path}")
+
+    sample_base, sample_num, sample_ext = _parse_filename_info(scan_filename)
+
+    selected_blank_path = None
+    selected_blank_filename = None
+
+    if sample_base is None or sample_num is None:
+        logging.warning(f"Could not parse sample filename: {scan_filename} to find its number. Proceeding without blank.")
+    else:
+        logging.debug(f"Parsed sample {scan_filename}: base='{sample_base}', num={sample_num}, ext='{sample_ext}'")
+        candidate_blanks = []
+        for bl_path, bl_filename in ListOfBlanks:
+            if bl_path == scan_path:  # Blank must be in the same path
+                blank_base, blank_num, blank_ext = _parse_filename_info(bl_filename)
+                if blank_base and blank_num is not None and blank_ext == sample_ext:
+                    if blank_num < sample_num:
+                        candidate_blanks.append({
+                            'path': bl_path,
+                            'filename': bl_filename,
+                            'number': blank_num
+                        })
+        
+        if candidate_blanks:
+            # Sort candidates by their number in descending order to get the largest number < sample_num
+            candidate_blanks.sort(key=lambda b: b['number'], reverse=True)
+            best_blank = candidate_blanks[0]
+            selected_blank_path = best_blank['path']
+            selected_blank_filename = best_blank['filename']
+            logging.info(f"Found blank for {scan_filename}: {selected_blank_filename} (num: {best_blank['number']}) in path {selected_blank_path}")
+        else:
+            logging.warning(f"No suitable blank found for sample {scan_filename} (num: {sample_num}) in path '{scan_path}'.")
+
+        # try:
+        #     #    processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
+        #     results.append(processFlyscan(path, filename, blankPath=selected_blank_path,blankFilename=selected_blank_filename,deleteExisting=True))
+        # except:
+        #     pass
+        #     #print("Done processing the Flyscans")
+        # Call the imported processFlyscan (singular) which does the actual data reduction
+        logging.info(f"Idenitfied for scan: {scan_filename}  blank: {selected_blank_filename}")
+    return selected_blank_path, selected_blank_filename   
+
+def _parse_filename_info(filename):
+    """
+    Parses a filename like 'name_XYZ.ext' to extract base, number, and extension.
+    Returns (base_prefix, number_int, extension) or (None, None, None) if parsing fails.
+    Example: "Scan_001.h5" -> ("Scan_", 1, ".h5")
+    """
+    name_part, ext_part = os.path.splitext(filename)
+    # Regex to find a base name ending with an underscore, followed by digits
+    match = re.match(r'(.*_)([0-9]+)$', name_part)
+    if match:
+        base_prefix = match.group(1)
+        number_str = match.group(2)
+        try:
+            number_int = int(number_str)
+            return base_prefix, number_int, ext_part
+        except ValueError:
+            # This case should ideally not happen if regex matches digits
+            return None, None, None
+    return None, None, None
+
+ 
 def calculatePD_Fly(data_dict):
         # create the gains array and corrects UPD for it.
         # Masks deadtimes and range changes

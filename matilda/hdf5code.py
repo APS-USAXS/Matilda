@@ -129,11 +129,17 @@ def saveNXcanSAS(Sample,path, filename):
     SampleName = Sample["RawData"]["sample"]["name"]
     SampleName = SampleName.decode('utf-8')
 
-    # SMR_Int =Sample["CalibratedData"]["SMR_Int"]
-    # SMR_Error =Sample["CalibratedData"]["SMR_Error"]
-    # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
-    # SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+    SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+    SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+    SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+    SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+    slitLength=Sample["CalibratedData"]["slitLength"]
 
+    R_Int = Sample["reducedData"]["Intensity"]
+    R_Qvec = Sample["reducedData"]["Q"]
+    R_Error=Sample["reducedData"]["Error"]
+
+    #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, "w") as f:
@@ -159,7 +165,7 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry.create_dataset('definition', data='NXsas')
         # other groups shoudl be here from RAW data, so ignore. 
 
-        # create the NXsubentry group for reduced data. 
+        # create the NXsubentry group for Desmeared reduced data. 
         newDataPath = "entry/"+SampleName
         nxDataEntry = f.create_group(newDataPath)
         nxDataEntry.attrs['NX_class'] = 'NXsubentry'
@@ -207,35 +213,75 @@ def saveNXcanSAS(Sample,path, filename):
         ds.attrs['units'] = 'cm2/cm3'
         ds.attrs['long_name'] = 'Uncertainties'  
 
-        # create the NXinstrument metadata group
-        # nxinstr = nxentry.create_group('instrument')
-        # nxinstr.attrs['NX_class'] = 'NXinstrument'
-        # nxinstr.attrs['canSAS_class'] = 'SASinstrument'
+        # add the SMR data
+        # create the NXsubentry group for Desmeared reduced data. 
+        newDataPath = "entry/"+SampleName+"_SMR"
+        nxDataEntry = f.create_group(newDataPath)
+        nxDataEntry.attrs['NX_class'] = 'NXsubentry'
+        nxDataEntry.attrs['canSAS_class'] = 'SASentry'
+        nxDataEntry.attrs['default'] = 'sasdata'
+        nxDataEntry.attrs['title'] = SampleName
+        #add definition as NXcanSas
+        nxDataEntry.create_dataset('definition', data='NXcanSAS')
+        #add title as NXcanSas
+        nxDataEntry.create_dataset('title', data=SampleName)
+        #add run (compulsory)
+        nxDataEntry.create_dataset('run', data="run_identifier")
 
-        # nxprocess = nxinstr.create_group('simulation_engine')
-        # nxprocess.attrs['NX_class'] = 'NXprocess'
-        # nxprocess.attrs['canSAS_class'] = 'SASprocess'
-        # nxprocess.attrs['name'] = '12IDE USAXS'
-        # nxprocess.attrs['date'] = timestamp # @TODO: get timestamp from simulation run and embed here.
-        # nxprocess.attrs['description'] = 'USAXS or SWAXS data'
+        # create the NXdata group for I(Q) for the avergaed data
+        nxdata = nxDataEntry.create_group('sasdata')
+        nxdata.attrs['NX_class'] = 'NXdata'
+        nxdata.attrs['canSAS_class'] = 'SASdata'
+        nxdata.attrs['signal'] = 'I'      # Y axis of default plot
+        nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
+        #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
 
-        # sim_notes = nxprocess.create_group('NOTE')
-        # sim_notes.attrs['NX_class'] = 'NXnote'
+        # Y axis data
+        ds = nxdata.create_dataset('I', data=SMR_Int)
+        ds.attrs['units'] = '1/cm'
+        ds.attrs['uncertainties'] = 'Idev'
+        ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+        ds.attrs['Kfactor'] = Kfactor
+        ds.attrs['OmegaFactor'] = OmegaFactor
+        ds.attrs['BlankName'] = BlankName
+        ds.attrs['thickness'] = thickness
+        ds.attrs['label'] = label
 
-        # sim_notes.attrs['description'] = 'UUSAXS or SWAXS data'
-        # sim_notes.attrs['author'] = '12IDE USAXS/SAXS/WAXS'
-        # sim_notes.attrs['data'] = 'TBA' #@TODO
+        # X axis data
+        ds = nxdata.create_dataset('Q', data=SMR_Qvec)
+        ds.attrs['units'] = '1/angstrom'
+        ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+        ds.attrs['resolutions'] = 'dQw, dQI'
+       
+        # d X axis data
+        ds = nxdata.create_dataset('dQw', data=SMR_dQ)
+        ds.attrs['units'] = '1/angstrom'
+        ds.attrs['long_name'] = 'dQw (A^-1)'           
+        # slitlength
+        ds = nxdata.create_dataset('dQI', data=slitLength)
+        ds.attrs['units'] = '1/angstrom'
+        ds.attrs['long_name'] = 'dQI (A^-1)'   
+        # dI axis data
+        ds = nxdata.create_dataset('Idev', data=SMR_Error)
+        ds.attrs['units'] = 'cm2/cm3'
+        ds.attrs['long_name'] = 'Uncertainties'  
 
-        # nxsample = nxentry.create_group('sample')
-        # nxsample.attrs['NX_class'] = 'NXsample'
-        # nxsample.attrs['canSAS_class'] = 'SASsample'
+        newDataPath = "entry/"+"QRS_data"
+        nxDataEntry = f.create_group(newDataPath)
+        # R_Int axis data
+        ds = nxdata.create_dataset('Intensity', data=R_Int)
+        ds.attrs['units'] = 'cm2/cm3'
+        ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+        # R_Qvec axis data
+        ds = nxdata.create_dataset('Q', data=R_Qvec)
+        ds.attrs['units'] = '1/angstrom'
+        ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
+        # R_Error axis data
+        ds = nxdata.create_dataset('Error', data=R_Error)
+        ds.attrs['units'] = 'cm2/cm3'
+        ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
         
-        # nxsample.attrs['name'] = SampleName
-        # nxsample.attrs['description'] = 'SAMPLE DESCRIPTION GOES HERE'
-        # #nxsample.attrs['type'] = 'simulated data'
-
-        #comp.create_dataset
-        
+    
     print("wrote file:", filename)
 
 

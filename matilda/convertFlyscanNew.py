@@ -61,39 +61,60 @@ processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFile
 import h5py
 import numpy as np
 import pprint
-#from scipy.optimize import curve_fit
+import os
 import matplotlib.pyplot as plt
 import pprint as pp
+import logging
+#from scipy.optimize import curve_fit
+
+
 from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
-import os
 from convertUSAXS import rebinData
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readNXcanSAS
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
+from new_matilda import recalculateAllData
+
 MinQMinFindRatio = 1.05
 
-#develop calibrated flyscan and step scan data routines
-# this will check if NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS
-# data. It needs Blank and Sample data.
-def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExisting=False):
+# Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
+# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
     # Open the HDF5 file in read/write mode
-    #location = 'entry/displayData/'
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
         # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        # if deleteExisting:
-        #     # Delete the group
-        #     del hdf_file[location]
-        #     print("Deleted existing group 'entry/displayData'.")
+        if deleteExisting:
+            # Delete the groups which may have een created by previously run saveNXcanSAS
+            location = 'entry/QRS_data/'
+            if location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
+            location = 'entry/'+filename+"_SMR"+'/'
+            if location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group with SMR` for file {filename}. ")
+            location = 'entry/'+filename+'/'
+            if location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
 
-        # if location in hdf_file:
-        #     # exists, so lets reuse the data from the file
-        #     Sample = dict()
-        #     Sample = load_dict_from_hdf5(hdf_file, location)
-        #     print("Used existing data")
-        #     return Sample
-        # else:
+
+        #Now, we will read the data from the file, if thye exist. Assume if NXcanSAS data exist, we can have all needed.. 
+        location = 'entry/'+filename+'/'
+        if location in hdf_file:
+            # exists, so lets reuse the data from the file
+            Sample = dict()
+            #Sample = load_dict_from_hdf5(hdf_file, location)
+            print("Used existing data")
+            return Sample
+        
+        else:
             Sample = dict()
             Sample["RawData"]=importFlyscan(path, filename)                 #import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                  # Creates PD_Intensity with corrected gains and background subtraction
@@ -131,8 +152,9 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                      "units":"[cm2/cm3]",
                      }
                 Sample["CalibratedData"].update(desmearedData)
-                #save_dict_to_hdf5(Sample, location, hdf_file)
-                #print("Appended new data to 'entry/displayData'.")
+                # save_dict_to_hdf5(Sample, location, hdf_file)
+                # print("Appended new data to 'entry/displayData'.")
+            
             else:
                 #set calibrated data in the structure to None 
                 Sample["CalibratedData"] = {"SMR_Qvec":None,
@@ -148,7 +170,9 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                             "Error":None,
                                             "dQ":None,
                                             }
-            return Sample
+            
+        saveNXcanSAS(Sample,path, filename)
+        return Sample
 
 def normalizeByTransmission(Sample):
     # This is a simple normalization of the Sample Intensity by transmission. 

@@ -12,8 +12,9 @@ import os
 import numpy as np
 import six  #what is this for???
 import datetime
+import logging
 
-def readNXcanSAS(path, filename):
+def readGenericNXcanSAS(path, filename):
     '''
     read data from NXcanSAS data in Nexus file. Ignore NXsas data and anything else
     '''
@@ -165,126 +166,209 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry.create_dataset('definition', data='NXsas')
         # other groups shoudl be here from RAW data, so ignore. 
 
-        # create the NXsubentry group for Desmeared reduced data. 
-        newDataPath = "entry/"+SampleName
-        nxDataEntry = f.create_group(newDataPath)
-        nxDataEntry.attrs['NX_class'] = 'NXsubentry'
-        nxDataEntry.attrs['canSAS_class'] = 'SASentry'
-        nxDataEntry.attrs['default'] = 'sasdata'
-        nxDataEntry.attrs['title'] = SampleName
-        #add definition as NXcanSas
-        nxDataEntry.create_dataset('definition', data='NXcanSAS')
-        #add title as NXcanSas
-        nxDataEntry.create_dataset('title', data=SampleName)
-        #add run (compulsory)
-        nxDataEntry.create_dataset('run', data="run_identifier")
+        if Intensity is not None:
+            logging.info(f"Wrote Desmeared NXcanSAS group for file {filename}. ")
+            # create the NXsubentry group for Desmeared reduced data. 
+            newDataPath = "entry/"+SampleName
+            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry.attrs['NX_class'] = 'NXsubentry'
+            nxDataEntry.attrs['canSAS_class'] = 'SASentry'
+            nxDataEntry.attrs['default'] = 'sasdata'
+            nxDataEntry.attrs['title'] = SampleName
+            #add definition as NXcanSas
+            nxDataEntry.create_dataset('definition', data='NXcanSAS')
+            #add title as NXcanSas
+            nxDataEntry.create_dataset('title', data=SampleName)
+            #add run (compulsory)
+            nxDataEntry.create_dataset('run', data="run_identifier")
 
-        # create the NXdata group for I(Q) for the avergaed data
-        nxdata = nxDataEntry.create_group('sasdata')
-        nxdata.attrs['NX_class'] = 'NXdata'
-        nxdata.attrs['canSAS_class'] = 'SASdata'
-        nxdata.attrs['signal'] = 'I'      # Y axis of default plot
-        nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
-        #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
+            # create the NXdata group for I(Q) for the avergaed data
+            nxdata = nxDataEntry.create_group('sasdata')
+            nxdata.attrs['NX_class'] = 'NXdata'
+            nxdata.attrs['canSAS_class'] = 'SASdata'
+            nxdata.attrs['signal'] = 'I'      # Y axis of default plot
+            nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
+            #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
 
-        # Y axis data
-        ds = nxdata.create_dataset('I', data=Intensity)
-        ds.attrs['units'] = '1/cm'
-        ds.attrs['uncertainties'] = 'Idev'
-        ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
-        ds.attrs['Kfactor'] = Kfactor
-        ds.attrs['OmegaFactor'] = OmegaFactor
-        ds.attrs['BlankName'] = BlankName
-        ds.attrs['thickness'] = thickness
-        ds.attrs['label'] = label
+            # Y axis data
+            ds = nxdata.create_dataset('I', data=Intensity)
+            ds.attrs['units'] = '1/cm'
+            ds.attrs['uncertainties'] = 'Idev'
+            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['Kfactor'] = Kfactor
+            ds.attrs['OmegaFactor'] = OmegaFactor
+            ds.attrs['BlankName'] = BlankName
+            ds.attrs['thickness'] = thickness
+            ds.attrs['label'] = label
 
-        # X axis data
-        ds = nxdata.create_dataset('Q', data=Q)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
-        ds.attrs['resolutions'] = 'Qdev'
-       
-        # d X axis data
-        ds = nxdata.create_dataset('Qdev', data=dQ)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q (A^-1)'   
-        # dI axis data
-        ds = nxdata.create_dataset('Idev', data=Error)
-        ds.attrs['units'] = 'cm2/cm3'
-        ds.attrs['long_name'] = 'Uncertainties'  
-
-        # add the SMR data
-        # create the NXsubentry group for Desmeared reduced data. 
-        newDataPath = "entry/"+SampleName+"_SMR"
-        nxDataEntry = f.create_group(newDataPath)
-        nxDataEntry.attrs['NX_class'] = 'NXsubentry'
-        nxDataEntry.attrs['canSAS_class'] = 'SASentry'
-        nxDataEntry.attrs['default'] = 'sasdata'
-        nxDataEntry.attrs['title'] = SampleName
-        #add definition as NXcanSas
-        nxDataEntry.create_dataset('definition', data='NXcanSAS')
-        #add title as NXcanSas
-        nxDataEntry.create_dataset('title', data=SampleName)
-        #add run (compulsory)
-        nxDataEntry.create_dataset('run', data="run_identifier")
-
-        # create the NXdata group for I(Q) for the avergaed data
-        nxdata = nxDataEntry.create_group('sasdata')
-        nxdata.attrs['NX_class'] = 'NXdata'
-        nxdata.attrs['canSAS_class'] = 'SASdata'
-        nxdata.attrs['signal'] = 'I'      # Y axis of default plot
-        nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
-        #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
-
-        # Y axis data
-        ds = nxdata.create_dataset('I', data=SMR_Int)
-        ds.attrs['units'] = '1/cm'
-        ds.attrs['uncertainties'] = 'Idev'
-        ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
-        ds.attrs['Kfactor'] = Kfactor
-        ds.attrs['OmegaFactor'] = OmegaFactor
-        ds.attrs['BlankName'] = BlankName
-        ds.attrs['thickness'] = thickness
-        ds.attrs['label'] = label
-
-        # X axis data
-        ds = nxdata.create_dataset('Q', data=SMR_Qvec)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
-        ds.attrs['resolutions'] = 'dQw, dQI'
-       
-        # d X axis data
-        ds = nxdata.create_dataset('dQw', data=SMR_dQ)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'dQw (A^-1)'           
-        # slitlength
-        ds = nxdata.create_dataset('dQI', data=slitLength)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'dQI (A^-1)'   
-        # dI axis data
-        ds = nxdata.create_dataset('Idev', data=SMR_Error)
-        ds.attrs['units'] = 'cm2/cm3'
-        ds.attrs['long_name'] = 'Uncertainties'  
-
-        newDataPath = "entry/"+"QRS_data"
-        nxDataEntry = f.create_group(newDataPath)
-        # R_Int axis data
-        ds = nxdata.create_dataset('Intensity', data=R_Int)
-        ds.attrs['units'] = 'cm2/cm3'
-        ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
-        # R_Qvec axis data
-        ds = nxdata.create_dataset('Q', data=R_Qvec)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
-        # R_Error axis data
-        ds = nxdata.create_dataset('Error', data=R_Error)
-        ds.attrs['units'] = 'cm2/cm3'
-        ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
+            # X axis data
+            ds = nxdata.create_dataset('Q', data=Q)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['resolutions'] = 'Qdev'
         
+            # d X axis data
+            ds = nxdata.create_dataset('Qdev', data=dQ)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'   
+            # dI axis data
+            ds = nxdata.create_dataset('Idev', data=Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Uncertainties'  
+
+        if SMR_Int is not None:
+            logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
+            # add the SMR data
+            # create the NXsubentry group for Desmeared reduced data. 
+            newDataPath = "entry/"+SampleName+"_SMR"
+            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry.attrs['NX_class'] = 'NXsubentry'
+            nxDataEntry.attrs['canSAS_class'] = 'SASentry'
+            nxDataEntry.attrs['default'] = 'sasdata'
+            nxDataEntry.attrs['title'] = SampleName
+            #add definition as NXcanSas
+            nxDataEntry.create_dataset('definition', data='NXcanSAS')
+            #add title as NXcanSas
+            nxDataEntry.create_dataset('title', data=SampleName)
+            #add run (compulsory)
+            nxDataEntry.create_dataset('run', data="run_identifier")
+
+            # create the NXdata group for I(Q) for the avergaed data
+            nxdata = nxDataEntry.create_group('sasdata')
+            nxdata.attrs['NX_class'] = 'NXdata'
+            nxdata.attrs['canSAS_class'] = 'SASdata'
+            nxdata.attrs['signal'] = 'I'      # Y axis of default plot
+            nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
+            #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
+
+            # Y axis data
+            ds = nxdata.create_dataset('I', data=SMR_Int)
+            ds.attrs['units'] = '1/cm'
+            ds.attrs['uncertainties'] = 'Idev'
+            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['Kfactor'] = Kfactor
+            ds.attrs['OmegaFactor'] = OmegaFactor
+            ds.attrs['BlankName'] = BlankName
+            ds.attrs['thickness'] = thickness
+            ds.attrs['label'] = label
+
+            # X axis data
+            ds = nxdata.create_dataset('Q', data=SMR_Qvec)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['resolutions'] = 'dQw, dQI'
+        
+            # d X axis data
+            ds = nxdata.create_dataset('dQw', data=SMR_dQ)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'dQw (A^-1)'           
+            # slitlength
+            ds = nxdata.create_dataset('dQI', data=slitLength)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'dQI (A^-1)'   
+            # dI axis data
+            ds = nxdata.create_dataset('Idev', data=SMR_Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Uncertainties'  
+
+        if R_Int is not None:
+            logging.info(f"Wrote QRS group for file {filename}. ")
+            newDataPath = "entry/"+"QRS_data"
+            nxDataEntry = f.create_group(newDataPath)
+            # R_Int axis data
+            ds = nxdata.create_dataset('Intensity', data=R_Int)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+            # R_Qvec axis data
+            ds = nxdata.create_dataset('Q', data=R_Qvec)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
+            # R_Error axis data
+            ds = nxdata.create_dataset('Error', data=R_Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
+            
     
-    print("wrote file:", filename)
+    #print("wrote file:", filename)
 
+def readMyNXcanSAS(path, filename):
+    """
+    Read My own data from NXcanSAS data in Nexus file.
+    
+    Parameters:
+    path (str): The directory path where the file is located.
+    filename (str): The name of the Nexus file to read.
 
+    Returns:
+    dict: A dictionary containing the read data.
+    """
+    Sample = dict()
+    Filepath = os.path.join(path, filename)
+    with h5py.File(Filepath, 'r') as f:
+        # Start at the root
+        # Find the NXcanSAS entries 
+        location = 'entry/QRS_data/'
+        if location in f:
+            Sample['reducedData'] = dict()
+            location = 'entry/QRS_data/'
+            dataset = f[location+"R_int"]
+            if dataset is not None:
+                Sample['reducedData']['Intensity'] = dataset[()]
+            dataset = f[location+"R_Qvec"]
+            if dataset is not None:
+                Sample['reducedData']['Q'] = dataset[()]
+            dataset = f[location+"R_Error"]
+            if dataset is not None:
+                Sample['reducedData']['Error'] = dataset[()]
+     
+        location = 'entry/'+filename.split('.')[0]+'_SMR/'
+        if location in f:
+            Sample['CalibratedData'] = dict()
+            dataset = f[location + "I"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Int'] = dataset[()]
+            dataset = f[location + "Q"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Qvec'] = dataset[()]
+            dataset = f[location + "Idev"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Error'] = dataset[()]
+            dataset = f[location + "dQw"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_dQ'] = dataset[()]
+            dataset = f[location + "dQI"]
+            if dataset is not None:
+                Sample['CalibratedData']['slitLength'] = dataset[()]
+        
+        location = 'entry/'+filename.split('.')[0]+'/'
+        if location in f:
+            Sample['CalibratedData'] = dict()
+            Sample['RawData'] = dict()
+            Sample['RawData']['sample'] = dict()
+            dataset = f[location + "I"]
+            if dataset is not None:
+                Sample['CalibratedData']['Intensity'] = dataset[()]
+            dataset = f[location + "Q"]
+            if dataset is not None:
+                Sample['CalibratedData']['Q'] = dataset[()]
+            dataset = f[location + "Idev"]
+            if dataset is not None:
+                Sample['CalibratedData']['Error'] = dataset[()]
+            dataset = f[location + "Qdev"]
+            if dataset is not None:
+                Sample['CalibratedData']['dQ'] = dataset[()]            
+            dataset = f[location + "title"]
+            if dataset is not None:
+                Sample["RawData"]["sample"]["name"] = dataset[()]
+            attributes = f[location + "I"].attrs
+            Sample['CalibratedData']['units'] = attributes['units']
+            Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"]
+            Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"]
+            Sample['CalibratedData']['BlankName'] = attributes["BlankName"]
+            Sample['CalibratedData']['thickness'] = attributes["thickness"]
+            Sample["RawData"]["Filename"] = attributes["label"]
+
+        return Sample
 
 
 

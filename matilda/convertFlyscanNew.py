@@ -70,7 +70,7 @@ import logging
 
 from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from convertUSAXS import rebinData
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readNXcanSAS
+from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
@@ -97,7 +97,7 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
             if location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
-                logging.info(f"Deleted existing group with SMR` for file {filename}. ")
+                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
             location = 'entry/'+filename+'/'
             if location in hdf_file:
                 # Delete the group
@@ -105,14 +105,21 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                 logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
 
 
-        #Now, we will read the data from the file, if thye exist. Assume if NXcanSAS data exist, we can have all needed.. 
-        location = 'entry/'+filename+'/'
-        if location in hdf_file:
-            # exists, so lets reuse the data from the file
-            Sample = dict()
-            #Sample = load_dict_from_hdf5(hdf_file, location)
-            print("Used existing data")
-            return Sample
+        #Now, we will read the data from the file, if the exist. 
+        # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
+        # if BlankName=None, then we just need the QRS_data group.   
+        location = None
+        if blankFilename is not None and blankPath is not None:
+            location = 'entry/'+filename+'/'        # require we have desmeared data
+        else:
+            location = 'entry/QRS_data/'            # all we want here are QRS data
+        
+        if location is not None and location in hdf_file:
+                # exists, so lets reuse the data from the file
+                Sample = dict()
+                Sample = readMyNXcanSAS(path, filename)
+                logging.info(f"Using existing data for file {filename}. ")
+                return Sample
         
         else:
             Sample = dict()
@@ -440,7 +447,7 @@ def test_matildaLocal():
         #removed file
         saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
-        Data = readNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
+        Data = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
         pprint.pprint(Data)
         Sample = {}
         Sample['CalibratedData']=Data

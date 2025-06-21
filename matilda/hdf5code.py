@@ -121,20 +121,27 @@ def saveNXcanSAS(Sample,path, filename):
     Error = Sample["CalibratedData"]["Error"]
     dQ = Sample["CalibratedData"]["dQ"]
     units = Sample["CalibratedData"]["units"]
-    Kfactor = Sample["CalibratedData"]["Kfactor"]
-    OmegaFactor = Sample["CalibratedData"]["OmegaFactor"]
-    BlankName = Sample["CalibratedData"]["BlankName"]
-    thickness = Sample["CalibratedData"]["thickness"]
+    Kfactor = Sample["CalibratedData"]["Kfactor"] if "Kfactor" in Sample["CalibratedData"] else None
+    OmegaFactor = Sample["CalibratedData"]["OmegaFactor"] if "OmegaFactor" in Sample["CalibratedData"] else None
+    BlankName = Sample["CalibratedData"]["BlankName"] if "BlankName" in Sample["CalibratedData"] else None
+    thickness = Sample["CalibratedData"]["thickness"] if "thickness" in Sample["CalibratedData"] else None
     label = Sample["RawData"]["Filename"]
     timeStamp = Sample["RawData"]["metadata"]["timeStamp"]
     SampleName = Sample["RawData"]["sample"]["name"]
     SampleName = SampleName.decode('utf-8')
 
-    SMR_Int =Sample["CalibratedData"]["SMR_Int"]
-    SMR_Error =Sample["CalibratedData"]["SMR_Error"]
-    SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
-    SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-    slitLength=Sample["CalibratedData"]["slitLength"]
+    if "SMR_Int" in Sample["CalibratedData"]:
+        SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+        SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+        SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+        SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+        slitLength=Sample["CalibratedData"]["slitLength"]
+    else:
+        SMR_Int = None
+        SMR_Error = None
+        SMR_Qvec = None
+        SMR_dQ = None
+        slitLength = None
 
     R_Int = Sample["reducedData"]["Intensity"]
     R_Qvec = Sample["reducedData"]["Q"]
@@ -204,11 +211,14 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['units'] = '1/cm'
             ds.attrs['uncertainties'] = 'Idev'
             ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
-            ds.attrs['Kfactor'] = Kfactor
-            ds.attrs['OmegaFactor'] = OmegaFactor
             ds.attrs['BlankName'] = BlankName
             ds.attrs['thickness'] = thickness
             ds.attrs['label'] = label
+            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+            if Kfactor is not None:
+                ds.attrs['Kfactor'] = Kfactor
+            if OmegaFactor is not None:
+                ds.attrs['OmegaFactor'] = OmegaFactor
 
             # X axis data
             ds = nxdata.create_dataset('Q', data=Q)
@@ -395,11 +405,11 @@ def readMyNXcanSAS(path, filename):
                 Sample["RawData"]["sample"]["name"] = dataset[()]
             attributes = f[location + "sasdata/I"].attrs
             Sample['CalibratedData']['units'] = attributes['units']
-            Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"]
-            Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"]
             Sample['CalibratedData']['BlankName'] = attributes["BlankName"]
             Sample['CalibratedData']['thickness'] = attributes["thickness"]
             Sample["RawData"]["Filename"] = attributes["label"]
+            Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
+            Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
         else:
             Sample['CalibratedData'] = dict()
             Sample['RawData'] = dict()

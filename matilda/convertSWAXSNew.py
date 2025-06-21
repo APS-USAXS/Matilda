@@ -122,11 +122,13 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
                 # Sample["CalibratedData"]["units"]
                 # blankName = Sample["calib2DData"]["BlankName"]
             else:
+                Sample["CalibratedData"]=dict()
                 Sample["CalibratedData"]["Q"] = None
                 Sample["CalibratedData"]["dQ"] = None
                 Sample["CalibratedData"]["Intensity"] = None
                 Sample["CalibratedData"]["Error"] = None
                 Sample["CalibratedData"]["units"] = None
+                Sample["calib2DData"]=dict()
                 Sample["calib2DData"]["BlankName"] = None
 
         hdf_file.flush()
@@ -155,7 +157,7 @@ def importADData(path, filename):
                             'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
                             'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
                             'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
-                            'scaler_freq'                     
+                            'scaler_freq', 'StartTime',                     
                         ]        
             metadata_group = hdf_file['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
@@ -172,6 +174,8 @@ def importADData(path, filename):
             Sample["RawData"]["metadata"] = metadata_dict
             Sample["RawData"]["sample"] = sample_dict
             Sample["RawData"]["control"] = control_dict
+            #path different names between SWAXS and USAXS
+            Sample["RawData"]["metadata"]["timeStamp"]=Sample["RawData"]["metadata"]["StartTime"]
             #logging.info(f"Finished reading data")
             #logging.info(f"Read data")
             return Sample
@@ -340,8 +344,12 @@ def reduceADData(Sample, useRawData=True):
         result["Intensity"] = intensity
         result["Error"] = sigma
         result["sampleName"]=sampleName
-        result["blankName"]=blankName
+        result["BlankName"]=blankName
         result["units"]="[cm2/cm3]"
+        #and these are for compatiblity with USAXS
+        result["Kfactor"]=None
+        result["OmegaFactor"]=None
+        result["thickness"] = Sample["RawData"]["sample"]["thickness"] if "thickness" in Sample["RawData"]["sample"] else None
         return result
 
 # def reduceADToQR(path, filename):

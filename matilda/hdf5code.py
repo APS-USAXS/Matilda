@@ -346,7 +346,7 @@ def readMyNXcanSAS(path, filename):
         # location is the first of entries from SASentries which contains string _SMR
         location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
         #print(f"Found SMR entry at: {location}")
-        if location in f:
+        if location is not None and location in f:
             Sample['CalibratedData'] = dict()
             dataset = f[location + "sasdata/I"]
             if dataset is not None:
@@ -363,10 +363,18 @@ def readMyNXcanSAS(path, filename):
             dataset = f[location + "sasdata/dQI"]
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset[()]
-        
+        else:
+            Sample['CalibratedData'] = dict()
+            Sample["CalibratedData"] ["SMR_Qvec"] = None,
+            Sample["CalibratedData"] ["SMR_Int"] = None,
+            Sample["CalibratedData"] ["SMR_Error"] = None,
+            Sample["CalibratedData"] ["SMR_dQ"] = None,
+            Sample["CalibratedData"] ["slitLength"] = None,
+
+     
         location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         #print(f"Found NXcanSAS entry at: {location}")
-        if location in f:
+        if location is not None and location in f:
             Sample['CalibratedData'] = dict()
             Sample['RawData'] = dict()
             Sample['RawData']['sample'] = dict()
@@ -392,7 +400,22 @@ def readMyNXcanSAS(path, filename):
             Sample['CalibratedData']['BlankName'] = attributes["BlankName"]
             Sample['CalibratedData']['thickness'] = attributes["thickness"]
             Sample["RawData"]["Filename"] = attributes["label"]
+        else:
+            Sample['CalibratedData'] = dict()
+            Sample['RawData'] = dict()
+            Sample["RawData"]["Filename"] = filename
+            Sample["RawData"]["sample"] = dict()
+            Sample['CalibratedData']['Intensity'] = None
+            Sample['CalibratedData']['Q'] = None
+            Sample['CalibratedData']['Error'] = None
+            Sample['CalibratedData']['Kfactor'] = None
+            Sample['CalibratedData']['OmegaFactor'] = None
+            Sample['CalibratedData']['BlankName'] = None
+            Sample['CalibratedData']['thickness'] = None
+            Sample['CalibratedData']['units'] = None
+            Sample['CalibratedData']['Error'] = None
 
+     
         return Sample
 
 

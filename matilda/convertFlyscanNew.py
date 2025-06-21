@@ -56,7 +56,7 @@ MinQMinFindRatio = 1.05
 # Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
-def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
+def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
@@ -67,17 +67,17 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
         if deleteExisting:
             # Delete the groups which may have een created by previously run saveNXcanSAS
             location = 'entry/QRS_data/'
-            if location in hdf_file:
+            if location is not None and location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
                 logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
             location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
-            if location in hdf_file:
+            if location is not None and location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
                 logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
             location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-            if location in hdf_file:
+            if location is not None and location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
                 logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
@@ -115,7 +115,7 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                                     Sample["RawData"]["TimePerPoint"],
                                                     replaceNans=True))                 
 
-            if blankPath is not None and blankFilename is not None:               
+            if blankPath is not None and blankFilename is not None and blankFilename != filename:               
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
@@ -148,6 +148,7 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                 Sample["CalibratedData"] = {"SMR_Qvec":None,
                                             "SMR_Int":None,
                                             "SMR_Error":None,
+                                            "SMR_dQ":None,
                                             "Kfactor":None,
                                             "OmegaFactor":None,
                                             "BlankName":None,
@@ -157,6 +158,7 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                             "Q":None,
                                             "Error":None,
                                             "dQ":None,
+                                            "slitLength":None,
                                             }
         # Ensure all changes are written and close the HDF5 file
         hdf_file.flush()

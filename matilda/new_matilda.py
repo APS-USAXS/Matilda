@@ -25,7 +25,7 @@ from supportFunctions import findProperBlankScan
 default_plt_font_size = 7
 #imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 imagePath = '/home/parallels/Desktop/'  # Path to save images
-recalculateAllData = True
+recalculateAllData = False
 
     
     
@@ -180,10 +180,11 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
     plt.figure(figsize=style["figsize"])
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
-        label = data_dict["RawData"]["Filename"]
-        Q_array = data_dict["CalibratedData"]["Q"]
-        UPD = data_dict["CalibratedData"]["Intensity"]
-        plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+        if data_dict["CalibratedData"]["Intensity"] is not None:
+            label = data_dict["RawData"]["Filename"]
+            Q_array = data_dict["CalibratedData"]["Q"]
+            UPD = data_dict["CalibratedData"]["Intensity"]
+            plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
 
     plt.title(style["title"])
     plt.xlabel(style["xlabel"])
@@ -290,7 +291,19 @@ if __name__ == "__main__":
     #ListOfScans = FindLastScanData("Flyscan",1,0)
     ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                    'R6016HRC_T4_V_1077.h5'],
-    ]
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'R6016HRC_T4_H_V_1084.h5'],
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'R6016HRC_RB_H_1085.h5'],
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'R6016ACT_T4_V_H_1086.h5'],
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'R6016ACT_T4_H_V_1087.h5'],
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'R6016HRC_T4_V_H_1083.h5'],
+                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                   'AirBlank_1076.h5'],
+                   ]
                    #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                    #'AirBlank_1076.h5'],]
     path, filename = ListOfScans[0]

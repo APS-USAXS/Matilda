@@ -5,6 +5,7 @@ import numpy as np
 import logging
 import os
 import copy
+import re
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt

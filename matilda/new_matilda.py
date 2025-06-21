@@ -17,6 +17,7 @@ import datetime
 from convertUSAXS import reduceStepScanToQR
 from readfromtiled import FindLastScanData, FindLastBlankScan
 from convertFlyscanNew import processFlyscan,reduceFlyscanToQR
+from convertSWAXSNew import process2Ddata
 #from developNewStepScan import processStepScan
 from convertSAS import reduceADToQR
 from supportFunctions import findProperBlankScan
@@ -58,18 +59,18 @@ logging.basicConfig(
 
 # Here we process different types of scans
 # Process the Flyscan data files
-def processFlyscans(ListOfScans):
-    results=[]
-    for scan in ListOfScans:
-        path = scan[0]
-        filename = scan[1]
-        #print(f"Processing file: {filename}")
-        try:
-            results.append(reduceFlyscanToQR(path, filename))
-        except:
-            pass
-    #print("Done processing the Flyscans")
-    return results
+# def processFlyscans(ListOfScans):
+#     results=[]
+#     for scan in ListOfScans:
+#         path = scan[0]
+#         filename = scan[1]
+#         #print(f"Processing file: {filename}")
+#         try:
+#             results.append(reduceFlyscanToQR(path, filename))
+#         except:
+#             pass
+#     #print("Done processing the Flyscans")
+#     return results
 
 # Process the step scan data files
 def processStepscans(ListOfScans):
@@ -98,6 +99,44 @@ def processSASdata(ListOfScans):
             pass
     #print("Done processing the AD data")
     return results
+
+def processADscans(ListOfScans, ListOfBlanks):
+    """
+    Processes a list of SAXS/WAXS data, finding the appropriate blank for each.
+    The correct blank is in the same path and has the largest number XYZ
+    that is smaller than the sample's number.
+    """
+    results=[]
+    logging.info("Starting processing of SAXS/WAXS with blanks")    
+    for scan_path, scan_filename in ListOfScans:
+        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+        result = process2Ddata(scan_path, scan_filename,
+                                    blankPath=selected_blank_path,
+                                    blankFilename=selected_blank_filename,
+                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+        results.append(result)
+    return results
+
+def processFlyscans(ListOfScans, ListOfBlanks):
+    """
+    Processes a list of flyscans, finding the appropriate blank for each.
+    The correct blank is in the same path and has the largest number XYZ
+    that is smaller than the sample's number.
+    """
+    results=[]
+    logging.info("Starting processing of flyscans with blanks")    
+    for scan_path, scan_filename in ListOfScans:
+        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+        result = processFlyscan(scan_path, scan_filename,
+                                    blankPath=selected_blank_path,
+                                    blankFilename=selected_blank_filename,
+                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+        results.append(result)
+        #except Exception as e:
+        #    logging.error(f"Error processing scan {scan_filename} with blank {selected_blank_filename}: {e}")
+    return results
+
+
 
 def get_usaxs_r_plot_style():
     """
@@ -205,78 +244,114 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
 
 
 
-# def plotSWAXSResults(ListOfresults, isSAXS = True):  
-#     # Number of data sets
-#     num_data_sets = len(ListOfresults)
-#     # Choose a colormap
-#     cmap = plt.get_cmap('viridis')
-#     # Generate colors from the colormap
-#     colors = [cmap(i) for i in np.linspace(0, 1, num_data_sets)]
+def plotSWAXSResults(ListOfresults, isSAXS = True):  
+    # Number of data sets
+    num_data_sets = len(ListOfresults)
+    # Choose a colormap
+    cmap = plt.get_cmap('viridis')
+    # Generate colors from the colormap
+    colors = [cmap(i) for i in np.linspace(0, 1, num_data_sets)]
 
-#     # Set the font size to specific size
-#     plt.rcParams['font.size'] = default_plt_font_size 
+    # Set the font size to specific size
+    plt.rcParams['font.size'] = default_plt_font_size 
 
-#     # Plot ydata against xdata
-#     plt.figure(figsize=(6, 6))
-#     for i, color in zip(range(len(ListOfresults)),colors):
-#         data_dict = ListOfresults[i]
-#         label = data_dict["RawData"]["Filename"]
-#         Q_array = data_dict["reducedData"]["Q_array"]
-#         UPD = data_dict["reducedData"]["Intensity"]
-#         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
-#     plt.ylabel('Intensity')   
-#     if isSAXS:
-#         plt.title('Plot of SAXS Intensity vs. Q')   
-#         plt.xlabel('log(Q) [1/A]')
-#         plt.xscale('log')
-#         plt.yscale('log')
-#         #plt.xlim(1e-5, 1)
-#         plt.grid(True)
-#         # Add legend
-#         plt.legend()
-#         current_hostname = socket.gethostname()
-#         if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-#             plt.savefig('/home/joule/WEBUSAXS/www_live/saxs.jpg', format='jpg', dpi=300)
-#             plt.close()
-#         else:
-#             plt.savefig('saxs.jpg', format='jpg', dpi=300)
-#         plt.show()
-#     else:
-#         plt.title('Plot of WAXS Intensity vs. Q')   
-#         plt.xlabel('Q [1/A]')
-#         plt.xscale('linear')
-#         plt.yscale('linear')        
-#         #plt.xlim(1e-5, 1)
-#         plt.grid(True)
-#         # Add legend
-#         plt.legend()
-#         # Save the plot as a JPEG image
-#         current_hostname = socket.gethostname()
-#         if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-#             plt.savefig('/home/joule/WEBUSAXS/www_live/waxs.jpg', format='jpg', dpi=300)
-#             plt.close()
-#         else:
-#             plt.savefig('waxs.jpg', format='jpg', dpi=300)
-#         plt.show()
+    # Plot ydata against xdata
+    plt.figure(figsize=(6, 6))
+    for i, color in zip(range(len(ListOfresults)),colors):
+        data_dict = ListOfresults[i]
+        label = data_dict["RawData"]["Filename"]
+        Q_array = data_dict["reducedData"]["Q_array"]
+        UPD = data_dict["reducedData"]["Intensity"]
+        plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+    plt.ylabel('Intensity')   
+    if isSAXS:
+        plt.title('Plot of SAXS Intensity vs. Q')   
+        plt.xlabel('log(Q) [1/A]')
+        plt.xscale('log')
+        plt.yscale('log')
+        #plt.xlim(1e-5, 1)
+        plt.grid(True)
+        # Add legend
+        plt.legend()
+        # Save the plot as a JPEG image
+        plt.savefig(os.path.join(imagePath, 'saxs.jpg'), format='jpg', dpi=300)
+        #plt.show()
+        plt.close()
 
-def processFlyscans(ListOfScans, ListOfBlanks):
-    """
-    Processes a list of flyscans, finding the appropriate blank for each.
-    The correct blank is in the same path and has the largest number XYZ
-    that is smaller than the sample's number.
-    """
-    results=[]
-    logging.info("Starting processing of flyscans with blanks")    
-    for scan_path, scan_filename in ListOfScans:
-        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
-        result = processFlyscan(scan_path, scan_filename,
-                                    blankPath=selected_blank_path,
-                                    blankFilename=selected_blank_filename,
-                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
-        results.append(result)
-        #except Exception as e:
-        #    logging.error(f"Error processing scan {scan_filename} with blank {selected_blank_filename}: {e}")
-    return results
+        # Get plot styling
+        style = get_usaxs_cal_plot_style()
+        # Set the font size to specific size
+        plt.rcParams['font.size'] = style["font_size"]
+
+        # Plot ydata against xdata
+        plt.figure(figsize=style["figsize"])
+        for i, color in zip(range(len(ListOfresults)),colors):
+            data_dict = ListOfresults[i]
+            if data_dict["CalibratedData"]["Intensity"] is not None:
+                label = data_dict["RawData"]["Filename"]
+                Q_array = data_dict["CalibratedData"]["Q"]
+                Intensity = data_dict["CalibratedData"]["Intensity"]
+                plt.plot(Q_array, Intensity, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+
+        plt.title(style["title"])
+        plt.xlabel(style["xlabel"])
+        plt.ylabel(style["ylabel"])
+        plt.xscale(style["xscale"])
+        plt.yscale(style["yscale"])
+        plt.xlim(style["xlim"])
+        plt.grid(style["grid"])
+        # Add legend
+        plt.legend()
+        # Save the plot as a JPEG image
+        plt.savefig(os.path.join(imagePath, 'saxs_cal.jpg'), format='jpg', dpi=300)
+        #plt.show()
+        plt.close()
+
+
+
+
+    else:
+        plt.title('Plot of WAXS Intensity vs. Q')   
+        plt.xlabel('Q [1/A]')
+        plt.xscale('linear')
+        plt.yscale('linear')        
+        #plt.xlim(1e-5, 1)
+        plt.grid(True)
+        # Add legend
+        plt.legend()
+        # Save the plot as a JPEG image
+        plt.savefig(os.path.join(imagePath, 'waxs_cal.jpg'), format='jpg', dpi=300)
+        #plt.show()
+        plt.close()
+
+        # Get plot styling
+        style = get_usaxs_cal_plot_style()
+        # Set the font size to specific size
+        plt.rcParams['font.size'] = style["font_size"]
+
+        # Plot ydata against xdata
+        plt.figure(figsize=style["figsize"])
+        for i, color in zip(range(len(ListOfresults)),colors):
+            data_dict = ListOfresults[i]
+            if data_dict["CalibratedData"]["Intensity"] is not None:
+                label = data_dict["RawData"]["Filename"]
+                Q_array = data_dict["CalibratedData"]["Q"]
+                Intensity = data_dict["CalibratedData"]["Intensity"]
+                plt.plot(Q_array, Intensity, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+
+        plt.title(style["title"])
+        plt.xlabel(style["xlabel"])
+        plt.ylabel(style["ylabel"])
+        plt.xscale(style["xscale"])
+        plt.yscale(style["yscale"])
+        plt.xlim(style["xlim"])
+        plt.grid(style["grid"])
+        # Add legend
+        plt.legend()
+        # Save the plot as a JPEG image
+        plt.savefig(os.path.join(imagePath, 'waxs_cal.jpg'), format='jpg', dpi=300)
+        #plt.show()
+        plt.close()
 
 
 
@@ -287,37 +362,69 @@ if __name__ == "__main__":
     #logging.info("New round of processing started at : %s", datetime.datetime.now()) 
     #print("New round of processing started at : ", datetime.datetime.now()) 
     #logging.info('Processing the Flyscans')
-    print("Processing the Flyscans")
+    # print("Processing the Flyscans")
+    # #ListOfScans = FindLastScanData("Flyscan",1,0)
+    # ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016HRC_T4_V_1077.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016HRC_T4_H_V_1084.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016HRC_RB_H_1085.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016ACT_T4_V_H_1086.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016ACT_T4_H_V_1087.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'R6016HRC_T4_V_H_1083.h5'],
+    #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'AirBlank_1076.h5'],
+    #                ]
+    #                #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                #'AirBlank_1076.h5'],]
+    # path, filename = ListOfScans[0]
+    # #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
+    # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    #                'AirBlank_1076.h5']]
+    # print(f'Got list : {ListOfScans}')
+    # print(f'Got blank list : {listOfBlanks}')
+    
+    # results = processFlyscans(ListOfScans, listOfBlanks)
+    
+    # plotUSAXSResults(results, isFlyscan=True)  
+        
+
+
+    print("Processing the SAXS")
     #ListOfScans = FindLastScanData("Flyscan",1,0)
-    ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016HRC_T4_V_1077.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016HRC_T4_H_V_1084.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016HRC_RB_H_1085.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016ACT_T4_V_H_1086.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016ACT_T4_H_V_1087.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'R6016HRC_T4_V_H_1083.h5'],
-                   ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                   'AirBlank_1076.h5'],
-                   ]
+    ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
+                   'R6016HRC_T4_V_1077.h5'],]
+    
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'R6016HRC_T4_H_V_1084.h5'],
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'R6016HRC_RB_H_1085.h5'],
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'R6016ACT_T4_V_H_1086.h5'],
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'R6016ACT_T4_H_V_1087.h5'],
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'R6016HRC_T4_V_H_1083.h5'],
+                #    ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+                #    'AirBlank_1076.h5'],
+                #    ]
                    #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                    #'AirBlank_1076.h5'],]
     path, filename = ListOfScans[0]
     #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
-    listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
+    listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
                    'AirBlank_1076.h5']]
     print(f'Got list : {ListOfScans}')
     print(f'Got blank list : {listOfBlanks}')
     
-    results = processFlyscans(ListOfScans, listOfBlanks)
+    results = processADscans(ListOfScans, listOfBlanks)
     
-    plotUSAXSResults(results, isFlyscan=True)  
-        
-    
+    plotSWAXSResults(results, isSAXS = True)  
+
     #print(f'Got results : {results}')
     #processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
     # returns dictionary of this type:

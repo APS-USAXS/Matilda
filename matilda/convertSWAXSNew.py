@@ -31,16 +31,18 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from pyFAI.integrator.azimuthal import AzimuthalIntegrator
 import h5py
-from supportFunctions import read_group_to_dict, filter_nested_dict
 import pprint as pp
 import socket
 import os
 import tifffile as tiff
 import logging
+
+from supportFunctions import read_group_to_dict, filter_nested_dict, subtract_data
 from convertNikaTopyFAI import convert_Nika_to_Fit2D
 from readfromtiled import FindLastBlankScan
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5
+from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
+recalculateAllData = True
 
 # TODO: split into multiple steps as needed
 # Import images for sample and blank as separate calls and get sample and blank objects
@@ -52,39 +54,42 @@ from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5
 
 
 ## main code here
-def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExisting=False):
+def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-        # Check if the group 'displayData' exists
-        # if deleteExisting:
-        #     # Delete the group
-        #     del hdf_file[location]
-        #     print("Deleted existing group 'entry/displayData'.")
+        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
+        if deleteExisting:
+            # Delete the groups which may have een created by previously run saveNXcanSAS
+            location = 'entry/QRS_data/'
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
+            location = SASentries[0] if len(SASentries) > 0 else None
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
 
-        if location in hdf_file:
+
+        NXcanSASentry = SASentries[0] if len(SASentries) > 0 else None
+        if blankFilename is not None and blankPath is not None:
+            location = NXcanSASentry                 # require we have calibrated data
+        else:
+            location = 'entry/QRS_data/'            # all we want here are QRS data
+
+        if location is not None and location in hdf_file:
             # exists, so lets reuse the data from the file
             Sample = dict()
-            Sample = load_dict_from_hdf5(hdf_file, location)
-            print("Used existing data")
-            q = Sample["reducedData"]["Q_array"]
-            intensity = Sample["reducedData"]["Intensity"]
-            error = Sample["reducedData"]["Error"]
-            qcalib= Sample["calib1Ddata"]["Q"]
-            intcalib= Sample["calib1Ddata"]["Intensity"]
-            errcalib= Sample["calib1Ddata"]["Error"]
-            result = {"Int_raw":np.ravel(intensity), 
-                      "Q_raw":np.ravel(q),    
-                      "Error_raw":np.ravel(error),
-                      "Intensity":np.ravel(intcalib),
-                      "Q":np.ravel(qcalib),
-                      "Error":np.ravel(errcalib),
-                      }  
-            #TODO: create fake structure of Sample dictionary here to match output of reading
-            # will depend on how we store stuff in the hdf5 file... 
-            #TODO : pass around also name of the sample and name of the Blank 
-            return result
+            Sample = readMyNXcanSAS(path, filename)
+            logging.info(f"Using existing data for file {filename}. ")
+            print(f"Using existing data for file {filename}. ")
+            return Sample
         
         
         else:
@@ -94,53 +99,41 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
                 plan_name="SAXS"
             else:
                 plan_name="WAXS"
-            #TODO: write function returning Blank path and file names. 
-            # this needs to be hoisted up the chain in teh future
-            current_hostname = socket.gethostname()
-            if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-                blankPath, blankFilename = FindLastBlankScan(plan_name,NumScans=1)
-            else:
-                if plan_name == "SAXS":
-                    blankPath=path
-                    blankFilename="HeaterBlank_0060.hdf"
-                else:
-                    blankPath=path
-                    blankFilename="HeaterBlank_0060.hdf"    
-            #end of block moving up later
 
             Sample["reducedData"] = reduceADData(Sample, useRawData=True)   #this generates Int vs Q for raw data plot
-            q = Sample["reducedData"]["Q"]
-            intensity = Sample["reducedData"]["Intensity"]
-            error = Sample["reducedData"]["Error"]            
-            sampleName = Sample["RawData"]["SampleName"]
+            # q = Sample["reducedData"]["Q"]
+            # intensity = Sample["reducedData"]["Intensity"]
+            # error = Sample["reducedData"]["Error"]            
+            # sampleName = Sample["RawData"]["SampleName"]
             
             if blankPath is not None and blankFilename is not None:               
-                blank = importADData(blankPath, blankFilename)    #this is for blank path and blank, need to find them somehow
+                blank = importADData(blankPath, blankFilename)               #this is for blank path and blank name
                 Sample["calib2DData"] = calibrateAD2DData(Sample, blank)
-                Sample["calib1Ddata"] = reduceADData(Sample, useRawData=False)  #this generates Calibrated 1D data.
-                #append the data here into the hdf5 file for future use, do not append 2D data to save space,  
-                qcalib= Sample["calib1Ddata"]["Q"]
-                intcalib= Sample["calib1Ddata"]["Intensity"]
-                errcalib= Sample["calib1Ddata"]["Error"]
-                blankName = Sample["calib2DData"]["BlankName"]
+                #returns 2D calibrated data
+                    # result = {"data":calib2Ddata,
+                    #           "BlankName":blankName,
+                    #           "transmission":transmission
+                Sample["CalibratedData"] = reduceADData(Sample, useRawData=False)  #this generates Calibrated 1D data.
+                #returns :   
+                # qcalib= Sample["CalibratedData"]["Q"]
+                # dqcalib= Sample["CalibratedData"]["dQ"]
+                # intcalib= Sample["CalibratedData"]["Intensity"]
+                # errcalib= Sample["CalibratedData"]["Error"]
+                # Sample["CalibratedData"]["units"]
+                # blankName = Sample["calib2DData"]["BlankName"]
             else:
-                qcalib= None
-                intcalib= None
-                errcalib= None
-                blankName = None
+                Sample["CalibratedData"]["Q"] = None
+                Sample["CalibratedData"]["dQ"] = None
+                Sample["CalibratedData"]["Intensity"] = None
+                Sample["CalibratedData"]["Error"] = None
+                Sample["CalibratedData"]["units"] = None
+                Sample["calib2DData"]["BlankName"] = None
 
-
-            result=dict()
-            result["SampleName"]=sampleName
-            result["BlankName"]=blankName
-            result["reducedData"] =  {"Intensity":np.ravel(intensity), 
-                              "Q":np.ravel(q),
-                              "Error":np.ravel(error)}
-            result["CalibratedData"] = {"Intensity":np.ravel(intcalib),
-                                    "Q":np.ravel(qcalib),
-                                    "Error":np.ravel(errcalib),
-                                    }  
-            return result
+        hdf_file.flush()
+        # The 'with' statement will automatically close the file when the block ends
+    
+    saveNXcanSAS(Sample,path, filename)
+    return Sample
 
 
 
@@ -335,21 +328,20 @@ def reduceADData(Sample, useRawData=True):
         #npt = 1000  # Number of bins, if should be lower
         # Perform azimuthal integration
         q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, error_model="poisson", unit="q_A^-1")
-        ##if res.sigma is None:
-        #     q, intensity = res
-        # else:
-        #     q, intensity, sigma = res
+        # fake q resolution as distrance between the subsequent q poiints
+        dQ = np.zeros_like(q)
+        dQ[1:-1] = 0.5 * (q[2:] - q[:-2])
+        dQ[0] = q[1] - q[0]
+        dQ[-1] = q[-1] - q[-2]
         #logging.info(f"Finished 2d to 1D conversion")
         result = dict()
         result["Q"] = q
+        result["dQ"] = dQ
         result["Intensity"] = intensity
         result["Error"] = sigma
         result["sampleName"]=sampleName
         result["blankName"]=blankName
-        #save_dict_to_hdf5(Sample, location, hdf_file)
-        #print("Appended new data to 'entry/displayData'.")
-        #result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
-        #return result
+        result["units"]="[cm2/cm3]"
         return result
 
 # def reduceADToQR(path, filename):

@@ -143,7 +143,8 @@ def saveNXcanSAS(Sample,path, filename):
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
-    with h5py.File(Filepath, "w") as f:
+    print(f"Saving NXcanSAS data to {Filepath}")
+    with h5py.File(Filepath, "a") as f:
         # point to the default data to be plotted
         f.attrs['default']          = 'entry'   #our files have one entry input.
         # these are hopefullyoptional and useful. 
@@ -162,14 +163,22 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry = f['entry']
         nxentry.attrs['NX_class'] = 'NXentry'
         nxentry.attrs['default']  = SampleName   #modify with the most reduced data.
+        
         #add definition as NXsas - this is location of raw AND reduced data
+        # Check if 'definition' dataset exists in the entry group and delete it if present
+        if 'definition' in nxentry:
+            del nxentry['definition']
         nxentry.create_dataset('definition', data='NXsas')
-        # other groups shoudl be here from RAW data, so ignore. 
+        # other groups should be here from RAW data, so ignore. 
 
         if Intensity is not None:
             logging.info(f"Wrote Desmeared NXcanSAS group for file {filename}. ")
             # create the NXsubentry group for Desmeared reduced data. 
             newDataPath = "entry/"+SampleName
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+            
             nxDataEntry = f.create_group(newDataPath)
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
@@ -221,6 +230,10 @@ def saveNXcanSAS(Sample,path, filename):
             # add the SMR data
             # create the NXsubentry group for Desmeared reduced data. 
             newDataPath = "entry/"+SampleName+"_SMR"
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+
             nxDataEntry = f.create_group(newDataPath)
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
@@ -274,17 +287,21 @@ def saveNXcanSAS(Sample,path, filename):
         if R_Int is not None:
             logging.info(f"Wrote QRS group for file {filename}. ")
             newDataPath = "entry/"+"QRS_data"
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+
             nxDataEntry = f.create_group(newDataPath)
             # R_Int axis data
-            ds = nxdata.create_dataset('Intensity', data=R_Int)
+            ds = nxDataEntry.create_dataset('Intensity', data=R_Int)
             ds.attrs['units'] = 'cm2/cm3'
             ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
             # R_Qvec axis data
-            ds = nxdata.create_dataset('Q', data=R_Qvec)
+            ds = nxDataEntry.create_dataset('Q', data=R_Qvec)
             ds.attrs['units'] = '1/angstrom'
             ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
             # R_Error axis data
-            ds = nxdata.create_dataset('Error', data=R_Error)
+            ds = nxDataEntry.create_dataset('Error', data=R_Error)
             ds.attrs['units'] = 'cm2/cm3'
             ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
             
@@ -307,60 +324,68 @@ def readMyNXcanSAS(path, filename):
     with h5py.File(Filepath, 'r') as f:
         # Start at the root
         # Find the NXcanSAS entries 
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(f, required_attributes, required_items)
+        #print(f"Found {SASentries} entries in the file:{filename}")
+              
         location = 'entry/QRS_data/'
         if location in f:
             Sample['reducedData'] = dict()
-            location = 'entry/QRS_data/'
-            dataset = f[location+"R_int"]
+            dataset = f[location + "Intensity"]
             if dataset is not None:
                 Sample['reducedData']['Intensity'] = dataset[()]
-            dataset = f[location+"R_Qvec"]
+            dataset = f[location + "Q"]
             if dataset is not None:
                 Sample['reducedData']['Q'] = dataset[()]
-            dataset = f[location+"R_Error"]
+            dataset = f[location + "Error"]
             if dataset is not None:
                 Sample['reducedData']['Error'] = dataset[()]
      
-        location = 'entry/'+filename.split('.')[0]+'_SMR/'
+        #location = 'entry/'+filename.split('.')[0]+'_SMR/'
+        # location is the first of entries from SASentries which contains string _SMR
+        location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
+        #print(f"Found SMR entry at: {location}")
         if location in f:
             Sample['CalibratedData'] = dict()
-            dataset = f[location + "I"]
+            dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_Int'] = dataset[()]
-            dataset = f[location + "Q"]
+            dataset = f[location + "sasdata/Q"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_Qvec'] = dataset[()]
-            dataset = f[location + "Idev"]
+            dataset = f[location + "sasdata/Idev"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_Error'] = dataset[()]
-            dataset = f[location + "dQw"]
+            dataset = f[location + "sasdata/dQw"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_dQ'] = dataset[()]
-            dataset = f[location + "dQI"]
+            dataset = f[location + "sasdata/dQI"]
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset[()]
         
-        location = 'entry/'+filename.split('.')[0]+'/'
+        location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+        #print(f"Found NXcanSAS entry at: {location}")
         if location in f:
             Sample['CalibratedData'] = dict()
             Sample['RawData'] = dict()
             Sample['RawData']['sample'] = dict()
-            dataset = f[location + "I"]
+            dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['Intensity'] = dataset[()]
-            dataset = f[location + "Q"]
+            dataset = f[location + "sasdata/Q"]
             if dataset is not None:
                 Sample['CalibratedData']['Q'] = dataset[()]
-            dataset = f[location + "Idev"]
+            dataset = f[location + "sasdata/Idev"]
             if dataset is not None:
                 Sample['CalibratedData']['Error'] = dataset[()]
-            dataset = f[location + "Qdev"]
+            dataset = f[location + "sasdata/Qdev"]
             if dataset is not None:
                 Sample['CalibratedData']['dQ'] = dataset[()]            
             dataset = f[location + "title"]
             if dataset is not None:
                 Sample["RawData"]["sample"]["name"] = dataset[()]
-            attributes = f[location + "I"].attrs
+            attributes = f[location + "sasdata/I"].attrs
             Sample['CalibratedData']['units'] = attributes['units']
             Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"]
             Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"]

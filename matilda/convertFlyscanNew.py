@@ -4,59 +4,34 @@ TODO:
     convertFlyscancalibrated.py
 New, calibrated Flyscan code. 
     use: 
-processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
+processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)
         For example of use see: test_matildaLocal() at the end of this file. 
 
-    returns dictionary of this type:
-            result["SampleName"]=sampleName
-            result["BlankName"]=blankName
-            result["reducedData"] =  {"Intensity":np.ravel(intensity), 
-                              "Q":np.ravel(q),
-                              "Error":np.ravel(error)}
-            result["CalibratedData"] = {"Intensity":np.ravel(intcalib),
-                                    "Q":np.ravel(qcalib),
-                                    "Error":np.ravel(errcalib),
-                                   }  
-
-            this is when read from Nexus file. TODO: check and make sure it all works...  
-                    {'BlankName': 'TapeBlank_R_0317.h5',
-                'Error': array([5.41821571e+08, 3.61214381e+08, 1.80607190e+08, 1.45182650e+08,
-                    8.21066769e+07, 5.28638233e+07, 9.31836113e+07, 3.44934716e+07,
-                        ...
-                    3.70688211e-02, 3.70688211e-02, 3.70688211e-02]),
-                'Error_Attributes': <Attributes of closed HDF5 object>,
-                'Int_attributes': <Attributes of closed HDF5 object>,
-                'Intensity': array([4.52126415e+09, 3.89536685e+09, 3.08490075e+09, 2.58092468e+09,
-                    2.16199554e+09, 1.83504586e+09, 1.49810441e+09, 1.31218746e+09,
-                        ...
-                    3.24382536e-01, 3.68735659e-01, 2.65436440e-01]),
-                'Kfactor': np.float64(1.5194820557062783e-12),
-                'OmegaFactor': np.float64(4.171381472542379e-08),
-                'Q': array([1.05916862e-04, 1.09962784e-04, 1.14017257e-04, 1.18080210e-04,
-                    1.22151570e-04, 1.26231272e-04, 1.30319251e-04, 1.34415446e-04,
-                        ...
-                    2.93847771e-01, 2.97917894e-01, 3.00031668e-01]),
-                'Q_attributes': <Attributes of closed HDF5 object>,
-                'dQ': array([4.04592188e-06, 4.04592188e-06, 4.05447384e-06, 4.06295227e-06,
-                    4.07136056e-06, 4.07970183e-06, 4.08797899e-06, 4.09619476e-06,
-                        ...
-                    8.06617937e-03, 8.17837508e-03, 8.17837508e-03]),
-                'dQ_Attributes': <Attributes of closed HDF5 object>,
-                'label': 'AB3_R_0318',
-                'thickness': np.float64(1.0),
-                'units': '1/cm'}
-
-
-
-
+        
    Does:
     Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
-    Decide if we need to do desmearing, not ready yet.   
-    TODO: 
-    Add background path and name as input, set to None as default, if set as input then do subtarcting and calibration.
-        If not provided, stop with reduction before subtraction and return None for calibrated data. 
+    If Background is None, return only reduced data, no calibration or subtraction.
+    If Background is provided, then do calibration and subtraction.
     Store both reduced data and NXcanSAS data in original hdf file, read from file if they exist and skip data reduction. 
     Only some metadata are kept to keep all more reasonable on size
+
+    returns dictionary of this type:
+                Sample["reducedData"]["Intensity"],   
+                Sample["reducedData"]["Q"], 
+                Sample["reducedData"]["PD_range"], 
+                Sample["reducedData"]["Error"], 
+               
+                SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+                SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+
+               Sample["CalibratedData"]={
+                     "Intensity":DSM_Int,
+                     "Q":DSM_Qvec,
+                     "Error":DSM_Error,
+                     "dQ":DSM_dQ,
+                     "units":"[cm2/cm3]",
 '''
 import h5py
 import numpy as np
@@ -70,11 +45,11 @@ import logging
 
 from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from convertUSAXS import rebinData
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS
+from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
-from new_matilda import recalculateAllData
+recalculateAllData = True
 
 MinQMinFindRatio = 1.05
 
@@ -86,6 +61,9 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
         # Check if the group 'location' exists, if yes, bail out as this is all needed. 
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
         if deleteExisting:
             # Delete the groups which may have een created by previously run saveNXcanSAS
             location = 'entry/QRS_data/'
@@ -93,12 +71,12 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                 # Delete the group
                 del hdf_file[location]
                 logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
-            location = 'entry/'+filename+"_SMR"+'/'
+            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
             if location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
                 logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
-            location = 'entry/'+filename+'/'
+            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
             if location in hdf_file:
                 # Delete the group
                 del hdf_file[location]
@@ -108,18 +86,21 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
         #Now, we will read the data from the file, if the exist. 
         # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
         # if BlankName=None, then we just need the QRS_data group.   
+
+        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         location = None
         if blankFilename is not None and blankPath is not None:
-            location = 'entry/'+filename+'/'        # require we have desmeared data
+            location = NXcanSASentry        # require we have desmeared data
         else:
             location = 'entry/QRS_data/'            # all we want here are QRS data
         
         if location is not None and location in hdf_file:
-                # exists, so lets reuse the data from the file
-                Sample = dict()
-                Sample = readMyNXcanSAS(path, filename)
-                logging.info(f"Using existing data for file {filename}. ")
-                return Sample
+            # exists, so lets reuse the data from the file
+            Sample = dict()
+            Sample = readMyNXcanSAS(path, filename)
+            logging.info(f"Using existing data for file {filename}. ")
+            print(f"Using existing data for file {filename}. ")
+            return Sample
         
         else:
             Sample = dict()
@@ -177,9 +158,11 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                             "Error":None,
                                             "dQ":None,
                                             }
-            
-        saveNXcanSAS(Sample,path, filename)
-        return Sample
+        # Ensure all changes are written and close the HDF5 file
+        hdf_file.flush()
+    # The 'with' statement will automatically close the file when the block ends
+    saveNXcanSAS(Sample,path, filename)
+    return Sample
 
 def normalizeByTransmission(Sample):
     # This is a simple normalization of the Sample Intensity by transmission. 
@@ -207,13 +190,13 @@ def reduceFlyscanToQR(path, filename, deleteExisting=True):
             if deleteExisting:
                 # Delete the group
                 del hdf_file[location]
-                print("Deleted existing group 'entry/displayData'.")
+                #print("Deleted existing group 'entry/displayData'.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
                 Sample = dict()
                 Sample = load_dict_from_hdf5(hdf_file, location)
-                print("Used existing data")
+                #print("Used existing data")
                 return Sample
             else:
                 Sample = dict()
@@ -224,7 +207,7 @@ def reduceFlyscanToQR(path, filename, deleteExisting=True):
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 
                 # these are not fully reduced data, this is for web plot purpose. 
                 save_dict_to_hdf5(Sample, location, hdf_file)
-                print("Appended new data to 'entry/displayData'.")
+                #print("Appended new data to 'entry/displayData'.")
                 return Sample
 
 def calibrateAndSubtractFlyscan(Sample):
@@ -334,13 +317,13 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 if location in hdf_file:
                     # Delete the group is exists and requested
                     del hdf_file[location]
-                    print("Deleted existing group 'entry/blankData'.")
+                    #print("Deleted existing group 'entry/blankData'.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
                 Blank = dict()
                 Blank = load_dict_from_hdf5(hdf_file, location)
-                print("Used existing Blank data")
+                #print("Used existing Blank data")
                 return Blank
             else:
                 Blank = dict()
@@ -368,7 +351,7 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 BlankData=Blank["BlankData"]
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 
                 save_dict_to_hdf5(BlankData, location, hdf_file)
-                print("Appended new Blank data to 'entry/blankData'.")
+                #print("Appended new Blank data to 'entry/blankData'.")
                 return BlankData
 
 
@@ -422,35 +405,35 @@ def test_matildaLocal():
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
     samplePath = r"\\Mac\Home\Desktop\Data\set1"
-    sampleName="AB3_R_0318.h5"
+    sampleName="SA_R_0325.h5"
     blankPath=r"\\Mac\Home\Desktop\Data\set1" 
     blankFilename="TapeBlank_R_0317.h5"
-    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)    
+    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    
     
-    # this is for testing save/restore from Nexus file... 
-    testme=False 
+    # # this is for testing save/restore from Nexus file... 
+    # testme=False 
 
-    if (testme):
-        # Specify the path and filename
-        #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
-        file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
-        # Check if the file exists before attempting to delete it
-        if os.path.exists(file_path):
-            try:
-                # Delete the file
-                os.remove(file_path)
-                print(f"File '{file_path}' has been deleted successfully.")
-            except Exception as e:
-                print(f"An error occurred while trying to delete the file: {e}")
-        else:
-            print(f"The file '{file_path}' does not exist.")
-        #removed file
-        saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
+    # if (testme):
+    #     # Specify the path and filename
+    #     #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
+    #     file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
+    #     # Check if the file exists before attempting to delete it
+    #     if os.path.exists(file_path):
+    #         try:
+    #             # Delete the file
+    #             os.remove(file_path)
+    #             print(f"File '{file_path}' has been deleted successfully.")
+    #         except Exception as e:
+    #             print(f"An error occurred while trying to delete the file: {e}")
+    #     else:
+    #         print(f"The file '{file_path}' does not exist.")
+    #     #removed file
+    #     saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
-        Data = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
-        pprint.pprint(Data)
-        Sample = {}
-        Sample['CalibratedData']=Data
+    Sample = {}
+    Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", sampleName)
+    #pprint.pprint(Data)
+    #Sample['CalibratedData']=Data
     # Q = Sample["reducedData"]["Q"]
     # UPD = Sample["reducedData"]["Intensity"]
     # Error = Sample["reducedData"]["Error"]

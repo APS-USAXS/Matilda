@@ -17,6 +17,7 @@
     
 '''
 import numpy as np
+import logging
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from scipy.integrate import simpson, trapezoid
@@ -66,7 +67,9 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
         return K0
     
     def power_law_fnct(x, K0, K1, K2):
-        return K0 + K1 * x**K2
+        # Clamp K2 to be within [0.1, 6]
+        K2 = np.clip(K2, 0.1, 6)
+        return np.abs(K0) + np.abs(K1) * x**np.abs(K2)
     
     def porod_fnct(x, K0, K1):
         return K0 + K1 / x**4

@@ -154,7 +154,7 @@ def saveNXcanSAS(Sample,path, filename):
     with h5py.File(Filepath, "a") as f:
         # point to the default data to be plotted
         f.attrs['default']          = 'entry'   #our files have one entry input.
-        # these are hopefullyoptional and useful. 
+        # these are hopefully optional and useful. 
         f.attrs['file_name']        = filename
         f.attrs['file_time']        = timeStamp 
         f.attrs['instrument']       = '12IDE USAXS'
@@ -169,7 +169,9 @@ def saveNXcanSAS(Sample,path, filename):
         
         nxentry = f['entry']
         nxentry.attrs['NX_class'] = 'NXentry'
+        nxentry.attrs['canSAS_class'] = 'SASentry'
         nxentry.attrs['default']  = SampleName   #modify with the most reduced data.
+
         
         #add definition as NXsas - this is location of raw AND reduced data
         # Check if 'definition' dataset exists in the entry group and delete it if present
@@ -279,16 +281,16 @@ def saveNXcanSAS(Sample,path, filename):
             ds = nxdata.create_dataset('Q', data=SMR_Qvec)
             ds.attrs['units'] = '1/angstrom'
             ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
-            ds.attrs['resolutions'] = 'dQw, dQI'
+            ds.attrs['resolutions'] = 'dQw,dQl'
         
             # d X axis data
             ds = nxdata.create_dataset('dQw', data=SMR_dQ)
             ds.attrs['units'] = '1/angstrom'
             ds.attrs['long_name'] = 'dQw (A^-1)'           
             # slitlength
-            ds = nxdata.create_dataset('dQI', data=slitLength)
+            ds = nxdata.create_dataset('dQl', data=slitLength)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'dQI (A^-1)'   
+            ds.attrs['long_name'] = 'dQl (A^-1)'   
             # dI axis data
             ds = nxdata.create_dataset('Idev', data=SMR_Error)
             ds.attrs['units'] = 'cm2/cm3'
@@ -370,7 +372,7 @@ def readMyNXcanSAS(path, filename):
             dataset = f[location + "sasdata/dQw"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_dQ'] = dataset[()]
-            dataset = f[location + "sasdata/dQI"]
+            dataset = f[location + "sasdata/dQl"]
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset[()]
         else:

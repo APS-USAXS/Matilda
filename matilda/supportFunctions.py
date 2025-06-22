@@ -322,7 +322,7 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         popt, _ = curve_fit(modifiedGauss, xdata_filtered, ydata_filtered, p0=initial_guess)
 
         # Extract the fitted parameters
-        amplitude, x0, sigma, dparam = popt
+        amplitude, x0, sigma, exponent = popt
       
         # Calculate the FWHM
         # Calculate the half maximum
@@ -528,8 +528,18 @@ def gaussian(x, a, x0, sigma):
     return a * np.exp(-(x - x0)**2 / (2 * sigma**2))
 
 #modified gaussian function, gives better fits to peak profiles. 
-def modifiedGauss(xvar, a, x0, sigma, dparameter):
-    return a * np.exp(-(np.abs(xvar - x0) / (2*sigma)) ** dparameter)
+def modifiedGauss(xvar, a, x0, sigma, exponent):
+    base = np.abs(xvar - np.abs(x0)) / (2 * np.abs(sigma))
+    # Diagnostics: check for invalid values
+    if np.any(base < 0) or np.any(np.isnan(base)) or np.any(np.isnan(exponent)):
+        logging.warning("Warning: Invalid value encountered in base or exponent in modifiedGauss.")
+        logging.info(f"Base min: {np.nanmin(base)}, max: {np.nanmax(base)}, sigma: {sigma}, exponent: {exponent}")
+    try:
+        result =np.abs(a) * np.exp(-np.power(base, np.abs(exponent)))
+    except Exception as e:
+        logging.warning(f"Exception in modifiedGauss: {e}")
+        result = np.full_like(xvar, np.nan)
+    return result
 
 
 

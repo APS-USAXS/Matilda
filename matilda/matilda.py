@@ -256,8 +256,10 @@ if __name__ == "__main__":
     #logging.info("New round of processing started at : %s", datetime.datetime.now()) 
     #print("New round of processing started at : ", datetime.datetime.now()) 
     #logging.info('Processing the Flyscans')
-    processUSAXSFolder(r"\\Mac\Home\Desktop\06_12_GlassyCarbon\\")
-    
+    #processUSAXSFolder(r"\\Mac\Home\Desktop\06_12_GlassyCarbon\\")
+    ListOfScans=[[r"\\Mac\Home\Desktop\06_12_GlassyCarbon\06_12_GlassyCarbon_usaxs","SRM3600_T_0017.h5"]]
+    ListOfBlanks=[[r"\\Mac\Home\Desktop\06_12_GlassyCarbon\06_12_GlassyCarbon_usaxs","AirBlank_T_0016.h5"]]
+    result = processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=True,forceFirstBlank=True)
     
     
     # logging.info("Processing the Flyscans")

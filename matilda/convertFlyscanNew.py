@@ -1,61 +1,14 @@
 ''' 
-Here we develop new code which then moves to proper package
-TODO:
-    convertFlyscancalibrated.py
-New, calibrated Flyscan code. 
-    use: 
 processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)
         For example of use see: test_matildaLocal() at the end of this file. 
+        Does:
+        Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
+        If Background is None, return only reduced data, no calibration or subtraction.
+        If Background is provided, then do calibration and subtraction.
+        Store both reduced data and NXcanSAS data in original hdf file, read from file if they exist and skip data reduction. 
+        Only some metadata are kept to keep all more reasonable on size
 
-        
-    returns dictionary of this type:
-            result["SampleName"]=sampleName
-            result["BlankName"]=blankName
-            result["reducedData"] =  {"Intensity":np.ravel(intensity), 
-                              "Q":np.ravel(q),
-                              "Error":np.ravel(error)}
-            result["CalibratedData"] = {"Intensity":np.ravel(intcalib),
-                                    "Q":np.ravel(qcalib),
-                                    "Error":np.ravel(errcalib),
-                                   }  
-
-            this is when read from Nexus file. TODO: check and make sure it all works...  
-                    {'BlankName': 'TapeBlank_R_0317.h5',
-                'Error': array([5.41821571e+08, 3.61214381e+08, 1.80607190e+08, 1.45182650e+08,
-                    8.21066769e+07, 5.28638233e+07, 9.31836113e+07, 3.44934716e+07,
-                        ...
-                    3.70688211e-02, 3.70688211e-02, 3.70688211e-02]),
-                'Error_Attributes': <Attributes of closed HDF5 object>,
-                'Int_attributes': <Attributes of closed HDF5 object>,
-                'Intensity': array([4.52126415e+09, 3.89536685e+09, 3.08490075e+09, 2.58092468e+09,
-                    2.16199554e+09, 1.83504586e+09, 1.49810441e+09, 1.31218746e+09,
-                        ...
-                    3.24382536e-01, 3.68735659e-01, 2.65436440e-01]),
-                'Kfactor': np.float64(1.5194820557062783e-12),
-                'OmegaFactor': np.float64(4.171381472542379e-08),
-                'Q': array([1.05916862e-04, 1.09962784e-04, 1.14017257e-04, 1.18080210e-04,
-                    1.22151570e-04, 1.26231272e-04, 1.30319251e-04, 1.34415446e-04,
-                        ...
-                    2.93847771e-01, 2.97917894e-01, 3.00031668e-01]),
-                'Q_attributes': <Attributes of closed HDF5 object>,
-                'dQ': array([4.04592188e-06, 4.04592188e-06, 4.05447384e-06, 4.06295227e-06,
-                    4.07136056e-06, 4.07970183e-06, 4.08797899e-06, 4.09619476e-06,
-                        ...
-                    8.06617937e-03, 8.17837508e-03, 8.17837508e-03]),
-                'dQ_Attributes': <Attributes of closed HDF5 object>,
-                'label': 'AB3_R_0318',
-                'thickness': np.float64(1.0),
-                'units': '1/cm'}
-
-
-   Does:
-    Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
-    If Background is None, return only reduced data, no calibration or subtraction.
-    If Background is provided, then do calibration and subtraction.
-    Store both reduced data and NXcanSAS data in original hdf file, read from file if they exist and skip data reduction. 
-    Only some metadata are kept to keep all more reasonable on size
-
-    returns dictionary of this type:
+        returns dictionary of this type:
                 Sample["reducedData"]["Intensity"],   
                 Sample["reducedData"]["Q"], 
                 Sample["reducedData"]["PD_range"], 
@@ -155,7 +108,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
                                                     replaceNans=True))                 
 
             if blankPath is not None and blankFilename is not None and blankFilename != filename:               
-                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename)
+                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 #pp.pprint(Sample)
@@ -259,11 +212,7 @@ def calibrateAndSubtractFlyscan(Sample):
     BL_Error = Sample["BlankData"]["Error"]
     Q = Sample["reducedData"]["Q"]
     BL_Q = Sample["BlankData"]["Q"]
-        
-    SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
-    # find Qmin as the first point where we get above 5% of the background avleu and larger than instrument resolution
-    # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
-    # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
+
     FWHMSample = Sample["reducedData"]["FWHM"]
     FWHMBlank = Sample["BlankData"]["FWHM"]
     wavelength =  Sample["reducedData"]["wavelength"]
@@ -276,6 +225,13 @@ def calibrateAndSubtractFlyscan(Sample):
     BlTransGain = Sample['BlankData']['BlTransGain']
     BlI0Counts = Sample['BlankData']['BlI0Counts']
     BlI0Gain = Sample['BlankData']['BlI0Gain']
+
+    #Intensity and Error are corrected for transmission in normalizebytransmission above. 
+    SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
+    # find Qmin as the first point where we get above 5% of the background avleu and larger than instrument resolution
+    # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
+    # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
+
     MeasuredTransmission = ((SaTransCounts/SaTransGain)/(SaI0Counts/SaI0Gain))/((BlTransCounts /BlTransGain )/(BlI0Counts/BlI0Gain))
     MSAXSCorrection = MeasuredTransmission / PeakToPeakTransmission
     QminSample = 4*np.pi*np.sin(np.radians(FWHMSample)/2)/wavelength
@@ -333,7 +289,7 @@ def calibrateAndSubtractFlyscan(Sample):
     #apply calibration
     SMR_Int =  SMR_Int / (Kfactor*MSAXSCorrection) 
     SMR_Error = SMR_Error/ (Kfactor*MSAXSCorrection) 
-    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absowrption well scattering samples. 
+    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absorption well scattering samples. 
     return {"SMR_Qvec":SMR_Qvec,
             "SMR_Int":SMR_Int,
             "SMR_Error":SMR_Error,
@@ -413,12 +369,12 @@ def calculatePDError(Sample, isBlank=False):
 
     Monitor = Sample["RawData"]["Monitor"]
     I0AmpGain=Sample["RawData"]["metadata"]["I0AmpGain"]
-    VToFFactor = Sample["RawData"]["VToFFactor"]/10      #this is mca1 frequency, HDF5 writer 1.3 and above needs /10 
-    SigmaUSAXSPD=np.sqrt(UPD_array*(1+0.0001*UPD_array))		#this is our USAXS_PD error estimate, Poisson error + 1% of value
-    SigmaPDwDC=np.sqrt(SigmaUSAXSPD**2+(MeasTime*UPD_bkgErr)**2) #This should include now measured error for background
-    SigmaPDwDC=SigmaUSAXSPD/(Frequency*UPD_gains)
-    A=(UPD_array)/(VToFFactor[0]*UPD_gains)		#without dark current subtraction
-    SigmaMonitor= np.sqrt(Monitor)		            #these calculations were done for 10^6 
+    VToFFactor = Sample["RawData"]["VToFFactor"]                    #this is mca1 frequency, hardwired to 1e6 
+    SigmaUSAXSPD=np.sqrt(UPD_array*(1+0.0001*UPD_array))		    #this is our USAXS_PD error estimate, Poisson error + 1% of value
+    SigmaPDwDC=np.sqrt(SigmaUSAXSPD**2+(MeasTime*UPD_bkgErr)**2)    #This should include now measured error for background
+    SigmaPDwDC=SigmaPDwDC/(VToFFactor*UPD_gains)
+    A=(UPD_array)/(VToFFactor[0]*UPD_gains)		                    #without dark current subtraction
+    SigmaMonitor= np.sqrt(Monitor)		                            #these calculations were done for 10^6 
     ScaledMonitor = Monitor
     A = np.where(np.isnan(A), 0.0, A)
     SigmaMonitor = np.where(np.isnan(SigmaMonitor), 0.0, SigmaMonitor)
@@ -427,7 +383,7 @@ def calculatePDError(Sample, isBlank=False):
     SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
     SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
     SigmaRwave=SigmaRwave * I0AmpGain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0AmpGain
-    Error=SigmaRwave		                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
+    Error=SigmaRwave / 5                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
     result = {"Error":Error}
     return result
 

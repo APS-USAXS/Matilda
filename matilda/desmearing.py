@@ -130,7 +130,8 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
             ProblemWithFit = "Porod fit function did not converge properly, change function or Q range"
     
     elif SelectedFunction == "PowerLaw w flat":
-        K0_guess = np.min(Int_wave[FitFrom:DataLengths])
+        K0_guess = np.average(Int_wave[FitFrom:DataLengths])
+        if K0_guess <= 0: K0_guess = 1e-9
         K1_guess = (Int_wave[FitFrom] - K0_guess) / (Q_vct[FitFrom] ** -3.5)
         if K1_guess <= 0: K1_guess = 1e-9
         initial_guess = [K0_guess, K1_guess, -3.5]
@@ -346,7 +347,7 @@ def smooth_errors(errors, window_len=3):
     return smoothed
 
 
-def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSmearedInt, origSmearedErr, NormalizedError,ExtrapMethod,ExtrapQstart):
+def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSmearedInt, origSmearedErr, NormalizedError,ExtrapMethod,ExtrapQstart, NumIterations):
     """
     Perform one iteration of the desmearing process.
 
@@ -363,7 +364,9 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
         The original smeared errors.
     NormalizedError : array-like
         The normalized error array.
-
+    NumIterations : int
+        The current iteration number. We want to run through iterations for all point at least few times. If large error bars, we have seen artifacts in desmearing.
+        
     Returns:
     DesmearQWave, DesmearIntWave, DesmearEWave, NormalizedError
     """
@@ -412,9 +415,10 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
     FastFitIntensity = DesmearIntWave * (origSmearedInt / SmFitIntensity)
     #SlowFitIntensity = DesmearIntWave + (origSmearedInt - SmFitIntensity)
 
-    # Update DesmearIntWave based on normalized error
+    # Update DesmearIntWave based on normalized error and number of iterations
+    # need to run normal iterations at least few times before using this adaptive method. 
     for i in range(len(DesmearIntWave)):
-        if abs(NormalizedError[i]) > 0.5:
+        if abs(NormalizedError[i]) > 0.5 or NumIterations < 3:
             DesmearIntWave[i] = FastFitIntensity[i]
         else:
             DesmearIntWave[i] = DesmearIntWave[i]
@@ -488,7 +492,7 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
         MaxNumIter = 20
 
     while True:
-        tmpWork_Qvec, tmpWork_Int, tmpWork_Error, DesmNormalizedError = oneDesmearIteration(slitLength,tmpWork_Qvec, tmpWork_Int, tmpWork_Error, SMR_Int, SMR_Error, DesmNormalizedError, ExtrapMethod,ExtrapQstart)
+        tmpWork_Qvec, tmpWork_Int, tmpWork_Error, DesmNormalizedError = oneDesmearIteration(slitLength,tmpWork_Qvec, tmpWork_Int, tmpWork_Error, SMR_Int, SMR_Error, DesmNormalizedError, ExtrapMethod,ExtrapQstart, NumIterations)
         absNormalizedError = np.abs(DesmNormalizedError)
         endme = np.average(absNormalizedError)
         #this is difference in convergence between iterations

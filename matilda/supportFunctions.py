@@ -43,7 +43,8 @@ def importFlyscan(path, filename):
         dataset = file['/entry/flyScan/changes_DDPCA300_mcsChan'] 
         Channel = np.ravel(np.array(dataset))            
         dataset = file['/entry/flyScan/mca_clock_frequency'] 
-        vTof = np.ravel(np.array(dataset))    
+        vTof = np.full_like(np.ravel(np.array(dataset)), 1e6, dtype=float)
+        #vTof = 1e6  overwrite, the mca_clock_frequency (5e7) value is simply wrong.     
         #metadata
         keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0AmpGain','detector_distance',
                         'timeStamp',
@@ -224,7 +225,7 @@ def calculatePD_Fly(data_dict):
             updBkgErr[i] =  metadata_dict[updBkgErrName]
 
         #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
-    Frequency=VToFFactor[0]/10   #this is frequency of clock fed ito mca1/10 for HDF5 writer 1.3 and higher
+    Frequency= 1e6      #VToFFactor[0]/10   #this is frequency of clock fed into mca1/10 for HDF5 writer 1.3 and higher
     TimeInSec = TimePerPoint/Frequency
     #print("Exp. time :", sum(TimeInSec))
     for i in range(0, len(Channel)-1, 1):
@@ -243,7 +244,7 @@ def calculatePD_Fly(data_dict):
         #Correct UPD for gains and monitor counts and amplifier gain. 
         # Frequency=1e6  #this is to keep in sync with Igor code. 
     PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0AmpGain)  
-    PD_error = 0.01*PD_Intensity   #this is fake error for QR conversion
+    PD_error = 0.01*PD_Intensity   #this is fake error for QR conversion,recalculated in calculatePDerror
     result = {"Intensity":PD_Intensity,
               "Error":PD_error,
               "PD_range":GainsIndx,
@@ -399,12 +400,14 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     return results
 
 
-def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=False):
+def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=True):
     # Smoothing times for different ranges
-    rwave_smooth_times = [0, 0, 0.01, 0.03, 0.06]   # these are [in sec] values for USAXS on 4/20/2025
+    rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
 
     # Logarithm of intensity
-    temp_int_log = np.log(intensity)
+    # Replace negative or zero intensities with NaN before taking log
+    intensity_safe = np.where(intensity > 0, intensity, np.nan)
+    temp_int_log = np.log(intensity_safe)
     # for some cases replace nans with interpolated values
     if replaceNans:
         # Create a mask for NaNs

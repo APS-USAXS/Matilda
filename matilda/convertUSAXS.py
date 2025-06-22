@@ -165,7 +165,7 @@ def reduceStepScanToQR(path, filename, deleteExisting=True):
             # Delete the group
             if location in hdf_file:
                 del hdf_file[location]
-                print("Deleted existing group 'entry/displayData'.")    
+                logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
         
         if location in hdf_file:
                 # # exists, reuse existing data

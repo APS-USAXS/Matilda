@@ -98,8 +98,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
             # exists, so lets reuse the data from the file
             Sample = dict()
             Sample = readMyNXcanSAS(path, filename)
-            logging.info(f"Using existing data for file {filename}. ")
-            print(f"Using existing data for file {filename}. ")
+            logging.info(f"Using existing processed data from file {filename}.")
             return Sample
         
         else:
@@ -192,13 +191,13 @@ def reduceFlyscanToQR(path, filename, deleteExisting=True):
             if deleteExisting:
                 # Delete the group
                 del hdf_file[location]
-                #print("Deleted existing group 'entry/displayData'.")
+                logging.info("Deleted existing group 'entry/displayData'.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
                 Sample = dict()
                 Sample = load_dict_from_hdf5(hdf_file, location)
-                #print("Used existing data")
+                logging.info(f"Used existing QR data from {filename}")
                 return Sample
             else:
                 Sample = dict()
@@ -209,7 +208,7 @@ def reduceFlyscanToQR(path, filename, deleteExisting=True):
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 
                 # these are not fully reduced data, this is for web plot purpose. 
                 save_dict_to_hdf5(Sample, location, hdf_file)
-                #print("Appended new data to 'entry/displayData'.")
+                logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
                 return Sample
 
 def calibrateAndSubtractFlyscan(Sample):
@@ -319,13 +318,13 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 if location in hdf_file:
                     # Delete the group is exists and requested
                     del hdf_file[location]
-                    #print("Deleted existing group 'entry/blankData'.")
+                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
                 Blank = dict()
                 Blank = load_dict_from_hdf5(hdf_file, location)
-                #print("Used existing Blank data")
+                logging.info(f"Used existing Blank data from {blankFilename}")
                 return Blank
             else:
                 Blank = dict()
@@ -353,7 +352,7 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 BlankData=Blank["BlankData"]
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 
                 save_dict_to_hdf5(BlankData, location, hdf_file)
-                #print("Appended new Blank data to 'entry/blankData'.")
+                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
                 return BlankData
 
 

@@ -679,8 +679,9 @@ def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxw
 
     OldNumPnts = len(Wx)
     if 2 * NumberOfPoints > OldNumPnts:
-        print("User requested rebinning of data, but old number of points is less than 2*requested number of points, no rebinning done")
-        return None
+        logging.warning(f"Rebinning requested to {NumberOfPoints} points, but data has only {OldNumPnts} points. No rebinning will be done.")
+        # Return original data if no rebinning is done
+        return Wx, Wy, W1, W2, W3, W4, W5, Wsdev, Wxsdev, Wxwidth
 
     if Wx[0] <= 0:
         Wx[0] = Wx[1] / 2

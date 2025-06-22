@@ -28,7 +28,7 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     cmap = plt.get_cmap('viridis')
     # Generate colors from the colormap
     colors = [cmap(i) for i in np.linspace(0, 1, num_data_sets)]
-    print(f'Got {num_data_sets} data sets to plot')
+    logging.info(f'Got {num_data_sets} USAXS data sets to plot')
 
     # Get plot styling
     style = get_usaxs_r_plot_style()
@@ -229,6 +229,3 @@ def get_usaxs_cal_plot_style():
         "grid": True,
         "font_size": default_plt_font_size  # Assumes default_plt_font_size is defined globally
     }
-
-
-

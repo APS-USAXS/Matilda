@@ -87,8 +87,7 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
             # exists, so lets reuse the data from the file
             Sample = dict()
             Sample = readMyNXcanSAS(path, filename)
-            logging.info(f"Using existing data for file {filename}. ")
-            print(f"Using existing data for file {filename}. ")
+            logging.info(f"Using existing processed data from file {filename}.")
             return Sample
         
         
@@ -159,13 +158,13 @@ def ImportAndReduceAD(path, filename, deleteExisting=False):
         if deleteExisting:
             # Delete the group
             del hdf_file[location]
-            print("Deleted existing group 'entry/displayData'.")
+            logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
 
         if location in hdf_file:
             # exists, so lets reuse the data from the file
             Sample = dict()
             Sample = load_dict_from_hdf5(hdf_file, location)
-            print("Used existing data")
+            logging.info(f"Used existing QR data from {filename}")
             q = Sample["reducedData"]["Q_array"]
             intensity = Sample["reducedData"]["Intensity"]
             result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}  
@@ -261,7 +260,7 @@ def ImportAndReduceAD(path, filename, deleteExisting=False):
         Sample["reducedData"]["Q_array"] = q
         Sample["reducedData"]["Intensity"] = intensity
         save_dict_to_hdf5(Sample, location, hdf_file)
-        print("Appended new data to 'entry/displayData'.")
+        logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
         result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
         return result
 

@@ -31,7 +31,7 @@ def readGenericNXcanSAS(path, filename):
         #print(SASentries)
         FirstEntry = SASentries[0] if SASentries else None
         if FirstEntry is None:
-            print("No NXcanSAS entries found in the file.")
+            logging.warning(f"No NXcanSAS entries found in the file {filename}.")
             return None
 
         current_location = FirstEntry
@@ -43,13 +43,13 @@ def readGenericNXcanSAS(path, filename):
                 if 'default' in f[current_location].attrs:
                     current_location = f"{current_location}/{default_location}".strip('/')
 
-        #print(f"Data is located at: {current_location}")    
+        logging.debug(f"Data is located at: {current_location}")
         group_or_dataset = f[current_location]
         # Retrieve and print the list of attributes
         attributes = group_or_dataset.attrs
-        print(f"Attributes at '{current_location}':")
+        logging.debug(f"Attributes at '{current_location}':")
         for attr_name, attr_value in attributes.items():
-            print(f"{attr_name}: {attr_value}")
+            logging.debug(f"{attr_name}: {attr_value}")
 
         data_location= current_location+'/'+attributes['signal']
         if data_location in f:
@@ -150,7 +150,7 @@ def saveNXcanSAS(Sample,path, filename):
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
-    #print(f"Saving NXcanSAS data to {Filepath}")
+    logging.info(f"Saving NXcanSAS data to {Filepath}")
     with h5py.File(Filepath, "a") as f:
         # point to the default data to be plotted
         f.attrs['default']          = 'entry'   #our files have one entry input.
@@ -316,7 +316,7 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
             
     
-    #print("wrote file:", filename)
+    logging.info(f"Wrote NXcanSAS data to file: {filename}")
 
 def readMyNXcanSAS(path, filename):
     """
@@ -337,7 +337,7 @@ def readMyNXcanSAS(path, filename):
         required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
         required_items = {'definition': 'NXcanSAS'}
         SASentries =  find_matching_groups(f, required_attributes, required_items)
-        #print(f"Found {SASentries} entries in the file:{filename}")
+        logging.debug(f"Found {SASentries} entries in the file:{filename}")
               
         location = 'entry/QRS_data/'
         if location in f:
@@ -355,7 +355,7 @@ def readMyNXcanSAS(path, filename):
         #location = 'entry/'+filename.split('.')[0]+'_SMR/'
         # location is the first of entries from SASentries which contains string _SMR
         location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
-        #print(f"Found SMR entry at: {location}")
+        logging.debug(f"Found SMR entry at: {location}")
         if location is not None and location in f:
             Sample['CalibratedData'] = dict()
             dataset = f[location + "sasdata/I"]
@@ -383,7 +383,7 @@ def readMyNXcanSAS(path, filename):
 
      
         location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-        #print(f"Found NXcanSAS entry at: {location}")
+        logging.debug(f"Found NXcanSAS entry at: {location}")
         if location is not None and location in f:
             Sample['CalibratedData'] = dict()
             Sample['RawData'] = dict()
@@ -442,7 +442,7 @@ def save_dict_to_hdf5(dic, location, h5file):
         for key, item in dic.items():
             if isinstance(item, dict):
                 # Create a new group for nested dictionaries
-                print(f"Creating group: {path} + {key}")
+                logging.debug(f"Creating group: {path} + {key}")
                 group = h5file.create_group(path + key)
                 recursively_save_dict_contents_to_group(h5file, path + key + '/', item)
             else:

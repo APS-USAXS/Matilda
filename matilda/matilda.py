@@ -172,14 +172,15 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
     results=[]
     logging.info("Starting processing of flyscans with blanks")    
     for scan_path, scan_filename in ListOfScans:
-        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
-        result = processFlyscan(scan_path, scan_filename,
-                                    blankPath=selected_blank_path,
-                                    blankFilename=selected_blank_filename,
-                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
-        results.append(result)
-        #except Exception as e:
-        #    logging.error(f"Error processing scan {scan_filename} with blank {selected_blank_filename}: {e}")
+        try:
+            selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+            result = processFlyscan(scan_path, scan_filename,
+                                        blankPath=selected_blank_path,
+                                        blankFilename=selected_blank_filename,
+                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+            results.append(result)
+        except Exception as e:
+            logging.error(f"Error processing scan {scan_filename}: {e}", exc_info=True)
     return results
 
 
@@ -189,12 +190,11 @@ def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAll
     for scan in ListOfScans:
         path = scan[0]
         filename = scan[1]
-        #print(f"Processing file: {filename}")
+        logging.info(f"Processing step scan: {filename}")
         try:
             results.append(reduceStepScanToQR(path, filename))
-        except:
-            pass
-    #print("Done processing the Step scans")
+        except Exception as e:
+            logging.error(f"Failed to process step scan {filename} in {path}: {e}", exc_info=True)
     return results
 
 #process SAXS/WAXS data, finding the appropriate blank for each.
@@ -207,12 +207,15 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllDa
     results=[]
     logging.info("Starting processing of SAXS/WAXS with blanks")    
     for scan_path, scan_filename in ListOfScans:
-        selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
-        result = process2Ddata(scan_path, scan_filename,
-                                    blankPath=selected_blank_path,
-                                    blankFilename=selected_blank_filename,
-                                    deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
-        results.append(result)
+        try:
+            selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+            result = process2Ddata(scan_path, scan_filename,
+                                        blankPath=selected_blank_path,
+                                        blankFilename=selected_blank_filename,
+                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+            results.append(result)
+        except Exception as e:
+            logging.error(f"Error processing AD scan {scan_filename}: {e}", exc_info=True)
     return results
 
 
@@ -228,7 +231,7 @@ if __name__ == "__main__":
     
     
     
-    print("Processing the Flyscans")
+    logging.info("Processing the Flyscans")
     #ListOfScans = FindLastScanData("Flyscan",1,0)
     ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                    'R6016HRC_T4_V_1077.h5'],
@@ -249,16 +252,15 @@ if __name__ == "__main__":
     #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
     listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                    'AirBlank_1076.h5']]
-    print(f'Got list : {ListOfScans}')
-    print(f'Got blank list : {listOfBlanks}')
+    logging.info(f'Got list : {ListOfScans}')
+    logging.info(f'Got blank list : {listOfBlanks}')
     
     results = processFlyscans(ListOfScans, listOfBlanks)
     
     plotUSAXSResults(results, imagePath, isFlyscan=True)  
         
 
-
-    print("Processing the SAXS")
+    logging.info("Processing the SAXS")
     #ListOfScans = FindLastScanData("Flyscan",1,0)
     ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
                    'R6016HRC_T4_V_1077.hdf'],   
@@ -281,14 +283,14 @@ if __name__ == "__main__":
     #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
     listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
                    'AirBlank_1076.hdf']]
-    print(f'Got list : {ListOfScans}')
-    print(f'Got blank list : {listOfBlanks}')
+    logging.info(f'Got list : {ListOfScans}')
+    logging.info(f'Got blank list : {listOfBlanks}')
     
     results = processADscans(ListOfScans, listOfBlanks)
     
     plotSWAXSResults(results, imagePath, isSAXS = True)  
 
-    print("Processing the WAXS")
+    logging.info("Processing the WAXS")
     #ListOfScans = FindLastScanData("Flyscan",1,0)
     ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
                    'R6016HRC_T4_V_1077.hdf'],   
@@ -311,8 +313,8 @@ if __name__ == "__main__":
     #listOfBlanks = FindLastBlankScan("Flyscan",path, 1,0)
     listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
                    'AirBlank_1076.hdf']]
-    print(f'Got list : {ListOfScans}')
-    print(f'Got blank list : {listOfBlanks}')
+    logging.info(f'Got list : {ListOfScans}')
+    logging.info(f'Got blank list : {listOfBlanks}')
     
     results = processADscans(ListOfScans, listOfBlanks)
     

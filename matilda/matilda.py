@@ -6,24 +6,30 @@ When run as a script, it will process the data from the last scan and blank scan
 
 User facing functions are defined in this file.
 
-processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData) 
+processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False) 
     - SAXS or WAXS data, finding the appropriate blank for each.
     - ListOfScans is a list of tuples with path and filename of the scan data
     - ListOfBlanks is a list of tuples with path and filename of the blank data
+    - forceFirstBlank set to true will skip Blank selection and use the first blank in the list
+    - recalculateAllData set to true will force reprocessing of the data, otherwise it
     - returns a list of dictionaries with the reduced data
     - No plotting, just processing
 
-processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData)
+processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False)
     - Flyscan data, finding the appropriate blank for each.
     - ListOfScans is a list of tuples with path and filename of the scan data
     - ListOfBlanks is a list of tuples with path and filename of the blank data
+    - forceFirstBlank set to true will skip Blank selection and use the first blank in the list
+    - recalculateAllData set to true will force reprocessing of the data, otherwise it
     - returns a list of dictionaries with the reduced data
     - No plotting, just processing
     
-TODO: processStepScans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData)
+TODO: processStepScans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False)
     - Step scan data, finding the appropriate blank for each.
     - ListOfScans is a list of tuples with path and filename of the scan data
     - ListOfBlanks is a list of tuples with path and filename of the blank data
+    - forceFirstBlank set to true will skip Blank selection and use the first blank in the list
+    - recalculateAllData set to true will force reprocessing of the data, otherwise it
     - returns a list of dictionaries with the reduced data
     - No plotting, just processing
 
@@ -158,17 +164,28 @@ def processUSAXSFolder(path):
 
 
 #process list of flyscans, finding the appropriate blank for each.
-def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData):
+def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData,forceFirstBlank=False):
     """
     Processes a list of flyscans, finding the appropriate blank for each.
-    The correct blank is in the same path and has the largest number XYZ
+    The correct blank is in the same path and has the number _XYZ
     that is smaller than the sample's number.
+    forceFirstBlank=True will skip Blank selection and use the first blank in the list
+    recalculateAllData=True will force reprocessing of the data, otherwise it
     """
     results=[]
-    logging.info("Starting processing of flyscans with blanks")    
+    logging.info("Processing of flyscans with blanks")    
     for scan_path, scan_filename in ListOfScans:
         try:
-            selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+            if forceFirstBlank:
+                # Use the first blank in the list
+                selected_blank_path = ListOfBlanks[0][0]
+                selected_blank_filename = ListOfBlanks[0][1]
+                #logging.info(f"User forced use of blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+            else:
+                selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+                 #logging.info(f"Automatically selected blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+           
+            logging.info(f"Flyscan data processing: path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
             result = processFlyscan(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,
@@ -180,7 +197,7 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
 
 
 # Process the step scan data files
-def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData):
+def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
     results=[]
     for scan in ListOfScans:
         path = scan[0]
@@ -193,18 +210,26 @@ def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAll
     return results
 
 #process SAXS/WAXS data, finding the appropriate blank for each.
-def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData):
+def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
     """
     Processes a list of SAXS/WAXS data, finding the appropriate blank for each.
     The correct blank is in the same path and has the largest number XYZ
     that is smaller than the sample's number.
     """
     results=[]
-    logging.info("Starting processing of SAXS/WAXS with blanks")    
+    logging.info("Processing of SAXS/WAXS with blanks")    
     for scan_path, scan_filename in ListOfScans:
         try:
-            selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
-            logging.info(f"Data path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
+            if forceFirstBlank:
+                # Use the first blank in the list
+                selected_blank_path = ListOfBlanks[0][0]
+                selected_blank_filename = ListOfBlanks[0][1]
+                #logging.info(f"User forced use of blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+            else:
+                selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+                #logging.info(f"Automatically selected blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+
+            logging.info(f"2D data processing: path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
             result = process2Ddata(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,

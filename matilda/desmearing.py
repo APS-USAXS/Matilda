@@ -67,9 +67,9 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
         return K0
     
     def power_law_fnct(x, K0, K1, K2):
-        # Clamp K2 to be within [0.1, 6]
-        K2 = np.clip(K2, 0.1, 6)
-        return np.abs(K0) + np.abs(K1) * x**np.abs(K2)
+        # This is a standard power law with a flat background.
+        # K2 is expected to be negative for decaying data.
+        return K0 + K1 * x**K2
     
     def porod_fnct(x, K0, K1):
         return K0 + K1 / x**4
@@ -77,7 +77,8 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
     # Fit and extend based on the selected function
     if SelectedFunction == "flat":
         try:
-            popt, _ = curve_fit(flat_fnct, Q_vct[FitFrom:DataLengths], Int_wave[FitFrom:DataLengths], sigma=Err_wave[FitFrom:DataLengths])
+            # Add bounds to ensure K0 is non-negative
+            popt, _ = curve_fit(flat_fnct, Q_vct[FitFrom:DataLengths], Int_wave[FitFrom:DataLengths], sigma=Err_wave[FitFrom:DataLengths], bounds=([0], [np.inf]))
             for i in range(1, NumNewPoints + 1):
                 Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
                 Int_wave[DataLengths + i] = popt[0]
@@ -85,9 +86,21 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
             ProblemWithFit = "Linear fit function did not converge properly, change function or Q range"
     
     elif SelectedFunction == "Power law":
-        initial_guess = [np.min(Int_wave),(Int_wave[FitFrom]-np.min(Int_wave))/(Q_vct[FitFrom]**(-3.5))]
+        K0_guess = np.min(Int_wave[FitFrom:DataLengths])
+        K1_guess = (Int_wave[FitFrom] - K0_guess) / (Q_vct[FitFrom] ** -3.5)
+        if K1_guess <= 0: K1_guess = 1e-9
+        initial_guess = [K0_guess, K1_guess, -3.5]
+        bounds = ([0, 0, -6], [np.inf, np.inf, -0.1])
         try:
-            popt, _ = curve_fit(power_law_fnct, Q_vct[FitFrom:DataLengths], Int_wave[FitFrom:DataLengths], sigma=Err_wave[FitFrom:DataLengths],p0=initial_guess)
+            popt, _ = curve_fit(
+                power_law_fnct, 
+                Q_vct[FitFrom:DataLengths], 
+                Int_wave[FitFrom:DataLengths], 
+                sigma=Err_wave[FitFrom:DataLengths],
+                p0=initial_guess,
+                bounds=bounds,
+                maxfev=5000
+            )
             for i in range(1, NumNewPoints + 1):
                 Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
                 Int_wave[DataLengths + i] = popt[0] + popt[1] * Q_vct[DataLengths + i]**popt[2]
@@ -95,9 +108,21 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
             ProblemWithFit = "Power law fit function did not converge properly, change function or Q range"
     
     elif SelectedFunction == "Porod":
-        initial_guess = [np.min(Int_wave),(Int_wave[FitFrom]-np.min(Int_wave))/(Q_vct[FitFrom]**(-3.5))]
+        K0_guess = np.min(Int_wave[FitFrom:DataLengths])
+        K1_guess = (Int_wave[FitFrom] - K0_guess) * (Q_vct[FitFrom]**4)
+        if K1_guess <= 0: K1_guess = 1e-9
+        initial_guess = [K0_guess, K1_guess]
+        bounds = ([0, 0], [np.inf, np.inf])
         try:
-            popt, _ = curve_fit(porod_fnct, Q_vct[FitFrom:DataLengths], Int_wave[FitFrom:DataLengths], sigma=Err_wave[FitFrom:DataLengths],p0=initial_guess)
+            popt, _ = curve_fit(
+                porod_fnct, 
+                Q_vct[FitFrom:DataLengths], 
+                Int_wave[FitFrom:DataLengths], 
+                sigma=Err_wave[FitFrom:DataLengths],
+                p0=initial_guess,
+                bounds=bounds,
+                maxfev=5000
+            )
             for i in range(1, NumNewPoints + 1):
                 Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
                 Int_wave[DataLengths + i] = popt[0] + popt[1] / Q_vct[DataLengths + i]**4
@@ -105,9 +130,21 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
             ProblemWithFit = "Porod fit function did not converge properly, change function or Q range"
     
     elif SelectedFunction == "PowerLaw w flat":
-        initial_guess = [np.min(Int_wave),(Int_wave[FitFrom]-np.min(Int_wave))/(Q_vct[FitFrom]**(-3.5)), -3.5]
+        K0_guess = np.min(Int_wave[FitFrom:DataLengths])
+        K1_guess = (Int_wave[FitFrom] - K0_guess) / (Q_vct[FitFrom] ** -3.5)
+        if K1_guess <= 0: K1_guess = 1e-9
+        initial_guess = [K0_guess, K1_guess, -3.5]
+        bounds = ([0, 0, -6], [np.inf, np.inf, -0.1])
         try:
-            popt, _ = curve_fit(power_law_fnct, Q_vct[FitFrom:DataLengths], Int_wave[FitFrom:DataLengths], sigma=Err_wave[FitFrom:DataLengths],p0=initial_guess)
+            popt, _ = curve_fit(
+                power_law_fnct, 
+                Q_vct[FitFrom:DataLengths], 
+                Int_wave[FitFrom:DataLengths], 
+                sigma=Err_wave[FitFrom:DataLengths],
+                p0=initial_guess,
+                bounds=bounds,
+                maxfev=5000
+            )
             for i in range(1, NumNewPoints + 1):
                 Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
                 Int_wave[DataLengths + i] = popt[0] + popt[1] * Q_vct[DataLengths + i]**popt[2]

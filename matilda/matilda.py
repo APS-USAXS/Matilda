@@ -38,6 +38,10 @@ processUSAXSFolder(path)
 When run as main, it will process the data from the last 10 scans and blank scan
 for each USAXSstep, Flyscan, SAXS, WAXS data types.
 
+
+TODO: add to each processXYZ option to force Blank if Blanks is only one and avoid checking on order number. 
+        This is to enable use for Igor or elsewhere to use different blank than was measured prior experiment. 
+
 '''
 
 import pprint as pp

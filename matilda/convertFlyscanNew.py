@@ -1,4 +1,4 @@
-'''
+''' 
 Here we develop new code which then moves to proper package
 TODO:
     convertFlyscancalibrated.py
@@ -8,6 +8,46 @@ processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFile
         For example of use see: test_matildaLocal() at the end of this file. 
 
         
+    returns dictionary of this type:
+            result["SampleName"]=sampleName
+            result["BlankName"]=blankName
+            result["reducedData"] =  {"Intensity":np.ravel(intensity), 
+                              "Q":np.ravel(q),
+                              "Error":np.ravel(error)}
+            result["CalibratedData"] = {"Intensity":np.ravel(intcalib),
+                                    "Q":np.ravel(qcalib),
+                                    "Error":np.ravel(errcalib),
+                                   }  
+
+            this is when read from Nexus file. TODO: check and make sure it all works...  
+                    {'BlankName': 'TapeBlank_R_0317.h5',
+                'Error': array([5.41821571e+08, 3.61214381e+08, 1.80607190e+08, 1.45182650e+08,
+                    8.21066769e+07, 5.28638233e+07, 9.31836113e+07, 3.44934716e+07,
+                        ...
+                    3.70688211e-02, 3.70688211e-02, 3.70688211e-02]),
+                'Error_Attributes': <Attributes of closed HDF5 object>,
+                'Int_attributes': <Attributes of closed HDF5 object>,
+                'Intensity': array([4.52126415e+09, 3.89536685e+09, 3.08490075e+09, 2.58092468e+09,
+                    2.16199554e+09, 1.83504586e+09, 1.49810441e+09, 1.31218746e+09,
+                        ...
+                    3.24382536e-01, 3.68735659e-01, 2.65436440e-01]),
+                'Kfactor': np.float64(1.5194820557062783e-12),
+                'OmegaFactor': np.float64(4.171381472542379e-08),
+                'Q': array([1.05916862e-04, 1.09962784e-04, 1.14017257e-04, 1.18080210e-04,
+                    1.22151570e-04, 1.26231272e-04, 1.30319251e-04, 1.34415446e-04,
+                        ...
+                    2.93847771e-01, 2.97917894e-01, 3.00031668e-01]),
+                'Q_attributes': <Attributes of closed HDF5 object>,
+                'dQ': array([4.04592188e-06, 4.04592188e-06, 4.05447384e-06, 4.06295227e-06,
+                    4.07136056e-06, 4.07970183e-06, 4.08797899e-06, 4.09619476e-06,
+                        ...
+                    8.06617937e-03, 8.17837508e-03, 8.17837508e-03]),
+                'dQ_Attributes': <Attributes of closed HDF5 object>,
+                'label': 'AB3_R_0318',
+                'thickness': np.float64(1.0),
+                'units': '1/cm'}
+
+
    Does:
     Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
     If Background is None, return only reduced data, no calibration or subtraction.
@@ -406,7 +446,7 @@ def test_matildaLocal():
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
     samplePath = r"\\Mac\Home\Desktop\Data\set1"
-    sampleName="SA_R_0325.h5"
+    sampleName="AB3_R_0318.h5"
     blankPath=r"\\Mac\Home\Desktop\Data\set1" 
     blankFilename="TapeBlank_R_0317.h5"
     Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    

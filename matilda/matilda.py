@@ -70,7 +70,6 @@ from plotData import plotUSAXSResults, plotSWAXSResults
 imagePath = '/home/parallels/Desktop/'  # Path to save images
 
 recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
-
     
 # Configure logging
 # Get the directory of the current script

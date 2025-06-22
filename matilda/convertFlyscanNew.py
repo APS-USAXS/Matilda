@@ -4,94 +4,104 @@ TODO:
     convertFlyscancalibrated.py
 New, calibrated Flyscan code. 
     use: 
-processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
+processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)
         For example of use see: test_matildaLocal() at the end of this file. 
 
-    returns dictionary of this type:
-            result["SampleName"]=sampleName
-            result["BlankName"]=blankName
-            result["reducedData"] =  {"Intensity":np.ravel(intensity), 
-                              "Q":np.ravel(q),
-                              "Error":np.ravel(error)}
-            result["CalibratedData"] = {"Intensity":np.ravel(intcalib),
-                                    "Q":np.ravel(qcalib),
-                                    "Error":np.ravel(errcalib),
-                                   }  
-
-            this is when read from Nexus file. TODO: check and make sure it all works...  
-                    {'BlankName': 'TapeBlank_R_0317.h5',
-                'Error': array([5.41821571e+08, 3.61214381e+08, 1.80607190e+08, 1.45182650e+08,
-                    8.21066769e+07, 5.28638233e+07, 9.31836113e+07, 3.44934716e+07,
-                        ...
-                    3.70688211e-02, 3.70688211e-02, 3.70688211e-02]),
-                'Error_Attributes': <Attributes of closed HDF5 object>,
-                'Int_attributes': <Attributes of closed HDF5 object>,
-                'Intensity': array([4.52126415e+09, 3.89536685e+09, 3.08490075e+09, 2.58092468e+09,
-                    2.16199554e+09, 1.83504586e+09, 1.49810441e+09, 1.31218746e+09,
-                        ...
-                    3.24382536e-01, 3.68735659e-01, 2.65436440e-01]),
-                'Kfactor': np.float64(1.5194820557062783e-12),
-                'OmegaFactor': np.float64(4.171381472542379e-08),
-                'Q': array([1.05916862e-04, 1.09962784e-04, 1.14017257e-04, 1.18080210e-04,
-                    1.22151570e-04, 1.26231272e-04, 1.30319251e-04, 1.34415446e-04,
-                        ...
-                    2.93847771e-01, 2.97917894e-01, 3.00031668e-01]),
-                'Q_attributes': <Attributes of closed HDF5 object>,
-                'dQ': array([4.04592188e-06, 4.04592188e-06, 4.05447384e-06, 4.06295227e-06,
-                    4.07136056e-06, 4.07970183e-06, 4.08797899e-06, 4.09619476e-06,
-                        ...
-                    8.06617937e-03, 8.17837508e-03, 8.17837508e-03]),
-                'dQ_Attributes': <Attributes of closed HDF5 object>,
-                'label': 'AB3_R_0318',
-                'thickness': np.float64(1.0),
-                'units': '1/cm'}
-
-
+        
    Does:
     Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
-    Decide if we need to do desmearing, not ready yet.   
-    TODO: 
-    Add background path and name as input, set to None as default, if set as input then do subtarcting and calibration.
-        If not provided, stop with reduction before subtraction and return None for calibrated data. 
+    If Background is None, return only reduced data, no calibration or subtraction.
+    If Background is provided, then do calibration and subtraction.
     Store both reduced data and NXcanSAS data in original hdf file, read from file if they exist and skip data reduction. 
     Only some metadata are kept to keep all more reasonable on size
+
+    returns dictionary of this type:
+                Sample["reducedData"]["Intensity"],   
+                Sample["reducedData"]["Q"], 
+                Sample["reducedData"]["PD_range"], 
+                Sample["reducedData"]["Error"], 
+               
+                SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+                SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+
+               Sample["CalibratedData"]={
+                     "Intensity":DSM_Int,
+                     "Q":DSM_Qvec,
+                     "Error":DSM_Error,
+                     "dQ":DSM_dQ,
+                     "units":"[cm2/cm3]",
 '''
 import h5py
 import numpy as np
 import pprint
-#from scipy.optimize import curve_fit
+import os
 import matplotlib.pyplot as plt
 import pprint as pp
+import logging
+#from scipy.optimize import curve_fit
+
+
 from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
-import os
 from convertUSAXS import rebinData
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readNXcanSAS
-from convertUSAXS import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
+from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
+recalculateAllData = True
 
+MinQMinFindRatio = 1.05
 
-#develop calibrated flyscan and step scan data routines
-# this will check if NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS
-# data. It needs Blank and Sample data.
-def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExisting=False):
+# Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
+# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
     # Open the HDF5 file in read/write mode
-    #location = 'entry/displayData/'
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
         # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        # if deleteExisting:
-        #     # Delete the group
-        #     del hdf_file[location]
-        #     print("Deleted existing group 'entry/displayData'.")
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
+        if deleteExisting:
+            # Delete the groups which may have een created by previously run saveNXcanSAS
+            location = 'entry/QRS_data/'
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
+            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
+            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
 
-        # if location in hdf_file:
-        #     # exists, so lets reuse the data from the file
-        #     Sample = dict()
-        #     Sample = load_dict_from_hdf5(hdf_file, location)
-        #     print("Used existing data")
-        #     return Sample
-        # else:
+
+        #Now, we will read the data from the file, if the exist. 
+        # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
+        # if BlankName=None, then we just need the QRS_data group.   
+
+        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+        location = None
+        if blankFilename is not None and blankPath is not None:
+            location = NXcanSASentry        # require we have desmeared data
+        else:
+            location = 'entry/QRS_data/'            # all we want here are QRS data
+        
+        if location is not None and location in hdf_file:
+            # exists, so lets reuse the data from the file
+            Sample = dict()
+            Sample = readMyNXcanSAS(path, filename)
+            logging.info(f"Using existing processed data from file {filename}.")
+            return Sample
+        
+        else:
             Sample = dict()
             Sample["RawData"]=importFlyscan(path, filename)                 #import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                  # Creates PD_Intensity with corrected gains and background subtraction
@@ -104,16 +114,15 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                                     Sample["RawData"]["TimePerPoint"],
                                                     replaceNans=True))                 
 
-            if blankPath is not None and blankFilename is not None:               
+            if blankPath is not None and blankFilename is not None and blankFilename != filename:               
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename)
-                Sample["reducedData"].update(normalizeBlank(Sample))          # Normalize sample by dividing by transmission for subtraction
+                Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 #pp.pprint(Sample)
-                # TODO: check calibration
                 # TODO: fix rebinning for 3 input waves returning 4 waves with dQ
-                Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
-                # TODO: desmearing here
-                # Create the group and dataset for the new data inside the hdf5 file for future use. 
+                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
+                    Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
                 slitLength=Sample["CalibratedData"]["slitLength"]
                 #DesmearNumberOfIterations = 10
                 SMR_Int =Sample["CalibratedData"]["SMR_Int"]
@@ -130,13 +139,15 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                      "units":"[cm2/cm3]",
                      }
                 Sample["CalibratedData"].update(desmearedData)
-                #save_dict_to_hdf5(Sample, location, hdf_file)
-                #print("Appended new data to 'entry/displayData'.")
+                # save_dict_to_hdf5(Sample, location, hdf_file)
+                # print("Appended new data to 'entry/displayData'.")
+            
             else:
                 #set calibrated data in the structure to None 
                 Sample["CalibratedData"] = {"SMR_Qvec":None,
                                             "SMR_Int":None,
                                             "SMR_Error":None,
+                                            "SMR_dQ":None,
                                             "Kfactor":None,
                                             "OmegaFactor":None,
                                             "BlankName":None,
@@ -146,17 +157,21 @@ def processFlyscan(path, filename,blankPath=None, blankFilename=None, deleteExis
                                             "Q":None,
                                             "Error":None,
                                             "dQ":None,
+                                            "slitLength":None,
                                             }
-            return Sample
+        # Ensure all changes are written and close the HDF5 file
+        hdf_file.flush()
+    # The 'with' statement will automatically close the file when the block ends
+    saveNXcanSAS(Sample,path, filename)
+    return Sample
 
-def normalizeBlank(Sample):
-    # This is a simple normalization of the blank data to the sample data. 
+def normalizeByTransmission(Sample):
+    # This is a simple normalization of the Sample Intensity by transmission. 
     # It will be used for background subtraction.
     PeakIntensitySample = Sample["reducedData"]["Maximum"]
     PeakIntensityBlank = Sample["BlankData"]["Maximum"]
     PeakToPeakTransmission = PeakIntensitySample/PeakIntensityBlank
-
-
+    #BlankIntensity = Sample["BlankData"]["Intensity"]
     Intensity = Sample["reducedData"]["Intensity"]
     Intensity = Intensity / PeakToPeakTransmission
     Error = Sample["reducedData"]["Error"]
@@ -167,21 +182,48 @@ def normalizeBlank(Sample):
             }
     return result
     
+# TODO: remove deleteExisting=True for operations
+def reduceFlyscanToQR(path, filename, deleteExisting=True):
+    # Open the HDF5 file in read/write mode
+    location = 'entry/displayData/'
+    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+            # Check if the group 'displayData' exists
+            if deleteExisting:
+                # Delete the group
+                del hdf_file[location]
+                logging.info("Deleted existing group 'entry/displayData'.")
+
+            if location in hdf_file:
+                # exists, so lets reuse the data from the file
+                Sample = dict()
+                Sample = load_dict_from_hdf5(hdf_file, location)
+                logging.info(f"Used existing QR data from {filename}")
+                return Sample
+            else:
+                Sample = dict()
+                Sample["RawData"]=importFlyscan(path, filename)         #import data
+                Sample["reducedData"]= calculatePD_Fly(Sample)       # Correct gains
+                Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
+                Sample["reducedData"].update(rebinData(Sample))         #Rebin data
+                # Create the group and dataset for the new data inside the hdf5 file for future use. 
+                # these are not fully reduced data, this is for web plot purpose. 
+                save_dict_to_hdf5(Sample, location, hdf_file)
+                logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
+                return Sample
 
 def calibrateAndSubtractFlyscan(Sample):
-    # This is a step wehre we subtract and calibrate the sample and Blank. 
+    # This is a step where we subtract and calibrate the sample and Blank. 
     Intensity = Sample["reducedData"]["Intensity"]
     BL_Intensity = Sample["BlankData"]["Intensity"]
     Error = Sample["reducedData"]["Error"]
     BL_Error = Sample["BlankData"]["Error"]
     Q = Sample["reducedData"]["Q"]
     BL_Q = Sample["BlankData"]["Q"]
-
-    SMR_Qvec, SMR_Int, SMR_Error = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
-    # TODO: trim, calibrate, 
-    # find Qmin as the first point where we get above 3% of the background avleu and larger than instrument resolution
-    IntRatio = Intensity / BL_Intensity
-    # find point where the IntRatio is larger than 1.03
+        
+    SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
+    # find Qmin as the first point where we get above 5% of the background avleu and larger than instrument resolution
+    # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
+    # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
     FWHMSample = Sample["reducedData"]["FWHM"]
     FWHMBlank = Sample["BlankData"]["FWHM"]
     wavelength =  Sample["reducedData"]["wavelength"]
@@ -198,13 +240,46 @@ def calibrateAndSubtractFlyscan(Sample):
     MSAXSCorrection = MeasuredTransmission / PeakToPeakTransmission
     QminSample = 4*np.pi*np.sin(np.radians(FWHMSample)/2)/wavelength
     QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
-    indexSample = np.searchsorted(Q, QminSample)
-    indexBlank = np.searchsorted(Q, QminBlank)
-    indexRatio =  np.searchsorted(IntRatio, 1.03)
+    indexSample = np.searchsorted(Q, QminSample)+1
+    indexBlank = np.searchsorted(Q, QminBlank)+1
+    # now we need to reproduce the Q correction from Igor. 
+    MaxCorrection = 1
+    PowerCorrection = 3
+    QCorrection =  1 + MaxCorrection*(abs(QminBlank/SMR_Qvec))**PowerCorrection
+    QCorrection = np.where(QCorrection < (MaxCorrection + 1), QCorrection, MaxCorrection + 1)
+    IntRatio = IntRatio/ QCorrection  # apply the Q correction to the IntRatio
+    #we need to set IntRatio values for points up to indexSample to 1:
+    IntRatio[:indexSample] = 1
+    #plot the IntRatio
+    # plt.plot(SMR_Qvec, IntRatio, linestyle='-')  # You can customize the marker and linestyle
+    # plt.title('Plot of IntRatio vs. Q')
+    # plt.xlabel('log(Q) [1/A]')
+    # plt.xlim((1e-5, 0.0005))
+    # plt.show()    
+    # # Find the first index where IntRatio > MinQMinFindRatio
+    # np.argmax returns the first index of True. If all are False, it returns 0.
+    potential_first_index = np.argmax(IntRatio > MinQMinFindRatio)
+    if IntRatio[potential_first_index] > MinQMinFindRatio:
+        indexRatio = potential_first_index
+        #print(f"First index where IntRatio > {MinQMinFindRatio} is {indexRatio} with value {IntRatio[indexRatio]}.")
+    else:
+        # This means no element in IntRatio was > MinQMinFindRatio (argmax returned 0 and IntRatio[0] was not > 1.03)
+        indexRatio = len(IntRatio) # Default to end of array if no such point is found
+        logging.warning(f"No points found where IntRatio > {MinQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
+        
     largest_value = max(indexSample, indexBlank, indexRatio)
-    SMR_Qvec = SMR_Qvec[largest_value-1 : ]    
-    SMR_Int = SMR_Int[largest_value-1 : ]    
-    SMR_Error = SMR_Error[largest_value-1 : ]
+    # Ensure the start_index is within bounds and there's data to slice
+    if largest_value < len(SMR_Qvec):
+        SMR_Qvec = SMR_Qvec[largest_value:]    
+        SMR_Int = SMR_Int[largest_value:]    
+        SMR_Error = SMR_Error[largest_value:]
+    else:
+        # This case means the calculated start index is at or beyond the end of the array
+        logging.warning(f"Calculated start_index_for_data ({largest_value}) is at or beyond array length ({len(SMR_Qvec)}). "
+                        "Resulting SMR arrays will be empty. Check Qmin, blank, and IntRatio > 1.03 criteria.")
+        SMR_Qvec = np.array([])
+        SMR_Int = np.array([])
+        SMR_Error = np.array([])
     # now calibration... 
     SDD = Sample["RawData"]["metadata"]['detector_distance']
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
@@ -243,13 +318,13 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 if location in hdf_file:
                     # Delete the group is exists and requested
                     del hdf_file[location]
-                    print("Deleted existing group 'entry/blankData'.")
+                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
                 Blank = dict()
                 Blank = load_dict_from_hdf5(hdf_file, location)
-                print("Used existing Blank data")
+                logging.info(f"Used existing Blank data from {blankFilename}")
                 return Blank
             else:
                 Blank = dict()
@@ -277,7 +352,7 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
                 BlankData=Blank["BlankData"]
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 
                 save_dict_to_hdf5(BlankData, location, hdf_file)
-                print("Appended new Blank data to 'entry/blankData'.")
+                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
                 return BlankData
 
 
@@ -305,6 +380,10 @@ def calculatePDError(Sample, isBlank=False):
     A=(UPD_array)/(VToFFactor[0]*UPD_gains)		#without dark current subtraction
     SigmaMonitor= np.sqrt(Monitor)		            #these calculations were done for 10^6 
     ScaledMonitor = Monitor
+    A = np.where(np.isnan(A), 0.0, A)
+    SigmaMonitor = np.where(np.isnan(SigmaMonitor), 0.0, SigmaMonitor)
+    SigmaPDwDC = np.where(np.isnan(SigmaPDwDC), 0.0, SigmaPDwDC)
+    ScaledMonitor = np.where(np.isnan(ScaledMonitor), 0.0, ScaledMonitor)
     SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
     SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
     SigmaRwave=SigmaRwave * I0AmpGain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0AmpGain
@@ -326,36 +405,36 @@ def test_matildaLocal():
     #     print("File found")
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    samplePath = r"\\Mac\Home\Desktop\Data\set1"
+    samplePath = "\\Mac\Home\Desktop\Data\set1"
     sampleName="AB3_R_0318.h5"
-    blankPath=r"\\Mac\Home\Desktop\Data\set1" 
+    blankPath="\\Mac\Home\Desktop\Data\set1" 
     blankFilename="TapeBlank_R_0317.h5"
-    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)    
+    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    
     
-    # this is for testing save/restore from Nexus file... 
-    testme=False 
+    # # this is for testing save/restore from Nexus file... 
+    # testme=False 
 
-    if (testme):
-        # Specify the path and filename
-        #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
-        file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
-        # Check if the file exists before attempting to delete it
-        if os.path.exists(file_path):
-            try:
-                # Delete the file
-                os.remove(file_path)
-                print(f"File '{file_path}' has been deleted successfully.")
-            except Exception as e:
-                print(f"An error occurred while trying to delete the file: {e}")
-        else:
-            print(f"The file '{file_path}' does not exist.")
-        #removed file
-        saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
+    # if (testme):
+    #     # Specify the path and filename
+    #     #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
+    #     file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
+    #     # Check if the file exists before attempting to delete it
+    #     if os.path.exists(file_path):
+    #         try:
+    #             # Delete the file
+    #             os.remove(file_path)
+    #             print(f"File '{file_path}' has been deleted successfully.")
+    #         except Exception as e:
+    #             print(f"An error occurred while trying to delete the file: {e}")
+    #     else:
+    #         print(f"The file '{file_path}' does not exist.")
+    #     #removed file
+    #     saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
-        Data = readNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
-        pprint.pprint(Data)
-        Sample = {}
-        Sample['CalibratedData']=Data
+    Sample = {}
+    Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", sampleName)
+    #pprint.pprint(Data)
+    #Sample['CalibratedData']=Data
     # Q = Sample["reducedData"]["Q"]
     # UPD = Sample["reducedData"]["Intensity"]
     # Error = Sample["reducedData"]["Error"]

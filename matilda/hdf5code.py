@@ -12,8 +12,9 @@ import os
 import numpy as np
 import six  #what is this for???
 import datetime
+import logging
 
-def readNXcanSAS(path, filename):
+def readGenericNXcanSAS(path, filename):
     '''
     read data from NXcanSAS data in Nexus file. Ignore NXsas data and anything else
     '''
@@ -30,7 +31,7 @@ def readNXcanSAS(path, filename):
         #print(SASentries)
         FirstEntry = SASentries[0] if SASentries else None
         if FirstEntry is None:
-            print("No NXcanSAS entries found in the file.")
+            logging.warning(f"No NXcanSAS entries found in the file {filename}.")
             return None
 
         current_location = FirstEntry
@@ -42,13 +43,13 @@ def readNXcanSAS(path, filename):
                 if 'default' in f[current_location].attrs:
                     current_location = f"{current_location}/{default_location}".strip('/')
 
-        #print(f"Data is located at: {current_location}")    
+        logging.debug(f"Data is located at: {current_location}")
         group_or_dataset = f[current_location]
         # Retrieve and print the list of attributes
         attributes = group_or_dataset.attrs
-        print(f"Attributes at '{current_location}':")
+        logging.debug(f"Attributes at '{current_location}':")
         for attr_name, attr_value in attributes.items():
-            print(f"{attr_name}: {attr_value}")
+            logging.debug(f"{attr_name}: {attr_value}")
 
         data_location= current_location+'/'+attributes['signal']
         if data_location in f:
@@ -120,23 +121,37 @@ def saveNXcanSAS(Sample,path, filename):
     Error = Sample["CalibratedData"]["Error"]
     dQ = Sample["CalibratedData"]["dQ"]
     units = Sample["CalibratedData"]["units"]
-    Kfactor = Sample["CalibratedData"]["Kfactor"]
-    OmegaFactor = Sample["CalibratedData"]["OmegaFactor"]
-    BlankName = Sample["CalibratedData"]["BlankName"]
-    thickness = Sample["CalibratedData"]["thickness"]
+    Kfactor = Sample["CalibratedData"]["Kfactor"] if "Kfactor" in Sample["CalibratedData"] else None
+    OmegaFactor = Sample["CalibratedData"]["OmegaFactor"] if "OmegaFactor" in Sample["CalibratedData"] else None
+    BlankName = Sample["CalibratedData"]["BlankName"] if "BlankName" in Sample["CalibratedData"] else None
+    thickness = Sample["CalibratedData"]["thickness"] if "thickness" in Sample["CalibratedData"] else None
     label = Sample["RawData"]["Filename"]
     timeStamp = Sample["RawData"]["metadata"]["timeStamp"]
     SampleName = Sample["RawData"]["sample"]["name"]
     SampleName = SampleName.decode('utf-8')
 
-    # SMR_Int =Sample["CalibratedData"]["SMR_Int"]
-    # SMR_Error =Sample["CalibratedData"]["SMR_Error"]
-    # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
-    # SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+    if "SMR_Int" in Sample["CalibratedData"]:
+        SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+        SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+        SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+        SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+        slitLength=Sample["CalibratedData"]["slitLength"]
+    else:
+        SMR_Int = None
+        SMR_Error = None
+        SMR_Qvec = None
+        SMR_dQ = None
+        slitLength = None
 
+    R_Int = Sample["reducedData"]["Intensity"]
+    R_Qvec = Sample["reducedData"]["Q"]
+    R_Error=Sample["reducedData"]["Error"]
+
+    #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
-    with h5py.File(Filepath, "w") as f:
+    logging.info(f"Saving NXcanSAS data to {Filepath}")
+    with h5py.File(Filepath, "a") as f:
         # point to the default data to be plotted
         f.attrs['default']          = 'entry'   #our files have one entry input.
         # these are hopefullyoptional and useful. 
@@ -155,90 +170,263 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry = f['entry']
         nxentry.attrs['NX_class'] = 'NXentry'
         nxentry.attrs['default']  = SampleName   #modify with the most reduced data.
+        
         #add definition as NXsas - this is location of raw AND reduced data
+        # Check if 'definition' dataset exists in the entry group and delete it if present
+        if 'definition' in nxentry:
+            del nxentry['definition']
         nxentry.create_dataset('definition', data='NXsas')
-        # other groups shoudl be here from RAW data, so ignore. 
+        # other groups should be here from RAW data, so ignore. 
 
-        # create the NXsubentry group for reduced data. 
-        newDataPath = "entry/"+SampleName
-        nxDataEntry = f.create_group(newDataPath)
-        nxDataEntry.attrs['NX_class'] = 'NXsubentry'
-        nxDataEntry.attrs['canSAS_class'] = 'SASentry'
-        nxDataEntry.attrs['default'] = 'sasdata'
-        nxDataEntry.attrs['title'] = SampleName
-        #add definition as NXcanSas
-        nxDataEntry.create_dataset('definition', data='NXcanSAS')
-        #add title as NXcanSas
-        nxDataEntry.create_dataset('title', data=SampleName)
-        #add run (compulsory)
-        nxDataEntry.create_dataset('run', data="run_identifier")
+        if Intensity is not None:
+            logging.info(f"Wrote Desmeared NXcanSAS group for file {filename}. ")
+            # create the NXsubentry group for Desmeared reduced data. 
+            newDataPath = "entry/"+SampleName
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+            
+            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry.attrs['NX_class'] = 'NXsubentry'
+            nxDataEntry.attrs['canSAS_class'] = 'SASentry'
+            nxDataEntry.attrs['default'] = 'sasdata'
+            nxDataEntry.attrs['title'] = SampleName
+            #add definition as NXcanSas
+            nxDataEntry.create_dataset('definition', data='NXcanSAS')
+            #add title as NXcanSas
+            nxDataEntry.create_dataset('title', data=SampleName)
+            #add run (compulsory)
+            nxDataEntry.create_dataset('run', data="run_identifier")
 
-        # create the NXdata group for I(Q) for the avergaed data
-        nxdata = nxDataEntry.create_group('sasdata')
-        nxdata.attrs['NX_class'] = 'NXdata'
-        nxdata.attrs['canSAS_class'] = 'SASdata'
-        nxdata.attrs['signal'] = 'I'      # Y axis of default plot
-        nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
-        #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
+            # create the NXdata group for I(Q) for the avergaed data
+            nxdata = nxDataEntry.create_group('sasdata')
+            nxdata.attrs['NX_class'] = 'NXdata'
+            nxdata.attrs['canSAS_class'] = 'SASdata'
+            nxdata.attrs['signal'] = 'I'      # Y axis of default plot
+            nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
+            #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
 
-        # Y axis data
-        ds = nxdata.create_dataset('I', data=Intensity)
-        ds.attrs['units'] = '1/cm'
-        ds.attrs['uncertainties'] = 'Idev'
-        ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
-        ds.attrs['Kfactor'] = Kfactor
-        ds.attrs['OmegaFactor'] = OmegaFactor
-        ds.attrs['BlankName'] = BlankName
-        ds.attrs['thickness'] = thickness
-        ds.attrs['label'] = label
+            # Y axis data
+            ds = nxdata.create_dataset('I', data=Intensity)
+            ds.attrs['units'] = '1/cm'
+            ds.attrs['uncertainties'] = 'Idev'
+            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['BlankName'] = BlankName
+            ds.attrs['thickness'] = thickness
+            ds.attrs['label'] = label
+            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+            if Kfactor is not None:
+                ds.attrs['Kfactor'] = Kfactor
+            if OmegaFactor is not None:
+                ds.attrs['OmegaFactor'] = OmegaFactor
 
-        # X axis data
-        ds = nxdata.create_dataset('Q', data=Q)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
-        ds.attrs['resolutions'] = 'Qdev'
-       
-        # d X axis data
-        ds = nxdata.create_dataset('Qdev', data=dQ)
-        ds.attrs['units'] = '1/angstrom'
-        ds.attrs['long_name'] = 'Q (A^-1)'   
-        # dI axis data
-        ds = nxdata.create_dataset('Idev', data=Error)
-        ds.attrs['units'] = 'cm2/cm3'
-        ds.attrs['long_name'] = 'Uncertainties'  
-
-        # create the NXinstrument metadata group
-        # nxinstr = nxentry.create_group('instrument')
-        # nxinstr.attrs['NX_class'] = 'NXinstrument'
-        # nxinstr.attrs['canSAS_class'] = 'SASinstrument'
-
-        # nxprocess = nxinstr.create_group('simulation_engine')
-        # nxprocess.attrs['NX_class'] = 'NXprocess'
-        # nxprocess.attrs['canSAS_class'] = 'SASprocess'
-        # nxprocess.attrs['name'] = '12IDE USAXS'
-        # nxprocess.attrs['date'] = timestamp # @TODO: get timestamp from simulation run and embed here.
-        # nxprocess.attrs['description'] = 'USAXS or SWAXS data'
-
-        # sim_notes = nxprocess.create_group('NOTE')
-        # sim_notes.attrs['NX_class'] = 'NXnote'
-
-        # sim_notes.attrs['description'] = 'UUSAXS or SWAXS data'
-        # sim_notes.attrs['author'] = '12IDE USAXS/SAXS/WAXS'
-        # sim_notes.attrs['data'] = 'TBA' #@TODO
-
-        # nxsample = nxentry.create_group('sample')
-        # nxsample.attrs['NX_class'] = 'NXsample'
-        # nxsample.attrs['canSAS_class'] = 'SASsample'
+            # X axis data
+            ds = nxdata.create_dataset('Q', data=Q)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['resolutions'] = 'Qdev'
         
-        # nxsample.attrs['name'] = SampleName
-        # nxsample.attrs['description'] = 'SAMPLE DESCRIPTION GOES HERE'
-        # #nxsample.attrs['type'] = 'simulated data'
+            # d X axis data
+            ds = nxdata.create_dataset('Qdev', data=dQ)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'   
+            # dI axis data
+            ds = nxdata.create_dataset('Idev', data=Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Uncertainties'  
 
-        #comp.create_dataset
+        if SMR_Int is not None:
+            logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
+            # add the SMR data
+            # create the NXsubentry group for Desmeared reduced data. 
+            newDataPath = "entry/"+SampleName+"_SMR"
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+
+            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry.attrs['NX_class'] = 'NXsubentry'
+            nxDataEntry.attrs['canSAS_class'] = 'SASentry'
+            nxDataEntry.attrs['default'] = 'sasdata'
+            nxDataEntry.attrs['title'] = SampleName
+            #add definition as NXcanSas
+            nxDataEntry.create_dataset('definition', data='NXcanSAS')
+            #add title as NXcanSas
+            nxDataEntry.create_dataset('title', data=SampleName)
+            #add run (compulsory)
+            nxDataEntry.create_dataset('run', data="run_identifier")
+
+            # create the NXdata group for I(Q) for the avergaed data
+            nxdata = nxDataEntry.create_group('sasdata')
+            nxdata.attrs['NX_class'] = 'NXdata'
+            nxdata.attrs['canSAS_class'] = 'SASdata'
+            nxdata.attrs['signal'] = 'I'      # Y axis of default plot
+            nxdata.attrs['I_axes'] = 'Q'      # X axis of default plot
+            #nxdata.attrs['Q_indices'] = [1]    # TODO not sure what this means
+
+            # Y axis data
+            ds = nxdata.create_dataset('I', data=SMR_Int)
+            ds.attrs['units'] = '1/cm'
+            ds.attrs['uncertainties'] = 'Idev'
+            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['Kfactor'] = Kfactor
+            ds.attrs['OmegaFactor'] = OmegaFactor
+            ds.attrs['BlankName'] = BlankName
+            ds.attrs['thickness'] = thickness
+            ds.attrs['label'] = label
+
+            # X axis data
+            ds = nxdata.create_dataset('Q', data=SMR_Qvec)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['resolutions'] = 'dQw, dQI'
         
-    print("wrote file:", filename)
+            # d X axis data
+            ds = nxdata.create_dataset('dQw', data=SMR_dQ)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'dQw (A^-1)'           
+            # slitlength
+            ds = nxdata.create_dataset('dQI', data=slitLength)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'dQI (A^-1)'   
+            # dI axis data
+            ds = nxdata.create_dataset('Idev', data=SMR_Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Uncertainties'  
 
+        if R_Int is not None:
+            logging.info(f"Wrote QRS group for file {filename}. ")
+            newDataPath = "entry/"+"QRS_data"
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
 
+            nxDataEntry = f.create_group(newDataPath)
+            # R_Int axis data
+            ds = nxDataEntry.create_dataset('Intensity', data=R_Int)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+            # R_Qvec axis data
+            ds = nxDataEntry.create_dataset('Q', data=R_Qvec)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
+            # R_Error axis data
+            ds = nxDataEntry.create_dataset('Error', data=R_Error)
+            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
+            
+    
+    logging.info(f"Wrote NXcanSAS data to file: {filename}")
+
+def readMyNXcanSAS(path, filename):
+    """
+    Read My own data from NXcanSAS data in Nexus file.
+    
+    Parameters:
+    path (str): The directory path where the file is located.
+    filename (str): The name of the Nexus file to read.
+
+    Returns:
+    dict: A dictionary containing the read data.
+    """
+    Sample = dict()
+    Filepath = os.path.join(path, filename)
+    with h5py.File(Filepath, 'r') as f:
+        # Start at the root
+        # Find the NXcanSAS entries 
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(f, required_attributes, required_items)
+        logging.debug(f"Found {SASentries} entries in the file:{filename}")
+              
+        location = 'entry/QRS_data/'
+        if location in f:
+            Sample['reducedData'] = dict()
+            dataset = f[location + "Intensity"]
+            if dataset is not None:
+                Sample['reducedData']['Intensity'] = dataset[()]
+            dataset = f[location + "Q"]
+            if dataset is not None:
+                Sample['reducedData']['Q'] = dataset[()]
+            dataset = f[location + "Error"]
+            if dataset is not None:
+                Sample['reducedData']['Error'] = dataset[()]
+     
+        #location = 'entry/'+filename.split('.')[0]+'_SMR/'
+        # location is the first of entries from SASentries which contains string _SMR
+        location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
+        logging.debug(f"Found SMR entry at: {location}")
+        if location is not None and location in f:
+            Sample['CalibratedData'] = dict()
+            dataset = f[location + "sasdata/I"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Int'] = dataset[()]
+            dataset = f[location + "sasdata/Q"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Qvec'] = dataset[()]
+            dataset = f[location + "sasdata/Idev"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_Error'] = dataset[()]
+            dataset = f[location + "sasdata/dQw"]
+            if dataset is not None:
+                Sample['CalibratedData']['SMR_dQ'] = dataset[()]
+            dataset = f[location + "sasdata/dQI"]
+            if dataset is not None:
+                Sample['CalibratedData']['slitLength'] = dataset[()]
+        else:
+            Sample['CalibratedData'] = dict()
+            Sample["CalibratedData"] ["SMR_Qvec"] = None,
+            Sample["CalibratedData"] ["SMR_Int"] = None,
+            Sample["CalibratedData"] ["SMR_Error"] = None,
+            Sample["CalibratedData"] ["SMR_dQ"] = None,
+            Sample["CalibratedData"] ["slitLength"] = None,
+
+     
+        location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+        logging.debug(f"Found NXcanSAS entry at: {location}")
+        if location is not None and location in f:
+            Sample['CalibratedData'] = dict()
+            Sample['RawData'] = dict()
+            Sample['RawData']['sample'] = dict()
+            dataset = f[location + "sasdata/I"]
+            if dataset is not None:
+                Sample['CalibratedData']['Intensity'] = dataset[()]
+            dataset = f[location + "sasdata/Q"]
+            if dataset is not None:
+                Sample['CalibratedData']['Q'] = dataset[()]
+            dataset = f[location + "sasdata/Idev"]
+            if dataset is not None:
+                Sample['CalibratedData']['Error'] = dataset[()]
+            dataset = f[location + "sasdata/Qdev"]
+            if dataset is not None:
+                Sample['CalibratedData']['dQ'] = dataset[()]            
+            dataset = f[location + "title"]
+            if dataset is not None:
+                Sample["RawData"]["sample"]["name"] = dataset[()]
+            attributes = f[location + "sasdata/I"].attrs
+            Sample['CalibratedData']['units'] = attributes['units']
+            Sample['CalibratedData']['BlankName'] = attributes["BlankName"]
+            Sample['CalibratedData']['thickness'] = attributes["thickness"]
+            Sample["RawData"]["Filename"] = attributes["label"]
+            Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
+            Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
+        else:
+            Sample['CalibratedData'] = dict()
+            Sample['RawData'] = dict()
+            Sample["RawData"]["Filename"] = filename
+            Sample["RawData"]["sample"] = dict()
+            Sample['CalibratedData']['Intensity'] = None
+            Sample['CalibratedData']['Q'] = None
+            Sample['CalibratedData']['Error'] = None
+            Sample['CalibratedData']['Kfactor'] = None
+            Sample['CalibratedData']['OmegaFactor'] = None
+            Sample['CalibratedData']['BlankName'] = None
+            Sample['CalibratedData']['thickness'] = None
+            Sample['CalibratedData']['units'] = None
+            Sample['CalibratedData']['Error'] = None
+
+     
+        return Sample
 
 
 
@@ -254,7 +442,7 @@ def save_dict_to_hdf5(dic, location, h5file):
         for key, item in dic.items():
             if isinstance(item, dict):
                 # Create a new group for nested dictionaries
-                print(f"Creating group: {path} + {key}")
+                logging.debug(f"Creating group: {path} + {key}")
                 group = h5file.create_group(path + key)
                 recursively_save_dict_contents_to_group(h5file, path + key + '/', item)
             else:

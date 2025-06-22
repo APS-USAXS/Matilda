@@ -122,7 +122,7 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
     
     if ErrorMessages:
         ExtensionFailed = True
-        print(f"Extending data by average intensity (aka:flat)")
+        logging.warning(f"Extending data by average intensity (aka:flat). Error was: {ErrorMessages}")
         AveInt = np.mean(Int_wave[FitFrom:DataLengths])
         for i in range(1, NumNewPoints + 1):
             Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
@@ -363,7 +363,10 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
     NormalizedError = NormalizedError[:numOfPoints]
 
     # Calculate normalized error
-    NormalizedError = (origSmearedInt - SmFitIntensity) / origSmearedErr
+    # Handle division by zero for origSmearedErr
+    with np.errstate(divide='ignore', invalid='ignore'):
+        NormalizedError = np.where(origSmearedErr != 0, (origSmearedInt - SmFitIntensity) / origSmearedErr, 0)
+
 
     # Fast and slow convergence
     FastFitIntensity = DesmearIntWave * (origSmearedInt / SmFitIntensity)
@@ -453,11 +456,9 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
         oldendme = endme
         NumIterations += 1
         #Conditions under which we will end 
-        if (endme < DesmearAutoTargChisq or abs(difff) < 0.02 or NumIterations > MaxNumIter):
-            # print("Convergence reached")
-            # print("Number of iterations (>", MaxNumIter,"): ", NumIterations)
-            # print("Final average error (<0.5): ", endme)
-            # print("Final convergence (<0.02): ", abs(difff))
+        if (endme < DesmearAutoTargChisq or abs(difff) < 0.02 or NumIterations >= MaxNumIter):
+            logging.info(f"Desmearing convergence reached after {NumIterations} iterations. "
+                         f"Final avg error: {endme:.4f} (target < {DesmearAutoTargChisq}). Diff: {abs(difff):.4f} (target < 0.02).")
             break
 
     DSM_Int = np.copy(tmpWork_Int)
@@ -466,4 +467,3 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
     DSM_dQ = np.copy(tmpWork_dQ)
     #print(NumIterations)
     return DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ
-

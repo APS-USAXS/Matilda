@@ -197,7 +197,7 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
 
 # Process the step scan data files
 def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
-    results=[]
+    results=[] 
     for scan in ListOfScans:
         path = scan[0]
         filename = scan[1]

@@ -171,7 +171,6 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry.attrs['NX_class'] = 'NXentry'
         nxentry.attrs['canSAS_class'] = 'SASentry'
         nxentry.attrs['default']  = SampleName   #modify with the most reduced data.
-
         
         #add definition as NXsas - this is location of raw AND reduced data
         # Check if 'definition' dataset exists in the entry group and delete it if present

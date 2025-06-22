@@ -322,7 +322,11 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         popt, _ = curve_fit(modifiedGauss, xdata_filtered, ydata_filtered, p0=initial_guess)
 
         # Extract the fitted parameters
+<<<<<<< HEAD
         amplitude, x0, sigma, exponent = popt
+=======
+        amplitude, x0, sigma, dparam = popt
+>>>>>>> origin/main
       
         # Calculate the FWHM
         # Calculate the half maximum

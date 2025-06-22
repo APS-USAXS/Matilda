@@ -127,7 +127,7 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
         #     pass
         #     #print("Done processing the Flyscans")
         # Call the imported processFlyscan (singular) which does the actual data reduction
-        logging.info(f"Idenitfied for scan: {scan_filename}  blank: {selected_blank_filename}")
+        logging.info(f"Found blank for {scan_filename} , blank name : {selected_blank_filename}")
     return selected_blank_path, selected_blank_filename   
 
 def _parse_filename_info(filename):

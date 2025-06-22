@@ -157,11 +157,6 @@ def processUSAXSFolder(path):
 
 
 
-def extract_number_from_filename(filename):
-    """Extract number from filename, return 0 if no number found"""
-    match = re.search(r'_(\d+)\.hdf', filename)
-    return int(match.group(1)) if match else 0
-
 #process list of flyscans, finding the appropriate blank for each.
 def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData):
     """
@@ -218,6 +213,11 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllDa
             logging.error(f"Error processing AD scan {scan_filename}: {e}", exc_info=True)
     return results
 
+
+def extract_number_from_filename(filename):
+    """Extract number from filename, return 0 if no number found"""
+    match = re.search(r'_(\d+)\.hdf', filename)
+    return int(match.group(1)) if match else 0
 
 
 

@@ -138,6 +138,135 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
     return Sample
 
 
+def reduceADToQR(path, filename):
+        tempFilename= os.path.splitext(filename)[0]
+        tempSample = {"RawData":{"Filename": tempFilename}}
+        # label = data_dict["RawData"]["Filename"]
+        # Q_array = data_dict["reducedData"]["Q_array"]
+        # Intensity = data_dict["reducedData"]["PD_intensity"]
+        tempSample["reducedData"]=ImportAndReduceAD(path, filename)
+        #pp.pprint(tempSample)
+        #pp.pprint(tempSample["RawData"]["Filename"])
+        return tempSample
+
+
+## main code here
+def ImportAndReduceAD(path, filename, deleteExisting=False):
+    # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
+    location = 'entry/displayData/'
+    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+        # Check if the group 'displayData' exists
+        if deleteExisting:
+            # Delete the group
+            del hdf_file[location]
+            print("Deleted existing group 'entry/displayData'.")
+
+        if location in hdf_file:
+            # exists, so lets reuse the data from the file
+            Sample = dict()
+            Sample = load_dict_from_hdf5(hdf_file, location)
+            print("Used existing data")
+            q = Sample["reducedData"]["Q_array"]
+            intensity = Sample["reducedData"]["Intensity"]
+            result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}  
+            return result
+        
+        
+        else:
+            Sample = dict()
+            #read various data sets
+            logging.info(f"Read file :{filename}")
+            dataset = hdf_file['/entry/data/data'] 
+            my2DData = np.array(dataset)
+            #metadata
+            instrument_group = hdf_file['/entry/instrument']
+            instrument_dict = read_group_to_dict(instrument_group)
+            #metadata
+            keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_gated',
+                            'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrI0gain','Pin_TrPD','Pin_TrPDgain',
+                            'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
+                            'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
+                            'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
+                            'scaler_freq'                     
+                        ]        
+            metadata_group = hdf_file['/entry/Metadata']
+            metadata_dict = read_group_to_dict(metadata_group)
+            metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+            # wavelength, keep in A for Fit2D
+            wavelength = instrument_dict["monochromator"]["wavelength"]
+            # pixel_size, keep in mm, converted in convert_Nika_to_Fit2D to micron for Fit2D and then to m for pyFAI... 
+            pixel_size1 = instrument_dict["detector"]["x_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
+            # assume pixels are square, therefore size2 is not needed. No idea how to fix this in Nika or pyFAI for that matter anyway. 
+            #pixel_size2 = instrument_dict["detector"]["y_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
+            # detector_distance, keep in mm for Fit2D
+            detector_distance = instrument_dict["detector"]["distance"] #in mm in Nika, in mm in Fit2D
+            #logging.info(f"Read metadata")
+            if "pin_ccd_tilt_x" in metadata_dict:                       # this is SAXS
+                usingWAXS=0
+                BCX= instrument_dict["detector"]["beam_center_x"]       #  This will be swapped later in convert_Nika_to_Fit2D 
+                BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
+                HorTilt = metadata_dict["pin_ccd_tilt_x"]               #   keep in degrees for Fit2D
+                VertTilt = metadata_dict["pin_ccd_tilt_y"]              #   keep in degrees for Fit2D
+            else:                                                       # and this is WAXS
+                usingWAXS=1
+                BCX = instrument_dict["detector"]["beam_center_x"]      #  This will be swapped later in convert_Nika_to_Fit2D
+                BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
+                HorTilt = metadata_dict["waxs_ccd_tilt_x"]              #   keep in degrees for Fit2D
+                VertTilt = metadata_dict["waxs_ccd_tilt_y"]             #   keep in degrees for Fit2D    
+
+            #logging.info(f"Finished reading metadata")
+        
+        # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
+        my_poni = convert_Nika_to_Fit2D(SSD=detector_distance, pix_size=pixel_size1, BCX=BCX, BCY=BCY, HorTilt=HorTilt, VertTilt=VertTilt, wavelength=wavelength)
+
+        #create mask here. Duplicate the my2DData and set all values above 1e7 to NaN for WAXS or for SAXS mask all negative intensities
+        # the differecne is due to Pilatus vs Eiger handing bad pixels differently. Dectris issue... 
+        if usingWAXS:
+            mask = np.copy(my2DData)
+            mask = 0*mask   # set all values to zero
+            mask[my2DData > 1e7] = 1
+            mask[:, 511:516] = 1
+            mask[:, 1026:1041] = 1
+            mask[:, 1551:1556] = 1
+        else:
+            mask = np.copy(my2DData)
+            mask = 0*mask   # set all values to zero
+            mask[my2DData < 0] = 1
+            # Set the first 4 rows to 1
+            mask[:, :4] = 1
+            # Set rows 192 to 195 to 1
+            mask[:, 242:245] = 1
+
+        #logging.info(f"Finished creating mask")
+        
+        #now define integrator... using pyFAI here. 
+        # this does not work, they really do not have way to pass whole poni in? 
+        #ai = AzimuthalIntegrator(poni=my_poni)
+        # but this works fine
+        ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
+                            rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
+                            wavelength=my_poni.wavelength)
+        
+        #   You can specify the number of bins for the integration
+        #   set npt to larger of dimmension of my2DData
+        if usingWAXS:
+            npt = max(my2DData.shape)
+        else:
+            npt=200 
+        #npt = 1000  # Number of bins, if should be lower
+        # Perform azimuthal integration
+        q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
+        #logging.info(f"Finished 2d to 1D conversion")
+        Sample["reducedData"] = dict()
+        Sample["reducedData"]["Q_array"] = q
+        Sample["reducedData"]["Intensity"] = intensity
+        save_dict_to_hdf5(Sample, location, hdf_file)
+        print("Appended new data to 'entry/displayData'.")
+        result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
+        return result
+
+
+
 
 def importADData(path, filename):
     Filepath = os.path.join(path, filename)

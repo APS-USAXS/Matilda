@@ -1,7 +1,8 @@
 ''' 
 
-    Import data from flyscan or step scan hdf5 file
+    Import data from step scan hdf5 file
     and convert to QRdata
+    TODO: fix calibration and saving. 
 
     First check if group root:DisplayData exists, if not, load data, process and save for future use. 
     If it exists, load data from it.
@@ -22,12 +23,10 @@ import pprint as pp
 from supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from supportFunctions import gaussian, modifiedGauss
 from supportFunctions import beamCenterCorrection, rebinData
-from rebinData import rebin_QRSdata
+from supportFunctions import rebin_QRSdata
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5
 
 
-
-## Flyscan main code here
 
 
 ## Stepscan main code here
@@ -157,23 +156,6 @@ def CorrectUPDGainsStep(data_dict):
     return result
 
 
-def PlotResults(data_dict):
-        # Plot UPD vs Q.
-    Q = data_dict["reducedData"]["Q"]
-    Intensity = data_dict["reducedData"]["Intensity"]
-    
-        # Plot ydata against xdata
-    plt.figure(figsize=(6, 12))
-    plt.plot(Q, Intensity, marker='o', linestyle='-')  # You can customize the marker and linestyle
-    plt.title('Plot of UPD vs. Q')
-    plt.xlabel('log(Q) [1/A]')
-    plt.ylabel('UPD')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show()
-
-
 # TODO: remove deleteExisting=True for operations
 def reduceStepScanToQR(path, filename, deleteExisting=True):
   # Open the HDF5 file in read/write mode
@@ -201,6 +183,25 @@ def reduceStepScanToQR(path, filename, deleteExisting=True):
                 return Sample
 
 
+# def PlotResults(data_dict):
+#         # Plot UPD vs Q.
+#     Q = data_dict["reducedData"]["Q"]
+#     Intensity = data_dict["reducedData"]["Intensity"]
+    
+#         # Plot ydata against xdata
+#     plt.figure(figsize=(6, 12))
+#     plt.plot(Q, Intensity, marker='o', linestyle='-')  # You can customize the marker and linestyle
+#     plt.title('Plot of UPD vs. Q')
+#     plt.xlabel('log(Q) [1/A]')
+#     plt.ylabel('UPD')
+#     plt.xscale('log')
+#     plt.yscale('log')
+#     plt.grid(True)
+#     plt.show()
+
+
+
+
 
 if __name__ == "__main__":
     Sample = dict()
@@ -220,7 +221,7 @@ if __name__ == "__main__":
     # Sample["reducedData"]= CorrectUPDGainsFly(Sample)
     # Sample["reducedData"].update(BeamCenterCorrection(Sample))
     # #pp.pprint(Sample["reducedData"])
-    PlotResults(Sample)
+    #PlotResults(Sample)
 
   
     

@@ -405,11 +405,11 @@ def test_matildaLocal():
     #     print("File found")
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    samplePath = "\\Mac\Home\Desktop\Data\set1"
-    sampleName="AB3_R_0318.h5"
-    blankPath="\\Mac\Home\Desktop\Data\set1" 
-    blankFilename="TapeBlank_R_0317.h5"
-    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    
+    # samplePath = "\\Mac\Home\Desktop\Data\set1"
+    # sampleName="AB3_R_0318.h5"
+    # blankPath="\\Mac\Home\Desktop\Data\set1" 
+    # blankFilename="TapeBlank_R_0317.h5"
+    # Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    
     
     # # this is for testing save/restore from Nexus file... 
     # testme=False 

@@ -107,33 +107,54 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
                                                     Sample["RawData"]["TimePerPoint"],
                                                     replaceNans=True))                 
 
-            if blankPath is not None and blankFilename is not None and blankFilename != filename:               
+            if (
+                blankPath is not None
+                and blankFilename is not None
+                and blankFilename != filename
+                and "blank" not in filename.lower()
+            ):
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
-                #pp.pprint(Sample)
-                # TODO: fix rebinning for 3 input waves returning 4 waves with dQ
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
-                if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
-                    Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
-                slitLength=Sample["CalibratedData"]["slitLength"]
-                #DesmearNumberOfIterations = 10
-                SMR_Int =Sample["CalibratedData"]["SMR_Int"]
-                SMR_Error =Sample["CalibratedData"]["SMR_Error"]
-                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
-                SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod='PowerLaw w flat',ExtrapQstart=0.1, MaxNumIter = 20)
-                desmearedData=list()
-                desmearedData={
-                     "Intensity":DSM_Int,
-                     "Q":DSM_Qvec,
-                     "Error":DSM_Error,
-                     "dQ":DSM_dQ,
-                     "units":"[cm2/cm3]",
-                     }
-                Sample["CalibratedData"].update(desmearedData)
-                # save_dict_to_hdf5(Sample, location, hdf_file)
-                # print("Appended new data to 'entry/displayData'.")
+                if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
+                    if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
+                        Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
+                    slitLength=Sample["CalibratedData"]["slitLength"]
+                    #DesmearNumberOfIterations = 10
+                    SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+                    SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+                    SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                    SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod='PowerLaw w flat',ExtrapQstart=0.1, MaxNumIter = 20)
+                    desmearedData=list()
+                    desmearedData={
+                        "Intensity":DSM_Int,
+                        "Q":DSM_Qvec,
+                        "Error":DSM_Error,
+                        "dQ":DSM_dQ,
+                        "units":"[cm2/cm3]",
+                        }
+                    Sample["CalibratedData"].update(desmearedData)
+                else:
+                    logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
+                                    "Skipping desmearing and rebinning steps. ")
+                    #set calibrated data in the structure to None 
+                    Sample["CalibratedData"] = {"SMR_Qvec":None,
+                                                "SMR_Int":None,
+                                                "SMR_Error":None,
+                                                "SMR_dQ":None,
+                                                "Kfactor":None,
+                                                "OmegaFactor":None,
+                                                "BlankName":None,
+                                                "thickness":None,
+                                                "units":"[cm2/cm3]",
+                                                "Intensity":None,
+                                                "Q":None,
+                                                "Error":None,
+                                                "dQ":None,
+                                                "slitLength":None,
+                                                }                    
             
             else:
                 #set calibrated data in the structure to None 

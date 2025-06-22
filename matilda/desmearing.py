@@ -122,7 +122,7 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
     
     if ErrorMessages:
         ExtensionFailed = True
-        print(f"Extending data by average intensity (aka:flat)")
+        #print(f"Extending data by average intensity (aka:flat)")
         AveInt = np.mean(Int_wave[FitFrom:DataLengths])
         for i in range(1, NumNewPoints + 1):
             Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
@@ -363,7 +363,10 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
     NormalizedError = NormalizedError[:numOfPoints]
 
     # Calculate normalized error
-    NormalizedError = (origSmearedInt - SmFitIntensity) / origSmearedErr
+    # Handle division by zero for origSmearedErr
+    with np.errstate(divide='ignore', invalid='ignore'):
+        NormalizedError = np.where(origSmearedErr != 0, (origSmearedInt - SmFitIntensity) / origSmearedErr, 0)
+
 
     # Fast and slow convergence
     FastFitIntensity = DesmearIntWave * (origSmearedInt / SmFitIntensity)
@@ -466,4 +469,3 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
     DSM_dQ = np.copy(tmpWork_dQ)
     #print(NumIterations)
     return DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ
-

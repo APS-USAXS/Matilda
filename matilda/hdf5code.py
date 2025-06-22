@@ -150,7 +150,7 @@ def saveNXcanSAS(Sample,path, filename):
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
-    print(f"Saving NXcanSAS data to {Filepath}")
+    #print(f"Saving NXcanSAS data to {Filepath}")
     with h5py.File(Filepath, "a") as f:
         # point to the default data to be plotted
         f.attrs['default']          = 'entry'   #our files have one entry input.

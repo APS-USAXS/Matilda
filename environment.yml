@@ -8,14 +8,10 @@ dependencies:
   - python=3.12.3
   - numpy
   - tifffile
-  - pandas
   - scipy
   - matplotlib
   - pyfai
-  - xarray
-  - requests
   - pip
   
   - pip:
     - h5py
-

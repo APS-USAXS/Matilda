@@ -197,7 +197,7 @@ def normalizeByTransmission(Sample):
     return result
     
 # TODO: remove deleteExisting=True for operations
-def reduceFlyscanToQR(path, filename, deleteExisting=True):
+def reduceFlyscanToQR(path, filename, deleteExisting=recalculateAllData):
     # Open the HDF5 file in read/write mode
     location = 'entry/displayData/'
     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
@@ -247,7 +247,9 @@ def calibrateAndSubtractFlyscan(Sample):
     BlI0Counts = Sample['BlankData']['BlI0Counts']
     BlI0Gain = Sample['BlankData']['BlI0Gain']
 
-    #Intensity and Error are corrected for transmission in normalizebytransmission above. 
+    #TODO: remove nans from both sets of arrays here. 
+    
+    #Intensity and Error are corrected for transmission in normalize by transmission above. 
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
     # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
     MaxSMR_Int = np.max(SMR_Int)
@@ -333,7 +335,7 @@ def calibrateAndSubtractFlyscan(Sample):
             "units":"[cm2/cm3]"
             }
 
-def getBlankFlyscan(blankPath, blankFilename, deleteExisting=False):
+def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData):
       # will reduce the blank linked as input into Igor BL_R_Int 
       # after reducing this first time, data are saved in Nexus file for subsequent use. 
       # We get the BL_QRS and calibration data as result.

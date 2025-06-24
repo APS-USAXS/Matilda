@@ -472,6 +472,10 @@ def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=
                 r_error[i] = r_error[i]
 
     intensity = np.exp(smooth_intensity)
+    #occasionally we are running out of number resolution here and we are getting 0 as exp(smooth_value)
+    #this is a hack to fix that, the dynamic range o fthe nstrumet is at most 11 decades, so let's fix background to that. 
+    MaxInt = np.max(intensity)
+    intensity[intensity < MaxInt*1e-11 ] = MaxInt*1e-11
     return  {"Intensity":intensity,
               "Error":r_error} 
 
@@ -494,19 +498,33 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
         - Ydiff is the difference between Y1 and interpolated Y2.
         - Esub is the propagated uncertainty.
         - IntRatio is the ratio of Y1 to Y2.
-    """
+    """    
     # Step 1: Interpolate log(Y2) vs X2 to values of X1
+    # we need to do some gymnastics developed in IN2G_LogInterpolateIntensity
+    # this offsets intensity high enough that log does not faill.
+    # find Y2 minimum
+    Y2_min = np.min(Y2)
+    #if Y2_min<1e-30, offset whole Y2 by 3*abs(Y2_min)
+    offset=0
+    if Y2_min<1e-30:
+        offset =  3*abs(Y2_min)
+    
+    Y2 = Y2 + offset
     logY2 = np.log(Y2)
     logY2_interp_func = interp1d(X2, logY2, kind='linear', fill_value='extrapolate')
-    logY2_interp = logY2_interp_func(X1)
+    logY2_interp = logY2_interp_func(X1) #this is the interpolation. 
 
     # Convert interpolated logY2 back to Y2interp
     Y2_interp = np.exp(logY2_interp)
 
+    #fix the offset, if it was added:
+    if offset>0:
+        Y2_interp = Y2_interp - offset
+
     # Step 2: Subtract Y1 - Y2interp to obtain Ydiff and divide to get IntRatio
     Ydiff = Y1 - Y2_interp
 
-    IntRatio = Y1 / Y2_interp  # Calculate the intensity ratio
+    IntRatio = np.abs(Y1 / Y2_interp)  # Calculate the intensity ratio
     
     # Step 3: Linearly interpolate E2 vs X2 to have E2interp vs X1
     E2_interp_func = interp1d(X2, E2, kind='linear', fill_value='extrapolate')

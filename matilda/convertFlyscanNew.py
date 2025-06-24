@@ -42,7 +42,7 @@ from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readM
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from desmearing import desmearData
 
-recalculateAllData = True
+recalculateAllData = False
 
 MinQMinFindRatio = 1.05
 

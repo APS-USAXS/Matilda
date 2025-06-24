@@ -144,7 +144,7 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
         # Add legend
         plt.legend()
         # Save the plot as a JPEG image
-        plt.savefig(os.path.join(imagePath, 'waxs_cal.jpg'), format='jpg', dpi=300)
+        plt.savefig(os.path.join(imagePath, 'waxs.jpg'), format='jpg', dpi=300)
         #plt.show()
         plt.close()
 
@@ -173,7 +173,7 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
         # Add legend
         plt.legend()
         # Save the plot as a JPEG image
-        plt.savefig(os.path.join(imagePath, 'saxs_calib.jpg'), format='jpg', dpi=300)
+        plt.savefig(os.path.join(imagePath, 'saxs_cal.jpg'), format='jpg', dpi=300)
         #plt.show()
         plt.close()
 
@@ -187,7 +187,7 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
         # Add legend
         plt.legend()
         # Save the plot as a JPEG image
-        plt.savefig(os.path.join(imagePath, 'waxs_calib.jpg'), format='jpg', dpi=300)
+        plt.savefig(os.path.join(imagePath, 'waxs_cal.jpg'), format='jpg', dpi=300)
         #plt.show()
         plt.close()
 

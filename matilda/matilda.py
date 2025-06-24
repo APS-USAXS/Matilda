@@ -262,12 +262,12 @@ if __name__ == "__main__":
                     #result = processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=True,forceFirstBlank=True)  
             logging.info("Processing the Flyscans")
             ListOfScans = FindLastScanData("Flyscan",10,50)
+            #path, filename = ListOfScans[-1]
             listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=10, lastNdays=50)   #FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0)
             logging.info(f'Got list : {ListOfScans}')
             logging.info(f'Got blank list : {listOfBlanks}')
             if len(ListOfScans) > 0:
                 results = processFlyscans(ListOfScans, listOfBlanks)
-                            #path, filename = ListOfScans[0]
                             # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                             #                'AirBlank_1076.h5']]
                 plotUSAXSResults(results, imagePath, isFlyscan=True)  

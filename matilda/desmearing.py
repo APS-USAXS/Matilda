@@ -387,11 +387,8 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
         BckgStartQ = QWave[-1] / 1.5
 
     SmFitIntensity = np.copy(DesmearIntWave)
-    # remove NaNs and infs from the original smeared intensity and errors
-    SmFitIntensity = np.nan_to_num(SmFitIntensity, nan=0.0, posinf=0.0, neginf=0.0)
     SmQWave = np.copy(QWave)
     SmErrors = np.copy(origSmearedErr)
-    #SmErrors = np.nan_to_num(origSmearedErr, nan=0.0)
     #here we extend the data to be at least slit length longer. 
     # it shoudl never fail as if it does with complex functions, inside will simply do flat extension.
     SmQWave, SmFitIntensity, SmErrors, ExtensionFailed = extendData(QWave,DesmearIntWave,SmErrors, SlitLength, BckgStartQ, BackgroundFunction)

@@ -254,41 +254,27 @@ def extract_number_from_filename(filename):
 
 if __name__ == "__main__":
     try:
+        listofFlyscansOld=dict{}
+        listofStepScansOld=dict{}
+        listofSAXSOld={}
+        listOfWAXSOld={}
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
-                    #processUSAXSFolder(r"\\Mac\Home\Desktop\06_12_GlassyCarbon\\")
-                    #ListOfScans=[[r"\\Mac\Home\Desktop\06_12_GlassyCarbon\06_12_GlassyCarbon_usaxs","SRM3600_T_0017.h5"]]
-                    #ListOfBlanks=[[r"\\Mac\Home\Desktop\06_12_GlassyCarbon\06_12_GlassyCarbon_usaxs","AirBlank_T_0016.h5"]]
-                    #result = processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=True,forceFirstBlank=True)  
+
             logging.info("Processing the Flyscans")
-            ListOfScans = FindLastScanData("Flyscan",10,50)
-            #path, filename = ListOfScans[-1]
-            listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=10, lastNdays=50)   #FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0)
-            logging.info(f'Got list : {ListOfScans}')
-            logging.info(f'Got blank list : {listOfBlanks}')
-            if len(ListOfScans) > 0:
-                results = processFlyscans(ListOfScans, listOfBlanks)
-                            # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'AirBlank_1076.h5']]
-                plotUSAXSResults(results, imagePath, isFlyscan=True)  
+            ListOfScans = FindLastScanData("Flyscan",10,5)
+            #need to check, if we have same list as before and if yes, skip everything
+            if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
+                logging.info('No new Flyscan data found')
             else:
-                logging.info('No Step scan data found')             
-                            # ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016HRC_T4_V_1077.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016HRC_T4_H_V_1084.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016HRC_RB_H_1085.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016ACT_T4_V_H_1086.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016ACT_T4_H_V_1087.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'R6016HRC_T4_V_H_1083.h5'],
-                            #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                            #                'AirBlank_1076.h5'],
-                            #                ]
-                            #                #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',                
+                #path, filename = ListOfScans[-1]
+                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=10, lastNdays=5) 
+                logging.info(f'Got list : {ListOfScans}')
+                logging.info(f'Got blank list : {listOfBlanks}')
+                results = processFlyscans(ListOfScans, listOfBlanks)
+                plotUSAXSResults(results, imagePath, isFlyscan=True) 
+                listofFlyscansOld = ListOfScans 
+            
         
             # logging.info('Processing the step scans')
             # ListOfScans = FindLastScanData("uascan",10,50) 
@@ -300,66 +286,28 @@ if __name__ == "__main__":
             #     logging.info('No Step scan data found') 
 
             logging.info("Processing the SAXS")
-            ListOfScans = FindLastScanData("SAXS",10,50)
-                        # ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016HRC_T4_V_1077.hdf'],   
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016HRC_T4_H_V_1084.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016HRC_RB_H_1085.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016ACT_T4_V_H_1086.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016ACT_T4_H_V_1087.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'R6016HRC_T4_V_H_1083.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'AirBlank_1076.hdf'],
-                        #                ]
-                        #                #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                        #                #'AirBlank_1076.hdf'],]
-                        # path, filename = ListOfScans[0]
-            listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=10, lastNdays=50)
-                        # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_saxs',
-                        #                'AirBlank_1076.hdf']]
-            logging.info(f'Got list : {ListOfScans}')
-            logging.info(f'Got blank list : {listOfBlanks}')
-            if len(ListOfScans) > 0:
-                results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS = True)  
+            ListOfScans = FindLastScanData("SAXS",10,5)
+            if ListOfScans == listofSAXSOld or len(ListOfScans) == 0:
+                logging.info('No new SAXS data found')
             else:
-                logging.info('No SAXS scan data found') 
+                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=10, lastNdays=5)
+                logging.info(f'Got list : {ListOfScans}')
+                logging.info(f'Got blank list : {listOfBlanks}')
+                results = processADscans(ListOfScans, listOfBlanks)
+                plotSWAXSResults(results, imagePath, isSAXS = True) 
+                listofSAXSOld = ListOfScans 
 
             logging.info("Processing the WAXS")
-            ListOfScans = FindLastScanData("WAXS",10,50)
-                        # ListOfScans = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016HRC_T4_V_1077.hdf'],   
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016HRC_T4_H_V_1084.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016HRC_RB_H_1085.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016ACT_T4_V_H_1086.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016ACT_T4_H_V_1087.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'R6016HRC_T4_V_H_1083.hdf'],
-                        #                ['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'AirBlank_1076.hdf'],
-                        #                ]
-                        #                #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
-                        #                #'AirBlank_1076.hdf'],]
-                        # path, filename = ListOfScans[0]
-            listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=10, lastNdays=50)
-                        # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_waxs',
-                        #                'AirBlank_1076.hdf']]
-            logging.info(f'Got list : {ListOfScans}')
-            logging.info(f'Got blank list : {listOfBlanks}')
-            if len(ListOfScans) > 0:
+            ListOfScans = FindLastScanData("WAXS",10,5)
+            if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
+                logging.info('No new WAXS data found')
+            else:
+                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=10, lastNdays=5)
+                logging.info(f'Got list : {ListOfScans}')
+                logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)      
                 plotSWAXSResults(results, imagePath, isSAXS = False)  
-            else:
-                logging.info('No WAXS scan data found') 
+                listofWAXSOld = ListOfScans 
 
             time.sleep(30)
     except KeyboardInterrupt:

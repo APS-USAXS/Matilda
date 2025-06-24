@@ -249,7 +249,18 @@ def calibrateAndSubtractFlyscan(Sample):
 
     #Intensity and Error are corrected for transmission in normalizebytransmission above. 
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
-    # find Qmin as the first point where we get above 5% of the background avleu and larger than instrument resolution
+    # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
+    MaxSMR_Int = np.max(SMR_Int)
+    #find min value in SMR_Int for points from half to end
+    MinSMR_Int = np.min(SMR_Int[int(len(SMR_Int)/2):])
+    #if MinSMR_Int < 0, then we need add to SMR_Int enough to lift it above zero
+    ScaleByBackground = 1.1         #this is from Igor code IN3_FixNegativeIntensities
+    ScaleByIntMax = 3e-11           #this is from Igor code IN3_FixNegativeIntensities
+    if MinSMR_Int < 0:
+        AddToSMR_Int = abs(MinSMR_Int) * ScaleByBackground + ScaleByIntMax * MaxSMR_Int
+        SMR_Int = SMR_Int + AddToSMR_Int
+    # now we needd to select Qmin which makes sense for the instrument resolution and sample scattering
+    # find Qmin as the first point where we get above 5% of the background level and larger than instrument resolution
     # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
     # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
 
@@ -259,7 +270,7 @@ def calibrateAndSubtractFlyscan(Sample):
     QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
     indexSample = np.searchsorted(Q, QminSample)+1
     indexBlank = np.searchsorted(Q, QminBlank)+1
-    # now we need to reproduce the Q correction from Igor. 
+    # now we need to reproduce the Q correction for 1.05 from Igor. These are values from there... 
     MaxCorrection = 1
     PowerCorrection = 3
     QCorrection =  1 + MaxCorrection*(abs(QminBlank/SMR_Qvec))**PowerCorrection

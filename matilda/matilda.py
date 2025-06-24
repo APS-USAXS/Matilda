@@ -254,10 +254,10 @@ def extract_number_from_filename(filename):
 
 if __name__ == "__main__":
     try:
-        listofFlyscansOld=dict{}
-        listofStepScansOld=dict{}
-        listofSAXSOld={}
-        listOfWAXSOld={}
+        listofFlyscansOld=dict()
+        listofStepScansOld=dict()
+        listofSAXSOld=()
+        listOfWAXSOld=()
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 

@@ -12,6 +12,7 @@ dependencies:
   - matplotlib
   - pyfai
   - pip
+  - requests
   
   - pip:
     - h5py

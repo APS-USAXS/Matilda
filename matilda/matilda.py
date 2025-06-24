@@ -56,6 +56,7 @@ import socket
 import re
 import time
 import logging
+import datetime
 from logging.handlers import RotatingFileHandler
 import os
 
@@ -264,8 +265,8 @@ if __name__ == "__main__":
             listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=10, lastNdays=50)   #FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0)
             logging.info(f'Got list : {ListOfScans}')
             logging.info(f'Got blank list : {listOfBlanks}')
-            results = processFlyscans(ListOfScans, listOfBlanks)
             if len(ListOfScans) > 0:
+                results = processFlyscans(ListOfScans, listOfBlanks)
                             #path, filename = ListOfScans[0]
                             # listOfBlanks = [['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',
                             #                'AirBlank_1076.h5']]
@@ -289,14 +290,14 @@ if __name__ == "__main__":
                             #                ]
                             #                #['/home/parallels/Desktop/06_15_Rakesh/06_15_Rakesh_usaxs',                
         
-            logging.info('Processing the step scans')
-            ListOfScans = FindLastScanData("uascan",10,50) 
-            listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=10, lastNdays=50)
-            ListOfresults = processStepscans(ListOfScans)
-            if len(ListOfresults) > 0:
-                plotUSAXSResults(ListOfresults,isFlyscan=False)
-            else:
-                logging.info('No Step scan data found') 
+            # logging.info('Processing the step scans')
+            # ListOfScans = FindLastScanData("uascan",10,50) 
+            # listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=10, lastNdays=50)
+            # ListOfresults = processStepscans(ListOfScans)
+            # if len(ListOfresults) > 0:
+            #     plotUSAXSResults(ListOfresults,isFlyscan=False)
+            # else:
+            #     logging.info('No Step scan data found') 
 
             logging.info("Processing the SAXS")
             ListOfScans = FindLastScanData("SAXS",10,50)
@@ -323,8 +324,8 @@ if __name__ == "__main__":
                         #                'AirBlank_1076.hdf']]
             logging.info(f'Got list : {ListOfScans}')
             logging.info(f'Got blank list : {listOfBlanks}')
-            results = processADscans(ListOfScans, listOfBlanks)
-            if len(ListOfresults) > 0:
+            if len(ListOfScans) > 0:
+                results = processADscans(ListOfScans, listOfBlanks)
                 plotSWAXSResults(results, imagePath, isSAXS = True)  
             else:
                 logging.info('No SAXS scan data found') 
@@ -354,8 +355,8 @@ if __name__ == "__main__":
                         #                'AirBlank_1076.hdf']]
             logging.info(f'Got list : {ListOfScans}')
             logging.info(f'Got blank list : {listOfBlanks}')
-            results = processADscans(ListOfScans, listOfBlanks)      
-            if len(ListOfresults) > 0:
+            if len(ListOfScans) > 0:
+                results = processADscans(ListOfScans, listOfBlanks)      
                 plotSWAXSResults(results, imagePath, isSAXS = False)  
             else:
                 logging.info('No WAXS scan data found') 

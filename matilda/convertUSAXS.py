@@ -20,17 +20,156 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import pprint as pp
+import logging
 from supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from supportFunctions import gaussian, modifiedGauss
 from supportFunctions import beamCenterCorrection, rebinData
 from supportFunctions import rebin_QRSdata
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5
+from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
+from supportFunctions import rebinData
+from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from supportFunctions import beamCenterCorrection, smooth_r_data
+from desmearing import desmearData
+from convertFlyscanNew import calculatePDError, getBlankFlyscan,normalizeByTransmission, calibrateAndSubtractFlyscan
 
+recalculateAllData =  True
+
+# This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
+# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
+    # Open the HDF5 file in read/write mode
+    Filepath = os.path.join(path, filename)
+    with h5py.File(Filepath, 'r+') as hdf_file:
+        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
+        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+        required_items = {'definition': 'NXcanSAS'}
+        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
+        if deleteExisting:
+            # Delete the groups which may have een created by previously run saveNXcanSAS
+            location = 'entry/QRS_data/'
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
+            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
+            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+            if location is not None and location in hdf_file:
+                # Delete the group
+                del hdf_file[location]
+                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
+
+
+        #Now, we will read the data from the file, if the exist. 
+        # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
+        # if BlankName=None, then we just need the QRS_data group.   
+
+        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
+        location = None
+        if blankFilename is not None and blankPath is not None:
+            location = NXcanSASentry        # require we have desmeared data
+        else:
+            location = 'entry/QRS_data/'            # all we want here are QRS data
+        
+        if location is not None and location in hdf_file:
+            # exists, so lets reuse the data from the file
+            Sample = dict()
+            Sample = readMyNXcanSAS(path, filename)
+            logging.info(f"Using existing processed data from file {filename}.")
+            return Sample
+        
+        else:
+            Sample = dict()
+            Sample["RawData"]=importStepScan(path, filename)                 #import data
+            Sample["reducedData"]=CorrectUPDGainsStep(Sample)
+            Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))
+            Sample["reducedData"].update(calculatePDError(Sample))          # Calculate UPD error, mostly the same as in Igor                
+            Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
+                                                    Sample["reducedData"]["Q"], 
+                                                    Sample["reducedData"]["PD_range"], 
+                                                    Sample["reducedData"]["Error"], 
+                                                    Sample["RawData"]["TimePerPoint"],
+                                                    replaceNans=True))                 
+
+            if (
+                blankPath is not None
+                and blankFilename is not None
+                and blankFilename != filename
+                and "blank" not in filename.lower()
+            ):
+                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
+                Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
+                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
+                SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
+                    # NOTE: no binning down done for step scans, if we collected many points, we need them. 
+                    slitLength=Sample["CalibratedData"]["slitLength"]
+                    SMR_Int =Sample["CalibratedData"]["SMR_Int"]
+                    SMR_Error =Sample["CalibratedData"]["SMR_Error"]
+                    SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
+                    SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod='PowerLaw w flat',ExtrapQstart=0.1, MaxNumIter = 20)
+                    desmearedData=list()
+                    desmearedData={
+                        "Intensity":DSM_Int,
+                        "Q":DSM_Qvec,
+                        "Error":DSM_Error,
+                        "dQ":DSM_dQ,
+                        "units":"[cm2/cm3]",
+                        }
+                    Sample["CalibratedData"].update(desmearedData)
+                else:
+                    logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
+                                    "Skipping desmearing and rebinning steps. ")
+                    #set calibrated data in the structure to None 
+                    Sample["CalibratedData"] = {"SMR_Qvec":None,
+                                                "SMR_Int":None,
+                                                "SMR_Error":None,
+                                                "SMR_dQ":None,
+                                                "Kfactor":None,
+                                                "OmegaFactor":None,
+                                                "BlankName":None,
+                                                "thickness":None,
+                                                "units":"[cm2/cm3]",
+                                                "Intensity":None,
+                                                "Q":None,
+                                                "Error":None,
+                                                "dQ":None,
+                                                "slitLength":None,
+                                                }                    
+            
+            else:
+                #set calibrated data in the structure to None 
+                Sample["CalibratedData"] = {"SMR_Qvec":None,
+                                            "SMR_Int":None,
+                                            "SMR_Error":None,
+                                            "SMR_dQ":None,
+                                            "Kfactor":None,
+                                            "OmegaFactor":None,
+                                            "BlankName":None,
+                                            "thickness":None,
+                                            "units":"[cm2/cm3]",
+                                            "Intensity":None,
+                                            "Q":None,
+                                            "Error":None,
+                                            "dQ":None,
+                                            "slitLength":None,
+                                            }
+        # Ensure all changes are written and close the HDF5 file
+        hdf_file.flush()
+    # The 'with' statement will automatically close the file when the block ends
+    saveNXcanSAS(Sample,path, filename)
+    return Sample
 
 
 
 ## Stepscan main code here
-def ImportStepScan(path, filename):
+def importStepScan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     with h5py.File(path+"/"+filename, 'r') as file:
         #read various data sets
@@ -157,30 +296,30 @@ def CorrectUPDGainsStep(data_dict):
 
 
 # TODO: remove deleteExisting=True for operations
-def reduceStepScanToQR(path, filename, deleteExisting=True):
-  # Open the HDF5 file in read/write mode
-    location = 'entry/displayData/'
-    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
-        if deleteExisting:
-            # Delete the group
-            if location in hdf_file:
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
+# def reduceStepScanToQR(path, filename, deleteExisting=True):
+#   # Open the HDF5 file in read/write mode
+#     location = 'entry/displayData/'
+#     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+#         if deleteExisting:
+#             # Delete the group
+#             if location in hdf_file:
+#                 del hdf_file[location]
+#                 logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
         
-        if location in hdf_file:
-                # # exists, reuse existing data
-                Sample = dict()
-                Sample = load_dict_from_hdf5(hdf_file, location)
-                return Sample
-        else:
-                Sample = dict()
-                Sample["RawData"]=ImportStepScan(path, filename)
-                Sample["reducedData"]= CorrectUPDGainsStep(Sample)
-                Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=1))
-                # Create the group and dataset for the new data inside the hdf5 file for future use.
-                # these are not fully reduced data, this is for web plot purpose.
-                save_dict_to_hdf5(Sample, location, hdf_file)
-                return Sample
+#         if location in hdf_file:
+#                 # # exists, reuse existing data
+#                 Sample = dict()
+#                 Sample = load_dict_from_hdf5(hdf_file, location)
+#                 return Sample
+#         else:
+#                 Sample = dict()
+#                 Sample["RawData"]=ImportStepScan(path, filename)
+#                 Sample["reducedData"]= CorrectUPDGainsStep(Sample)
+#                 Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=1))
+#                 # Create the group and dataset for the new data inside the hdf5 file for future use.
+#                 # these are not fully reduced data, this is for web plot purpose.
+#                 save_dict_to_hdf5(Sample, location, hdf_file)
+#                 return Sample
 
 
 # def PlotResults(data_dict):

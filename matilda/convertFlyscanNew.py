@@ -36,15 +36,15 @@ import logging
 #from scipy.optimize import curve_fit
 
 
-from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
+from supportFunctions import subtract_data 
 from convertUSAXS import rebinData
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
+from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan
 from desmearing import desmearData
 
 recalculateAllData = False
 
-MinQMinFindRatio = 1.05
 
 # Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
@@ -98,7 +98,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
             Sample = dict()
             Sample["RawData"]=importFlyscan(path, filename)                 #import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                  # Creates PD_Intensity with corrected gains and background subtraction
-            Sample["reducedData"].update(calculatePDError(Sample))          # Calculate UPD error, mostly the same as in Igor                
+            Sample["reducedData"].update(calculatePDErrorFly(Sample))          # Calculate UPD error, mostly the same as in Igor                
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
                                                     Sample["reducedData"]["Q"], 
@@ -179,23 +179,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
     saveNXcanSAS(Sample,path, filename)
     return Sample
 
-def normalizeByTransmission(Sample):
-    # This is a simple normalization of the Sample Intensity by transmission. 
-    # It will be used for background subtraction.
-    PeakIntensitySample = Sample["reducedData"]["Maximum"]
-    PeakIntensityBlank = Sample["BlankData"]["Maximum"]
-    PeakToPeakTransmission = PeakIntensitySample/PeakIntensityBlank
-    #BlankIntensity = Sample["BlankData"]["Intensity"]
-    Intensity = Sample["reducedData"]["Intensity"]
-    Intensity = Intensity / PeakToPeakTransmission
-    Error = Sample["reducedData"]["Error"]
-    Error = Error / PeakToPeakTransmission
-    result = {"Intensity":Intensity,
-            "Error":Error,
-            "PeakToPeakTransmission":PeakToPeakTransmission
-            }
-    return result
-    
+
 # TODO: remove deleteExisting=True for operations
 def reduceFlyscanToQR(path, filename, deleteExisting=recalculateAllData):
     # Open the HDF5 file in read/write mode
@@ -225,169 +209,7 @@ def reduceFlyscanToQR(path, filename, deleteExisting=recalculateAllData):
                 logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
                 return Sample
 
-def calibrateAndSubtractFlyscan(Sample):
-    # This is a step where we subtract and calibrate the sample and Blank. 
-    Intensity = Sample["reducedData"]["Intensity"]
-    BL_Intensity = Sample["BlankData"]["Intensity"]
-    Error = Sample["reducedData"]["Error"]
-    BL_Error = Sample["BlankData"]["Error"]
-    Q = Sample["reducedData"]["Q"]
-    BL_Q = Sample["BlankData"]["Q"]
-
-    FWHMSample = Sample["reducedData"]["FWHM"]
-    FWHMBlank = Sample["BlankData"]["FWHM"]
-    wavelength =  Sample["reducedData"]["wavelength"]
-    PeakToPeakTransmission =  Sample["reducedData"]["PeakToPeakTransmission"]
-    SaTransCounts = Sample['RawData']['metadata']['trans_pin_counts']
-    SaTransGain = Sample['RawData']['metadata']['trans_pin_gain']
-    SaI0Counts = Sample['RawData']['metadata']['trans_I0_counts']
-    SaI0Gain = Sample['RawData']['metadata']['trans_I0_gain'] 
-    BlTransCounts = Sample['BlankData']['BlTransCounts']
-    BlTransGain = Sample['BlankData']['BlTransGain']
-    BlI0Counts = Sample['BlankData']['BlI0Counts']
-    BlI0Gain = Sample['BlankData']['BlI0Gain']
-
-    #TODO: remove nans from both sets of arrays here. 
-    
-    #Intensity and Error are corrected for transmission in normalize by transmission above. 
-    SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
-    # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
-    MaxSMR_Int = np.max(SMR_Int)
-    #find min value in SMR_Int for points from half to end
-    MinSMR_Int = np.min(SMR_Int[int(len(SMR_Int)/2):])
-    #if MinSMR_Int < 0, then we need add to SMR_Int enough to lift it above zero
-    ScaleByBackground = 1.1         #this is from Igor code IN3_FixNegativeIntensities
-    ScaleByIntMax = 3e-11           #this is from Igor code IN3_FixNegativeIntensities
-    if MinSMR_Int < 0:
-        AddToSMR_Int = abs(MinSMR_Int) * ScaleByBackground + ScaleByIntMax * MaxSMR_Int
-        SMR_Int = SMR_Int + AddToSMR_Int
-    # now we needd to select Qmin which makes sense for the instrument resolution and sample scattering
-    # find Qmin as the first point where we get above 5% of the background level and larger than instrument resolution
-    # IntRatio = Intensity / BL_Intensity, calculated using interpolation in subtract_data function
-    # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
-
-    MeasuredTransmission = ((SaTransCounts/SaTransGain)/(SaI0Counts/SaI0Gain))/((BlTransCounts /BlTransGain )/(BlI0Counts/BlI0Gain))
-    MSAXSCorrection = MeasuredTransmission / PeakToPeakTransmission
-    QminSample = 4*np.pi*np.sin(np.radians(FWHMSample)/2)/wavelength
-    QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
-    indexSample = np.searchsorted(Q, QminSample)+1
-    indexBlank = np.searchsorted(Q, QminBlank)+1
-    # now we need to reproduce the Q correction for 1.05 from Igor. These are values from there... 
-    MaxCorrection = 1
-    PowerCorrection = 3
-    QCorrection =  1 + MaxCorrection*(abs(QminBlank/SMR_Qvec))**PowerCorrection
-    QCorrection = np.where(QCorrection < (MaxCorrection + 1), QCorrection, MaxCorrection + 1)
-    IntRatio = IntRatio/ QCorrection  # apply the Q correction to the IntRatio
-    #we need to set IntRatio values for points up to indexSample to 1:
-    IntRatio[:indexSample] = 1
-    #plot the IntRatio
-    # plt.plot(SMR_Qvec, IntRatio, linestyle='-')  # You can customize the marker and linestyle
-    # plt.title('Plot of IntRatio vs. Q')
-    # plt.xlabel('log(Q) [1/A]')
-    # plt.xlim((1e-5, 0.0005))
-    # plt.show()    
-    # # Find the first index where IntRatio > MinQMinFindRatio
-    # np.argmax returns the first index of True. If all are False, it returns 0.
-    potential_first_index = np.argmax(IntRatio > MinQMinFindRatio)
-    if IntRatio[potential_first_index] > MinQMinFindRatio:
-        indexRatio = potential_first_index
-        #print(f"First index where IntRatio > {MinQMinFindRatio} is {indexRatio} with value {IntRatio[indexRatio]}.")
-    else:
-        # This means no element in IntRatio was > MinQMinFindRatio (argmax returned 0 and IntRatio[0] was not > 1.03)
-        indexRatio = len(IntRatio) # Default to end of array if no such point is found
-        logging.warning(f"No points found where IntRatio > {MinQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
-        
-    largest_value = max(indexSample, indexBlank, indexRatio)
-    # Ensure the start_index is within bounds and there's data to slice
-    if largest_value < len(SMR_Qvec):
-        SMR_Qvec = SMR_Qvec[largest_value:]    
-        SMR_Int = SMR_Int[largest_value:]    
-        SMR_Error = SMR_Error[largest_value:]
-    else:
-        # This case means the calculated start index is at or beyond the end of the array
-        logging.warning(f"Calculated start_index_for_data ({largest_value}) is at or beyond array length ({len(SMR_Qvec)}). "
-                        "Resulting SMR arrays will be empty. Check Qmin, blank, and IntRatio > 1.03 criteria.")
-        SMR_Qvec = np.array([])
-        SMR_Int = np.array([])
-        SMR_Error = np.array([])
-    # now calibration... 
-    SDD = Sample["RawData"]["metadata"]['detector_distance']
-    UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
-    thickness = Sample["RawData"]["sample"]['thickness']
-    BLPeakMax = Sample["BlankData"]["Maximum"]
-    BlankName = Sample["BlankData"]["BlankName"]
-    #Igor:	variable SlitLength=0.5*((4*pi)/wavelength)*sin(PhotoDiodeSize/(2*SDDistance))
-    slitLength = 0.5*((4*np.pi)//wavelength)*np.sin(UPDSize/(2*SDD))
-    OmegaFactor= (UPDSize/SDD)*np.radians(FWHMBlank)
-    Kfactor=BLPeakMax*OmegaFactor*thickness * 0.1 
-    #apply calibration
-    SMR_Int =  SMR_Int / (Kfactor*MSAXSCorrection) 
-    SMR_Error = SMR_Error/ (Kfactor*MSAXSCorrection) 
-    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absorption well scattering samples. 
-    return {"SMR_Qvec":SMR_Qvec,
-            "SMR_Int":SMR_Int,
-            "SMR_Error":SMR_Error,
-            "Kfactor":Kfactor,
-            "OmegaFactor":OmegaFactor,
-            "BlankName":BlankName,
-            "thickness":thickness,
-            "slitLength":slitLength,
-            "units":"[cm2/cm3]"
-            }
-
-def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData):
-      # will reduce the blank linked as input into Igor BL_R_Int 
-      # after reducing this first time, data are saved in Nexus file for subsequent use. 
-      # We get the BL_QRS and calibration data as result.
-    # Open the HDF5 file in read/write mode
-    location = 'entry/blankData/'
-    Filepath = os.path.join(blankPath, blankFilename)
-    with h5py.File(Filepath, 'r+') as hdf_file:
-            # Check if the group 'location' exists, if yes, either delete if asked for or use. 
-            if deleteExisting:
-                if location in hdf_file:
-                    # Delete the group is exists and requested
-                    del hdf_file[location]
-                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
-
-            if location in hdf_file:
-                # exists, so lets reuse the data from the file
-                Blank = dict()
-                Blank = load_dict_from_hdf5(hdf_file, location)
-                logging.info(f"Used existing Blank data from {blankFilename}")
-                return Blank
-            else:
-                Blank = dict()
-                Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
-                BlTransCounts = Blank['RawData']['metadata']['trans_pin_counts']
-                BlTransGain = Blank['RawData']['metadata']['trans_pin_gain']
-                BlI0Counts = Blank['RawData']['metadata']['trans_I0_counts']
-                BlI0Gain = Blank['RawData']['metadata']['trans_I0_gain']
-                Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
-                Blank["BlankData"].update({"BlankName":blankFilename})      # add the name of the blank file
-                Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
-                Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
-                Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
-                Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
-                Blank["BlankData"].update(calculatePDError(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
-                Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
-                Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
-                                                        Blank["BlankData"]["Q"], 
-                                                        Blank["BlankData"]["PD_range"], 
-                                                        Blank["BlankData"]["Error"], 
-                                                        Blank["RawData"]["TimePerPoint"],
-                                                        replaceNans=True )) 
-                # we need to return just the BlankData part 
-                BlankData=dict()
-                BlankData=Blank["BlankData"]
-                # Create the group and dataset for the new data inside the hdf5 file for future use. 
-                save_dict_to_hdf5(BlankData, location, hdf_file)
-                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
-                return BlankData
-
-
-
-def calculatePDError(Sample, isBlank=False):
+def calculatePDErrorFly(Sample, isBlank=False):
     #OK, another incarnation of the error calculations...
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
@@ -420,7 +242,6 @@ def calculatePDError(Sample, isBlank=False):
     Error=SigmaRwave / 5                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
     result = {"Error":Error}
     return result
-
 
 
 def test_matildaLocal():

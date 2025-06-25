@@ -61,9 +61,9 @@ from logging.handlers import RotatingFileHandler
 import os
 
 
-from convertUSAXS import reduceStepScanToQR
 from readfromtiled import FindLastScanData, FindLastBlankScan
 from convertFlyscanNew import processFlyscan
+from convertUSAXS import processStepscan
 from convertSWAXSNew import process2Ddata
 #from developNewStepScan import processStepScan
 from supportFunctions import findProperBlankScan
@@ -203,16 +203,30 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
 
 # Process the step scan data files
 def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
-    results=[] 
-    for scan in ListOfScans:
-        path = scan[0]
-        filename = scan[1]
-        logging.info(f"Processing step scan: {filename}")
+    results=[]
+    logging.info("Processing of Step scans with blanks")    
+    for scan_path, scan_filename in ListOfScans:
         try:
-            results.append(reduceStepScanToQR(path, filename))
+            if forceFirstBlank:
+                # Use the first blank in the list
+                selected_blank_path = ListOfBlanks[0][0]
+                selected_blank_filename = ListOfBlanks[0][1]
+                #logging.info(f"User forced use of blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+            else:
+                selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
+                 #logging.info(f"Automatically selected blank path: {selected_blank_path}, filename: {selected_blank_filename}")
+           
+            logging.info(f"Flyscan data processing: path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
+            result = processStepscan(scan_path, scan_filename,
+                                        blankPath=selected_blank_path,
+                                        blankFilename=selected_blank_filename,
+                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+            results.append(result)
         except Exception as e:
-            logging.error(f"Failed to process step scan {filename} in {path}: {e}", exc_info=True)
+            logging.error(f"Error processing scan {scan_filename}: {e}", exc_info=True)
     return results
+
+
 
 #process SAXS/WAXS data, finding the appropriate blank for each.
 def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):

@@ -15,5 +15,5 @@ imagePath = '/home/parallels/Desktop/'  # Path to save images
 if __name__ == "__main__":
     #results = processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=True,forceFirstBlank=True)   
     results = processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=True,forceFirstBlank=True)
-    print(results)
+    #print(results)
     plotUSAXSResults(results, imagePath, isFlyscan=True) 

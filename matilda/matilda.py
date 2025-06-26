@@ -65,7 +65,6 @@ from readfromtiled import FindLastScanData, FindLastBlankScan
 from convertFlyscanNew import processFlyscan
 from convertUSAXS import processStepscan
 from convertSWAXSNew import process2Ddata
-#from developNewStepScan import processStepScan
 from supportFunctions import findProperBlankScan
 from plotData import plotUSAXSResults, plotSWAXSResults
 
@@ -74,6 +73,9 @@ from plotData import plotUSAXSResults, plotSWAXSResults
 #imagePath = None  # Do not save images
 imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 #imagePath = '/home/parallels/Desktop/'  # Path to save images
+
+NumberOfDaysToLookBack = 50  # Number of days to look back for scans
+NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 
 recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
@@ -216,7 +218,7 @@ def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAll
                 selected_blank_path, selected_blank_filename   = findProperBlankScan(scan_path, scan_filename, ListOfBlanks)
                  #logging.info(f"Automatically selected blank path: {selected_blank_path}, filename: {selected_blank_filename}")
            
-            logging.info(f"Flyscan data processing: path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
+            logging.info(f"Stepscan data processing: path {scan_path}, filename {scan_filename}, blank path {selected_blank_path}, blank filename {selected_blank_filename}")
             result = processStepscan(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,
@@ -270,41 +272,47 @@ if __name__ == "__main__":
     try:
         listofFlyscansOld=dict()
         listofStepScansOld=dict()
-        listofSAXSOld=()
-        listOfWAXSOld=()
+        listofSAXSOld=dict()
+        listOfWAXSOld=dict()
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
             logging.info("Processing the Flyscans")
-            ListOfScans = FindLastScanData("Flyscan",10,5)
+            ListOfScans = FindLastScanData("Flyscan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
             #need to check, if we have same list as before and if yes, skip everything
             if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
                 logging.info('No new Flyscan data found')
             else:
                 #path, filename = ListOfScans[-1]
-                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=10, lastNdays=5) 
+                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processFlyscans(ListOfScans, listOfBlanks)
                 plotUSAXSResults(results, imagePath, isFlyscan=True) 
                 listofFlyscansOld = ListOfScans 
             
-        
-            # logging.info('Processing the step scans')
-            # ListOfScans = FindLastScanData("uascan",10,50) 
-            # listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=10, lastNdays=50)
-            # ListOfresults = processStepscans(ListOfScans)
-            # if len(ListOfresults) > 0:
-            #     plotUSAXSResults(ListOfresults,isFlyscan=False)
-            # else:
-            #     logging.info('No Step scan data found') 
 
+            logging.info("Processing the Step scans")
+            ListOfScans = FindLastScanData("uascan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
+            #need to check, if we have same list as before and if yes, skip everything
+            if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
+                logging.info('No new Step scans data found')
+            else:
+                #path, filename = ListOfScans[-1]
+                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
+                logging.info(f'Got list : {ListOfScans}')
+                logging.info(f'Got blank list : {listOfBlanks}')
+                results = processStepscans(ListOfScans, listOfBlanks)
+                plotUSAXSResults(results, imagePath, isFlyscan=False) 
+                listofStepScansOld = ListOfScans 
+    
+            #process SAXS and WAXS data
             logging.info("Processing the SAXS")
-            ListOfScans = FindLastScanData("SAXS",10,5)
+            ListOfScans = FindLastScanData("SAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
             if ListOfScans == listofSAXSOld or len(ListOfScans) == 0:
                 logging.info('No new SAXS data found')
             else:
-                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=10, lastNdays=5)
+                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)
@@ -312,11 +320,11 @@ if __name__ == "__main__":
                 listofSAXSOld = ListOfScans 
 
             logging.info("Processing the WAXS")
-            ListOfScans = FindLastScanData("WAXS",10,5)
+            ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
             if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
                 logging.info('No new WAXS data found')
             else:
-                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=10, lastNdays=5)
+                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)      

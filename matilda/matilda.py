@@ -62,9 +62,9 @@ import os
 
 
 from readfromtiled import FindLastScanData, FindLastBlankScan
-from matilda.convertFlyscan import processFlyscan
+from convertFlyscan import processFlyscan
 from convertUSAXS import processStepscan
-from matilda.convertSWAXS import process2Ddata
+from convertSWAXS import process2Ddata
 from supportFunctions import findProperBlankScan
 from plotData import plotUSAXSResults, plotSWAXSResults
 

@@ -29,7 +29,7 @@ from hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
 from desmearing import desmearData
 
-recalculateAllData =  True
+recalculateAllData =  False
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file

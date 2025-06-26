@@ -23,7 +23,7 @@ import pprint as pp
 import logging
 from supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from supportFunctions import beamCenterCorrection, rebinData
-from supportFunctions import  calibrateAndSubtractFlyscan
+from supportFunctions import  calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
 from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
@@ -81,13 +81,14 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
         
         else:
             Sample = dict()
-            Sample["RawData"]=importStepScan(path, filename)                 #import data
-            Sample["reducedData"]=CorrectUPDGainsStep(Sample)
+            Sample["RawData"]=importStepScan(path, filename)                #import data
+            Sample["reducedData"]=(createUPDGainsAndBkgErrArrays(Sample))
+            Sample["reducedData"].update(CorrectUPDGainsStep(Sample))    # Correct UPD gains=CorrectUPDGainsStep(Sample)    # Correct UPD gains, this is the first step in data reduction
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))
             Sample["reducedData"].update(calculatePDErrorStep(Sample))          # Calculate UPD error, mostly the same as in Igor                
             # Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
             #                                         Sample["reducedData"]["Q"], 
-            #                                         Sample["reducedData"]["PD_range"], 
+            #                                         Sample["reducedData"]["UPD_gains"], 
             #                                         Sample["reducedData"]["Error"], 
             #                                         Sample["RawData"]["TimePerPoint"],
             #                                         replaceNans=True))                 
@@ -98,9 +99,10 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
                 and blankFilename != filename
                 and "blank" not in filename.lower()
             ):
-                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
+                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
+                Sample["CalibratedData"].update(calculatedQStep(Sample))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
                     # NOTE: no binning down done for step scans, if we collected many points, we need them. 
@@ -162,13 +164,116 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
     saveNXcanSAS(Sample,path, filename)
     return Sample
 
+def getBlankStepscan(blankPath, blankFilename, deleteExisting=recalculateAllData):
+      # will reduce the blank linked as input into Igor BL_R_Int 
+      # after reducing this first time, data are saved in Nexus file for subsequent use. 
+      # We get the BL_QRS and calibration data as result.
+    # Open the HDF5 file in read/write mode
+    location = 'entry/blankData/'
+    Filepath = os.path.join(blankPath, blankFilename)
+    with h5py.File(Filepath, 'r+') as hdf_file:
+            # Check if the group 'location' exists, if yes, either delete if asked for or use. 
+            if deleteExisting:
+                if location in hdf_file:
+                    # Delete the group is exists and requested
+                    del hdf_file[location]
+                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
+
+            if location in hdf_file:
+                # exists, so lets reuse the data from the file
+                Blank = dict()
+                Blank = load_dict_from_hdf5(hdf_file, location)
+                logging.info(f"Used existing Blank data from {blankFilename}")
+                return Blank
+            else:
+                Blank = dict()
+                Blank["RawData"]=importStepScan(blankPath, blankFilename)         #import data
+                BlTransCounts = Blank['RawData']['metadata']['trans_pin_counts']
+                BlTransGain = Blank['RawData']['metadata']['trans_pin_gain']
+                BlI0Counts = Blank['RawData']['metadata']['trans_I0_counts']
+                BlI0Gain = Blank['RawData']['metadata']['trans_I0_gain']
+                Blank["BlankData"]= (createUPDGainsAndBkgErrArrays(Blank))  
+                Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
+                Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
+                Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
+                Blank["BlankData"].update({"BlankName":blankFilename})      # add the name of the blank file
+                Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
+                Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
+                Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
+                Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
+                # Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
+                #                                         Blank["BlankData"]["Q"], 
+                #                                         Blank["BlankData"]["UPD_gains"], 
+                #                                         Blank["BlankData"]["Error"], 
+                #                                         Blank["RawData"]["TimePerPoint"],
+                #                                         replaceNans=True )) 
+                # we need to return just the BlankData part 
+                BlankData=dict()
+                BlankData=Blank["BlankData"]
+                # Create the group and dataset for the new data inside the hdf5 file for future use. 
+                save_dict_to_hdf5(BlankData, location, hdf_file)
+                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
+                return BlankData
+
+
+def createUPDGainsAndBkgErrArrays(Sample):
+    # Create UPD_gains and UPD_bkgErr arrays based on the AmpGain values
+    AmpGain = Sample["RawData"]["AmpGain"]
+    Bkg_map = Sample["RawData"]["Bkg_map"]  
+    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # Convert to seconds if needed
+    UPD_gains = np.zeros_like(AmpGain, dtype=float)
+    UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
+    
+    # Assign values based on AmpGain
+    for i, gain in enumerate(AmpGain):
+        if gain == 1e4:
+            UPD_gains[i] = 1e4
+            UPD_bkgErr[i] = Bkg_map["1e4"] * TimePerPoint[i] 
+        elif gain == 1e6:
+            UPD_gains[i] = 1e6
+            UPD_bkgErr[i] = Bkg_map["1e6"] * TimePerPoint[i] 
+        elif gain == 1e8:
+            UPD_gains[i] = 1e8
+            UPD_bkgErr[i] = Bkg_map["1e8"] * TimePerPoint[i] 
+        elif gain == 1e10:
+            UPD_gains[i] = 1e10
+            UPD_bkgErr[i] = Bkg_map["1e10"] * TimePerPoint[i] 
+        elif gain == 1e12:
+            UPD_gains[i] = 1e12
+            UPD_bkgErr[i] = Bkg_map["1e12"] * TimePerPoint[i] 
+    
+    result = dict()
+    result["UPD_gains"] = UPD_gains
+    result["UPD_bkgErr"] = UPD_bkgErr
+    return result
+
+def  calculatedQStep(Sample):
+    # Calculate Q from the Sample data
+    #TODO: add function adding dQ
+    #	variable InstrumentQresolution = 2*pi*sin(BlankWidth/3600*pi/180)/Wavelength
+    # dQ=InstrumentQresolution/2    # This is done by calculating Q from the ARangles and Wavelength
+    Wavelength = Sample["reducedData"]["wavelength"]
+    BlankWidth = Sample["BlankData"]["FWHM"]        # This is the width of the beam in degrees
+    Qvec=Sample["CalibratedData"]["SMR_Qvec"]  # This is the Q vector from the calibrated data
+    # make a copy of Qvec to avoid modifying the original
+    BlankWidth_rad = np.radians(BlankWidth)
+    InstrumentQresolution = (2*np.pi*np.sin(BlankWidth_rad)/Wavelength)/2   # Calculate dQ
+    #dQ is copy of Qvec filled with InstrumentQresolution
+    dQ = np.full_like(Qvec, InstrumentQresolution, dtype=float)  # Fill dQ with InstrumentQresolution
+    # Now we can create the result dictionary
+    result = dict()
+    result["SMR_dQ"] = dQ
+    return result
+
+                
+
 def calculatePDErrorStep(Sample, isBlank=False):
-    # TODO : fix based on Igor code, this is wrong... 
+    # TODO : Igor code uses same for Setp and FLyscan... 
     #OK, another incarnation of the error calculations...
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    Frequency=1e6   #this is frequency of clock fed into mca1
+    Frequency=1e7   #this is frequency of clock fed into mca1
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
@@ -178,12 +283,12 @@ def calculatePDErrorStep(Sample, isBlank=False):
         UPD_bkgErr = Sample["reducedData"]["UPD_bkgErr"]    
 
     Monitor = Sample["RawData"]["Monitor"]
-    I0AmpGain=Sample["RawData"]["metadata"]["I0AmpGain"]
+    I0Gain=Sample["RawData"]["I0gain"]
     VToFFactor = Sample["RawData"]["VToFFactor"]                    #this is mca1 frequency, hardwired to 1e6 
     SigmaUSAXSPD=np.sqrt(UPD_array*(1+0.0001*UPD_array))		    #this is our USAXS_PD error estimate, Poisson error + 1% of value
     SigmaPDwDC=np.sqrt(SigmaUSAXSPD**2+(MeasTime*UPD_bkgErr)**2)    #This should include now measured error for background
     SigmaPDwDC=SigmaPDwDC/(VToFFactor*UPD_gains)
-    A=(UPD_array)/(VToFFactor[0]*UPD_gains)		                    #without dark current subtraction
+    A=(UPD_array)/(VToFFactor*UPD_gains)		                    #without dark current subtraction
     SigmaMonitor= np.sqrt(Monitor)		                            #these calculations were done for 10^6 
     ScaledMonitor = Monitor
     A = np.where(np.isnan(A), 0.0, A)
@@ -192,7 +297,7 @@ def calculatePDErrorStep(Sample, isBlank=False):
     ScaledMonitor = np.where(np.isnan(ScaledMonitor), 0.0, ScaledMonitor)
     SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
     SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
-    SigmaRwave=SigmaRwave * I0AmpGain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0AmpGain
+    SigmaRwave=SigmaRwave * I0Gain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0Gain
     Error=SigmaRwave / 5                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
     result = {"Error":Error}
     return result
@@ -218,24 +323,53 @@ def importStepScan(path, filename):
         #UPD
         dataset = file['/entry/data/UPD'] 
         UPD_array = np.ravel(np.array(dataset))
-        #Arrays for gain changes
+        #Arrays for gains during data collection
         dataset = file['/entry/data/upd_autorange_controls_gain'] 
         AmpGain = np.ravel(np.array(dataset))
-            #dataset = file['/entry/data/upd_autorange_controls_reqrange'] 
-            #AmpReqGain = np.ravel(np.array(dataset))       #this contains only 0 values, useless... 
         #metadata
         keys_to_keep = ['SAD_mm', 'SDD_mm', 'thickness', 'title', 'useSBUSAXS',
-                        'intervals', 
+                        'intervals', 'VToFFactor'
                     ]
         metadata_group = file['/entry/instrument/bluesky/metadata']
         metadata_dict = read_group_to_dict(metadata_group)     
         metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+        #add more values to metadata_dict
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_I0_counts/value'] 
+        USAXSPinT_I0Counts = data[0]
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_I0_gain/value']
+        USAXSPinT_I0Gain = data[0]
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_diode_counts/value']
+        USAXSPinT_pinCounts = data[0]
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_diode_gain/value']
+        USAXSPinT_pinGain = data[0]
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_count_time/value']
+        USAXSPinT_Time = data[0]
+        metadata_dict['trans_pin_counts'] = USAXSPinT_I0Counts
+        metadata_dict['trans_pin_gain'] = USAXSPinT_I0Gain
+        metadata_dict['trans_I0_counts'] = USAXSPinT_pinCounts
+        metadata_dict['trans_I0_gain'] = USAXSPinT_pinGain
+        metadata_dict['trans_I0_time'] = USAXSPinT_Time
+        data = file['/entry/start_time']
+        timeStamp = data[()]
+        timeStamp = timeStamp.decode('utf-8')        
+        #add some missing or incorrectly named parameters to match FLyscan
+        data_sdd = file['/entry/instrument/bluesky/metadata/SDD_mm']
+        SDDmm = data_sdd[()]
+        data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_diode_upd_size/value']
+        UPDsize = data[0]
+        data = file['/entry/instrument/bluesky/metadata/sample_thickness_mm']
+        SampleThickness = data[()] 
+        metadata_dict['detector_distance'] = SDDmm
+        metadata_dict['UPDsize'] = UPDsize
+        metadata_dict['timeStamp'] = timeStamp
         #Instrument
         instrument_group = file['/entry/instrument/monochromator']
         instrument_dict = read_group_to_dict(instrument_group)        
         #Sample
         sample_group = file['/entry/sample']
         sample_dict = read_group_to_dict(sample_group)
+        sample_dict['thickness'] = SampleThickness
+
         # now backgrounds for UPD subtraction later
         # these are the locations of the background values... 
         # /entry/instrument/bluesky/streams/baseline/I0_autorange_controls_ranges_gain0_background/value, it is array of start adn end values. 
@@ -262,12 +396,12 @@ def importStepScan(path, filename):
                 "UPD_array": UPD_array,
                 "AmpGain": AmpGain,
                 "I0gain": I0gain,
+                "VToFFactor": 1e6,  # this is hardwired to 1e6, mca1 frequency
                 "sample": sample_dict,
                 "metadata": metadata_dict,
                 "instrument": instrument_dict,
                 "Bkg_map": Bkg_map,
                 }
-    
     return data_dict
     
 def CorrectUPDGainsStep(data_dict):
@@ -304,7 +438,6 @@ def CorrectUPDGainsStep(data_dict):
                 # if len(change_indices) > 0:
                 #     AmpGain_new[change_indices] = np.nan
                 #Correct UPD for gains with points we  want removed set to Nan
-    #TODO: here we also need to subtract background, not done for now anywhere for step scanning. 
     #this neds to be done on UPD_array before we correct for gains.
     # now we need to make a copy of UPD_array and depending on AmpGain value put int BkgX * TimePerPoint
     # Create a new array to store the results
@@ -316,6 +449,7 @@ def CorrectUPDGainsStep(data_dict):
     for i, gain in enumerate(AmpGain):
         background_value = Bkg_map_float_keys.get(gain, 0) # Default to 0 if not found
         Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # Convert to seconds if needed, here we assume TimePerPoint is in microseconds
+    #TODO: check 1e7 is correct, elsewhere we use 1e6. 
     # Now we can correct UPD_array for background
     # Remove background from UPD_array
     UPD_array_corr = UPD_array - Bckg_corr       
@@ -325,7 +459,6 @@ def CorrectUPDGainsStep(data_dict):
     return result
 
 
-# TODO: remove deleteExisting=True for operations
 # def reduceStepScanToQR(path, filename, deleteExisting=True):
 #   # Open the HDF5 file in read/write mode
 #     location = 'entry/displayData/'

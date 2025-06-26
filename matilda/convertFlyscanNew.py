@@ -11,7 +11,7 @@ processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFile
         returns dictionary of this type:
                 Sample["reducedData"]["Intensity"],   
                 Sample["reducedData"]["Q"], 
-                Sample["reducedData"]["PD_range"], 
+                Sample["reducedData"]["UPD_gains"], 
                 Sample["reducedData"]["Error"], 
                
                 SMR_Int =Sample["CalibratedData"]["SMR_Int"]
@@ -102,7 +102,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
                                                     Sample["reducedData"]["Q"], 
-                                                    Sample["reducedData"]["PD_range"], 
+                                                    Sample["reducedData"]["UPD_gains"], 
                                                     Sample["reducedData"]["Error"], 
                                                     Sample["RawData"]["TimePerPoint"],
                                                     replaceNans=True))                 
@@ -208,40 +208,6 @@ def reduceFlyscanToQR(path, filename, deleteExisting=recalculateAllData):
                 save_dict_to_hdf5(Sample, location, hdf_file)
                 logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
                 return Sample
-
-def calculatePDErrorFly(Sample, isBlank=False):
-    #OK, another incarnation of the error calculations...
-    UPD_array = Sample["RawData"]["UPD_array"]
-    # USAXS_PD = Sample["reducedData"]["Intensity"]
-    MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    Frequency=1e6   #this is frequency of clock fed into mca1
-    MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
-    if isBlank:
-        UPD_gains=Sample["BlankData"]["UPD_gains"]
-        UPD_bkgErr = Sample["BlankData"]["UPD_bkgErr"]    
-    else:
-        UPD_gains=Sample["reducedData"]["UPD_gains"]
-        UPD_bkgErr = Sample["reducedData"]["UPD_bkgErr"]    
-
-    Monitor = Sample["RawData"]["Monitor"]
-    I0AmpGain=Sample["RawData"]["metadata"]["I0AmpGain"]
-    VToFFactor = Sample["RawData"]["VToFFactor"]                    #this is mca1 frequency, hardwired to 1e6 
-    SigmaUSAXSPD=np.sqrt(UPD_array*(1+0.0001*UPD_array))		    #this is our USAXS_PD error estimate, Poisson error + 1% of value
-    SigmaPDwDC=np.sqrt(SigmaUSAXSPD**2+(MeasTime*UPD_bkgErr)**2)    #This should include now measured error for background
-    SigmaPDwDC=SigmaPDwDC/(VToFFactor*UPD_gains)
-    A=(UPD_array)/(VToFFactor[0]*UPD_gains)		                    #without dark current subtraction
-    SigmaMonitor= np.sqrt(Monitor)		                            #these calculations were done for 10^6 
-    ScaledMonitor = Monitor
-    A = np.where(np.isnan(A), 0.0, A)
-    SigmaMonitor = np.where(np.isnan(SigmaMonitor), 0.0, SigmaMonitor)
-    SigmaPDwDC = np.where(np.isnan(SigmaPDwDC), 0.0, SigmaPDwDC)
-    ScaledMonitor = np.where(np.isnan(ScaledMonitor), 0.0, ScaledMonitor)
-    SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
-    SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
-    SigmaRwave=SigmaRwave * I0AmpGain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0AmpGain
-    Error=SigmaRwave / 5                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
-    result = {"Error":Error}
-    return result
 
 
 def test_matildaLocal():

@@ -50,7 +50,7 @@ def importFlyscan(path, filename):
         vTof = np.full_like(np.ravel(np.array(dataset)), 1e6, dtype=float)
         #vTof = 1e6  overwrite, the mca_clock_frequency (5e7) value is simply wrong.     
         #metadata
-        keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0AmpGain','detector_distance',
+        keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain','detector_distance',
                         'timeStamp',
                         'trans_pin_counts','trans_pin_gain','trans_pin_time','trans_I0_counts','trans_I0_gain',
                         'UPDsize', 'trans_I0_counts', 'trans_I0_gain', 'upd_bkg0', 'upd_bkg1','upd_bkg2','upd_bkg3',
@@ -169,11 +169,11 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData)
                 Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
                 Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
                 Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
-                Blank["BlankData"].update(calculatePDError(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
+                Blank["BlankData"].update(calculatePDErrorFly(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
                 Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
                 Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
                                                         Blank["BlankData"]["Q"], 
-                                                        Blank["BlankData"]["PD_range"], 
+                                                        Blank["BlankData"]["UPD_gains"], 
                                                         Blank["BlankData"]["Error"], 
                                                         Blank["RawData"]["TimePerPoint"],
                                                         replaceNans=True )) 
@@ -294,7 +294,7 @@ def calibrateAndSubtractFlyscan(Sample):
     BLPeakMax = Sample["BlankData"]["Maximum"]
     BlankName = Sample["BlankData"]["BlankName"]
     #Igor:	variable SlitLength=0.5*((4*pi)/wavelength)*sin(PhotoDiodeSize/(2*SDDistance))
-    slitLength = 0.5*((4*np.pi)//wavelength)*np.sin(UPDSize/(2*SDD))
+    slitLength = 0.5*((4*np.pi)/wavelength)*np.sin(UPDSize/(2*SDD))
     OmegaFactor= (UPDSize/SDD)*np.radians(FWHMBlank)
     Kfactor=BLPeakMax*OmegaFactor*thickness * 0.1 
     #apply calibration
@@ -312,6 +312,40 @@ def calibrateAndSubtractFlyscan(Sample):
             "units":"[cm2/cm3]"
             }
 
+
+def calculatePDErrorFly(Sample, isBlank=False):
+    #OK, another incarnation of the error calculations...
+    UPD_array = Sample["RawData"]["UPD_array"]
+    # USAXS_PD = Sample["reducedData"]["Intensity"]
+    MeasTimeCts = Sample["RawData"]["TimePerPoint"]
+    Frequency=1e6   #this is frequency of clock fed into mca1
+    MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
+    if isBlank:
+        UPD_gains=Sample["BlankData"]["UPD_gains"]
+        UPD_bkgErr = Sample["BlankData"]["UPD_bkgErr"]    
+    else:
+        UPD_gains=Sample["reducedData"]["UPD_gains"]
+        UPD_bkgErr = Sample["reducedData"]["UPD_bkgErr"]    
+
+    Monitor = Sample["RawData"]["Monitor"]
+    I0Gain=Sample["RawData"]["metadata"]["I0Gain"]
+    VToFFactor = Sample["RawData"]["VToFFactor"]                    #this is mca1 frequency, hardwired to 1e6 
+    SigmaUSAXSPD=np.sqrt(UPD_array*(1+0.0001*UPD_array))		    #this is our USAXS_PD error estimate, Poisson error + 1% of value
+    SigmaPDwDC=np.sqrt(SigmaUSAXSPD**2+(MeasTime*UPD_bkgErr)**2)    #This should include now measured error for background
+    SigmaPDwDC=SigmaPDwDC/(VToFFactor*UPD_gains)
+    A=(UPD_array)/(VToFFactor[0]*UPD_gains)		                    #without dark current subtraction
+    SigmaMonitor= np.sqrt(Monitor)		                            #these calculations were done for 10^6 
+    ScaledMonitor = Monitor
+    A = np.where(np.isnan(A), 0.0, A)
+    SigmaMonitor = np.where(np.isnan(SigmaMonitor), 0.0, SigmaMonitor)
+    SigmaPDwDC = np.where(np.isnan(SigmaPDwDC), 0.0, SigmaPDwDC)
+    ScaledMonitor = np.where(np.isnan(ScaledMonitor), 0.0, ScaledMonitor)
+    SigmaRwave=np.sqrt((A**2 * SigmaMonitor**4)+(SigmaPDwDC**2 * ScaledMonitor**4)+((A**2 + SigmaPDwDC**2) * ScaledMonitor**2 * SigmaMonitor**2))
+    SigmaRwave=SigmaRwave/(ScaledMonitor*(ScaledMonitor**2-SigmaMonitor**2))
+    SigmaRwave=SigmaRwave * I0Gain			#fix for use of I0 gain here, the numbers were too low due to scaling of PD by I0Gain
+    Error=SigmaRwave / 5                    # this is the error in the USAXS data, it is not the same as in Igor, but it is close enough for now
+    result = {"Error":Error}
+    return result
 
 
 
@@ -354,7 +388,7 @@ def calculatePD_Fly(data_dict):
 
     
         # Create Gains arrays - one for requested and one for real
-    I0AmpGain = metadata_dict["I0AmpGain"]
+    I0Gain = metadata_dict["I0Gain"]
     num_elements = UPD_array.size 
     AmpGain_array = np.full(num_elements, AmpGain[len(AmpGain)-1])
     AmpGainReq_array = np.full(num_elements,AmpGain[len(AmpReqGain)-1])
@@ -428,11 +462,11 @@ def calculatePD_Fly(data_dict):
 
         #Correct UPD for gains and monitor counts and amplifier gain. 
         # Frequency=1e6  #this is to keep in sync with Igor code. 
-    PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0AmpGain)  
+    PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0Gain)  
     PD_error = 0.01*PD_Intensity   #this is fake error for QR conversion,recalculated in calculatePDerror
     result = {"Intensity":PD_Intensity,
               "Error":PD_error,
-              "PD_range":GainsIndx,
+              "UPD_gains":GainsIndx,
               "UPD_gains":Gains,
               "UPD_bkgErr":updBkgErr}
     return result
@@ -586,7 +620,7 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     return results
 
 
-def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=True):
+def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans=True):
     # Smoothing times for different ranges
     rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
 
@@ -614,13 +648,13 @@ def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=
         return a + b * x
 
     for i in range(40, len(intensity)):
-        if pd_range[i] == 1:
+        if UPD_gains[i] == 1:
             tmp_time = rwave_smooth_times[0]
-        elif pd_range[i] == 2:
+        elif UPD_gains[i] == 2:
             tmp_time = rwave_smooth_times[1]
-        elif pd_range[i] == 3:
+        elif UPD_gains[i] == 3:
             tmp_time = rwave_smooth_times[2]
-        elif pd_range[i] == 4:
+        elif UPD_gains[i] == 4:
             tmp_time = rwave_smooth_times[3]
         else:
             tmp_time = rwave_smooth_times[4]
@@ -637,7 +671,7 @@ def smooth_r_data(intensity, qvector, pd_range, r_error, meas_time, replaceNans=
             if i + end_points > len(intensity) - 1:
                 end_points = len(intensity) - 1 - i
 
-            if (pd_range[i - start_points] != pd_range[i]) or (pd_range[i + end_points] != pd_range[i]):
+            if (UPD_gains[i - start_points] != UPD_gains[i]) or (UPD_gains[i + end_points] != UPD_gains[i]):
                 temp_r = temp_int_log[i - start_points:i + end_points]
                 temp_q = qvector[i - start_points:i + end_points]
 

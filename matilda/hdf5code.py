@@ -128,7 +128,9 @@ def saveNXcanSAS(Sample,path, filename):
     label = Sample["RawData"]["Filename"]
     timeStamp = Sample["RawData"]["metadata"]["timeStamp"]
     SampleName = Sample["RawData"]["sample"]["name"]
-    SampleName = SampleName.decode('utf-8')
+    if isinstance(SampleName, bytes):
+        SampleName = SampleName.decode('utf-8')
+
 
     if "SMR_Int" in Sample["CalibratedData"]:
         SMR_Int =Sample["CalibratedData"]["SMR_Int"]

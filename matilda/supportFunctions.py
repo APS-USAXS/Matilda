@@ -51,7 +51,7 @@ def importFlyscan(path, filename):
         #vTof = 1e6  overwrite, the mca_clock_frequency (5e7) value is simply wrong.     
         #metadata
         keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain','detector_distance',
-                        'timeStamp',
+                        'timeStamp','I0AmpGain',
                         'trans_pin_counts','trans_pin_gain','trans_pin_time','trans_I0_counts','trans_I0_gain',
                         'UPDsize', 'trans_I0_counts', 'trans_I0_gain', 'upd_bkg0', 'upd_bkg1','upd_bkg2','upd_bkg3',
                         'upd_bkgErr0','upd_bkgErr1','upd_bkgErr2','upd_bkgErr3','upd_bkgErr4','upd_bkg_err0',
@@ -61,6 +61,9 @@ def importFlyscan(path, filename):
         metadata_group = file['/entry/metadata']
         metadata_dict = read_group_to_dict(metadata_group)
         metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+        # we need this key to be there also... COpy of the other one. 
+        I0Gain=metadata_dict["I0AmpGain"]   
+        metadata_dict["I0Gain"]=I0Gain
         #Instrument
         keys_to_keep = ['monochromator', 'energy', 'wavelength']
         instrument_group = file['/entry/instrument']

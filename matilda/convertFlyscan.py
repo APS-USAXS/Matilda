@@ -40,7 +40,7 @@ from supportFunctions import subtract_data
 from convertUSAXS import rebinData
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
-from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan
+from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
 from desmearing import desmearData
 
 recalculateAllData = False

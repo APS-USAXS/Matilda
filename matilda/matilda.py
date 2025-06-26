@@ -24,7 +24,7 @@ processFlyscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,
     - returns a list of dictionaries with the reduced data
     - No plotting, just processing
     
-TODO: processStepScans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False)
+processStepScans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False)
     - Step scan data, finding the appropriate blank for each.
     - ListOfScans is a list of tuples with path and filename of the scan data
     - ListOfBlanks is a list of tuples with path and filename of the blank data

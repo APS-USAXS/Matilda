@@ -38,7 +38,7 @@ import tifffile as tiff
 import logging
 
 from supportFunctions import read_group_to_dict, filter_nested_dict, subtract_data
-from convertNikaTopyFAI import convert_Nika_to_Fit2D
+from matilda.supportNikaFunctions import convert_Nika_to_Fit2D
 from readfromtiled import FindLastBlankScan
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 

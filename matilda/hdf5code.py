@@ -403,7 +403,8 @@ def readMyNXcanSAS(path, filename):
         location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
         logging.debug(f"Found SMR entry at: {location}")
         if location is not None and location in f:
-            Sample['CalibratedData'] = dict()
+            if 'CalibratedData' not in Sample:
+                Sample['CalibratedData'] = dict()
             dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_Int'] = dataset[()]
@@ -420,7 +421,8 @@ def readMyNXcanSAS(path, filename):
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset[()]
         else:
-            Sample['CalibratedData'] = dict()
+            if 'CalibratedData' not in Sample:
+                Sample['CalibratedData'] = dict()
             Sample["CalibratedData"] ["SMR_Qvec"] = None,
             Sample["CalibratedData"] ["SMR_Int"] = None,
             Sample["CalibratedData"] ["SMR_Error"] = None,
@@ -431,9 +433,12 @@ def readMyNXcanSAS(path, filename):
         location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         logging.debug(f"Found NXcanSAS entry at: {location}")
         if location is not None and location in f:
-            Sample['CalibratedData'] = dict()
-            Sample['RawData'] = dict()
-            Sample['RawData']['sample'] = dict()
+            if 'CalibratedData' not in Sample:
+                Sample['CalibratedData'] = dict()
+            if 'RawData' not in Sample:          
+                Sample['RawData'] = dict()
+                Sample['RawData']['sample'] = dict()
+
             dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['Intensity'] = dataset[()]
@@ -457,8 +462,11 @@ def readMyNXcanSAS(path, filename):
             Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
             Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
         else:
-            Sample['CalibratedData'] = dict()
-            Sample['RawData'] = dict()
+            if 'CalibratedData' not in Sample:
+                Sample['CalibratedData'] = dict()
+            if 'RawData' not in Sample:
+                Sample['RawData'] = dict()
+
             Sample["RawData"]["Filename"] = filename
             Sample["RawData"]["sample"] = dict()
             Sample['CalibratedData']['Intensity'] = None

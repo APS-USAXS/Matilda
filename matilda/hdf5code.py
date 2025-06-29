@@ -149,6 +149,10 @@ def saveNXcanSAS(Sample,path, filename):
     R_Qvec = Sample["reducedData"]["Q"]
     R_Error=Sample["reducedData"]["Error"]
 
+    BL_R_Int = Sample["BlankData"]["Intensity"]
+    BL_Q_vec = Sample["BlankData"]["Q"]
+    BL_Error = Sample["BlankData"]["Error"]    
+
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
@@ -307,7 +311,7 @@ def saveNXcanSAS(Sample,path, filename):
             nxDataEntry = f.create_group(newDataPath)
             # R_Int axis data
             ds = nxDataEntry.create_dataset('Intensity', data=R_Int)
-            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['units'] = 'arb'
             ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
             # R_Qvec axis data
             ds = nxDataEntry.create_dataset('Q', data=R_Qvec)
@@ -315,10 +319,33 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
             # R_Error axis data
             ds = nxDataEntry.create_dataset('Error', data=R_Error)
-            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['units'] = 'arb'
             ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
             
-    
+        if BL_R_Int is not None:
+            logging.info(f"Wrote Blank data group for file {filename}. ")
+            newDataPath = "entry/"+"Blank_data"
+            if newDataPath in f:
+                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
+                del f[newDataPath]
+
+            nxDataEntry = f.create_group(newDataPath)
+            # R_Int axis data
+            ds = nxDataEntry.create_dataset('Intensity', data=BL_R_Int)
+            ds.attrs['units'] = 'arb'
+            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
+            ds.attrs['BlankName']=BlankName 
+            # R_Qvec axis data
+            ds = nxDataEntry.create_dataset('Q', data=BL_Q_vec)
+            ds.attrs['units'] = '1/angstrom'
+            ds.attrs['long_name'] = 'Q'    # suggested X axis plot label
+            # R_Error axis data
+            ds = nxDataEntry.create_dataset('Error', data=BL_Error)
+            ds.attrs['units'] = 'arb'
+            ds.attrs['long_name'] = 'Error'    # suggested X axis plot label
+ 
+ 
+
     logging.info(f"Wrote NXcanSAS data to file: {filename}")
 
 def readMyNXcanSAS(path, filename):
@@ -354,7 +381,23 @@ def readMyNXcanSAS(path, filename):
             dataset = f[location + "Error"]
             if dataset is not None:
                 Sample['reducedData']['Error'] = dataset[()]
-     
+
+        location = 'entry/Blank_data/'
+        if location in f:
+            Sample['BlankData'] = dict()
+            dataset = f[location + "Intensity"]
+            if dataset is not None:
+                Sample['BlankData']['Intensity'] = dataset[()]
+            dataset = f[location + "Q"]
+            if dataset is not None:
+                Sample['BlankData']['Q'] = dataset[()]
+            dataset = f[location + "Error"]
+            if dataset is not None:
+                Sample['BlankData']['Error'] = dataset[()]
+            # BL_R_Int = Sample["BlankData"]["Intensity"]
+            # BL_Q_vec = Sample["BlankData"]["Q"]
+            # BL_Error = Sample["BlankData"]["Error"]    
+
         #location = 'entry/'+filename.split('.')[0]+'_SMR/'
         # location is the first of entries from SASentries which contains string _SMR
         location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)

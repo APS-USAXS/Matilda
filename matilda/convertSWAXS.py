@@ -107,6 +107,11 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
             
             if blankPath is not None and blankFilename is not None:               
                 blank = importADData(blankPath, blankFilename)               #this is for blank path and blank name
+                Sample["BlankData"] = reduceADData(blank, useRawData=True)   #this generates Int vs Q for blank data plot
+                # qcalib = Sample["BlankData"]["Q"]
+                # intensity = Sample["BlankData"]["Intensity"]
+                # error = Sample["BlankData"]["Error"]            
+                # blankName = Sample["RawData"]["BlankName"] 
                 Sample["calib2DData"] = calibrateAD2DData(Sample, blank)
                 #returns 2D calibrated data
                     # result = {"data":calib2Ddata,

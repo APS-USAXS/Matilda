@@ -77,7 +77,7 @@ imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 NumberOfDaysToLookBack = 5  # Number of days to look back for scans
 NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 
-recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
+#recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
 # Configure logging
 # Get the directory of the current script
@@ -146,32 +146,29 @@ def processUSAXSFolder(path):
     h5_files = [file for file in files if file.endswith('.hdf')]
     waxs_files = sorted(h5_files, key=extract_number_from_filename)
     waxs_blanks = [file for file in waxs_files if 'blank' in file.lower()]
-       
-    #force recalculateAllData to True
-    recalculateAllData = True
-    
+           
     #process all flyscans
     logging.info("Processing USAXS Flyscans")
     ListOfScans = [(os.path.join(path, usaxs_folder), file) for file in usaxs_files]
     ListOfBlanks = [(os.path.join(path, usaxs_folder), file) for file in usaxs_blanks]
-    data = processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData)
+    data = processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
 
     logging.info("Processing SAXS data")
     ListOfScans = [(os.path.join(path, saxs_folder), file) for file in saxs_files]
     ListOfBlanks = [(os.path.join(path, saxs_folder), file) for file in saxs_blanks]
-    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData)
+    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
 
 
     logging.info("Processing WAXS data")
     ListOfScans = [(os.path.join(path, waxs_folder), file) for file in waxs_files]
     ListOfBlanks = [(os.path.join(path, waxs_folder), file) for file in waxs_blanks]
-    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData)
+    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
     
 
 
 
 #process list of flyscans, finding the appropriate blank for each.
-def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAllData,forceFirstBlank=False):
+def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=False,forceFirstBlank=False):
     """
     Processes a list of flyscans, finding the appropriate blank for each.
     The correct blank is in the same path and has the number _XYZ
@@ -196,7 +193,7 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
             result = processFlyscan(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,
-                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+                                        recalculateAllData=recalculateAllData)          # recalculateAllData will be True for reprocessing
             results.append(result)
         except Exception as e:
             logging.error(f"Error processing scan {scan_filename}: {e}", exc_info=True)
@@ -204,7 +201,7 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=recalculateAll
 
 
 # Process the step scan data files
-def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
+def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirstBlank=False):
     results=[]
     logging.info("Processing of Step scans with blanks")    
     for scan_path, scan_filename in ListOfScans:
@@ -222,7 +219,7 @@ def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAll
             result = processStepscan(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,
-                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+                                        recalculateAllData=recalculateAllData)          # recalculateAllData will be True for reprocessing
             results.append(result)
         except Exception as e:
             logging.error(f"Error processing scan {scan_filename}: {e}", exc_info=True)
@@ -231,7 +228,7 @@ def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAll
 
 
 #process SAXS/WAXS data, finding the appropriate blank for each.
-def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllData,forceFirstBlank=False):
+def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirstBlank=False):
     """
     Processes a list of SAXS/WAXS data, finding the appropriate blank for each.
     The correct blank is in the same path and has the largest number XYZ
@@ -254,7 +251,7 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=recalculateAllDa
             result = process2Ddata(scan_path, scan_filename,
                                         blankPath=selected_blank_path,
                                         blankFilename=selected_blank_filename,
-                                        deleteExisting=recalculateAllData)          # deleteExisting will be True for reprocessing
+                                        recalculateAllData=recalculateAllData)          # recalculateAllData will be True for reprocessing
             results.append(result)
         except Exception as e:
             logging.error(f"Error processing AD scan {scan_filename}: {e}", exc_info=True)

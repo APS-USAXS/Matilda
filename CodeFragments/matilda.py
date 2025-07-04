@@ -191,7 +191,7 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
     plt.figure(figsize=(6, 6))
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
-        label = data_dict["RawData"]["Filename"]
+        label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q_array"]
         UPD = data_dict["reducedData"]["PD_intensity"]
         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
@@ -240,7 +240,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
     plt.figure(figsize=(6, 6))
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
-        label = data_dict["RawData"]["Filename"]
+        label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q_array"]
         UPD = data_dict["reducedData"]["Intensity"]
         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle

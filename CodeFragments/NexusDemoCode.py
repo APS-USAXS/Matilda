@@ -67,7 +67,7 @@ import h5py  # HDF5 support
 import numpy
 
 print("Write a NeXus HDF5 file")
-fileName = "simple_example_basic.nexus.hdf5"
+filename = "simple_example_basic.nexus.hdf5"
 timestamp = datetime.datetime.now().astimezone().isoformat()
 
 # load data from two column format
@@ -77,11 +77,11 @@ mr_arr = data[0]
 i00_arr = numpy.asarray(data[1], "int32")
 
 # create the HDF5 NeXus file
-with h5py.File(fileName, "w") as f:
+with h5py.File(filename, "w") as f:
     # point to the default data to be plotted
     f.attrs["default"] = "entry"
     # give the HDF5 root some more attributes
-    f.attrs["file_name"] = fileName
+    f.attrs["file_name"] = filename
     f.attrs["file_time"] = timestamp
     f.attrs["instrument"] = "APS USAXS at 32ID-B"
     f.attrs["creator"] = "simple_example_basic_write.py"
@@ -114,7 +114,7 @@ with h5py.File(fileName, "w") as f:
     ds.attrs["units"] = "counts"
     ds.attrs["long_name"] = "USAXS I00 (counts)"  # suggested Y axis plot label
 
-print("wrote file:", fileName)
+print("wrote file:", filename)
 
 
 

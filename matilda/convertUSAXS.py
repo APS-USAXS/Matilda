@@ -29,12 +29,11 @@ from hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
 from desmearing import desmearData
 
-recalculateAllData =  False
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
-def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
+def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
@@ -42,7 +41,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
         required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
         required_items = {'definition': 'NXcanSAS'}
         SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if deleteExisting:
+        if recalculateAllData:
             # Delete the groups which may have een created by previously run saveNXcanSAS
             location = 'entry/QRS_data/'
             if location is not None and location in hdf_file:
@@ -62,8 +61,8 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
 
 
         #Now, we will read the data from the file, if the exist. 
-        # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
-        # if BlankName=None, then we just need the QRS_data group.   
+        # More checks... if we have blankname, full NXcanSAS need to exist or recalculate
+        # if blankname=None, then we just need the QRS_data group.   
 
         NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         location = None
@@ -99,7 +98,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
                 and blankFilename != filename
                 and "blank" not in filename.lower()
             ):
-                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
+                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
@@ -131,7 +130,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
                                                 "SMR_dQ":None,
                                                 "Kfactor":None,
                                                 "OmegaFactor":None,
-                                                "BlankName":None,
+                                                "blankname":None,
                                                 "thickness":None,
                                                 "units":"[cm2/cm3]",
                                                 "Intensity":None,
@@ -149,7 +148,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
                                             "SMR_dQ":None,
                                             "Kfactor":None,
                                             "OmegaFactor":None,
-                                            "BlankName":None,
+                                            "blankname":None,
                                             "thickness":None,
                                             "units":"[cm2/cm3]",
                                             "Intensity":None,
@@ -164,7 +163,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, deleteEx
     saveNXcanSAS(Sample,path, filename)
     return Sample
 
-def getBlankStepscan(blankPath, blankFilename, deleteExisting=recalculateAllData):
+def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
       # will reduce the blank linked as input into Igor BL_R_Int 
       # after reducing this first time, data are saved in Nexus file for subsequent use. 
       # We get the BL_QRS and calibration data as result.
@@ -173,7 +172,7 @@ def getBlankStepscan(blankPath, blankFilename, deleteExisting=recalculateAllData
     Filepath = os.path.join(blankPath, blankFilename)
     with h5py.File(Filepath, 'r+') as hdf_file:
             # Check if the group 'location' exists, if yes, either delete if asked for or use. 
-            if deleteExisting:
+            if recalculateAllData:
                 if location in hdf_file:
                     # Delete the group is exists and requested
                     del hdf_file[location]
@@ -196,7 +195,7 @@ def getBlankStepscan(blankPath, blankFilename, deleteExisting=recalculateAllData
                 Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
                 Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
                 Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
-                Blank["BlankData"].update({"BlankName":blankFilename})      # add the name of the blank file
+                Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
                 Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
                 Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
                 Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
@@ -389,7 +388,7 @@ def importStepScan(path, filename):
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
     #Package these results into dictionary
-    data_dict = {"Filename": os.path.splitext(filename)[0],
+    data_dict = {"filename": os.path.splitext(filename)[0],
                 "ARangles":ARangles, 
                 "TimePerPoint": TimePerPoint, 
                 "Monitor":Monitor, 
@@ -459,11 +458,11 @@ def CorrectUPDGainsStep(data_dict):
     return result
 
 
-# def reduceStepScanToQR(path, filename, deleteExisting=True):
+# def reduceStepScanToQR(path, filename, recalculateAllData=True):
 #   # Open the HDF5 file in read/write mode
 #     location = 'entry/displayData/'
 #     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
-#         if deleteExisting:
+#         if recalculateAllData:
 #             # Delete the group
 #             if location in hdf_file:
 #                 del hdf_file[location]
@@ -508,7 +507,7 @@ def CorrectUPDGainsStep(data_dict):
 if __name__ == "__main__":
     Sample = dict()
     #Sample = reduceStepScanToQR("/home/parallels/Github/Matilda/TestData","USAXS_step.h5")
-    Sample = reduceStepScanToQR(r"C:\Users\ilavsky\Documents\GitHub\Matilda\TestData","USAXS_step.h5")
+   # Sample = reduceStepScanToQR(r"C:\Users\ilavsky\Documents\GitHub\Matilda\TestData","USAXS_step.h5")
     #Sample["RawData"]=ImportStepScan("/home/parallels/Github/Matilda","USAXS_step.h5")
         #pp.pprint(Sample)
         #Sample["reducedData"]= CorrectUPDGainsStep(Sample)
@@ -517,7 +516,7 @@ if __name__ == "__main__":
     #PlotResults(Sample)
     #flyscan
     #Sample = dict()
-    #Sample = reduceFlyscanToQR("./TestData","USAXS.h5",deleteExisting=True)
+    #Sample = reduceFlyscanToQR("./TestData","USAXS.h5",recalculateAllData=True)
     # Sample["RawData"]=ImportFlyscan("/home/parallels/Github/Matilda","USAXS.h5")
     # #pp.pprint(Sample)
     # Sample["reducedData"]= CorrectUPDGainsFly(Sample)

@@ -13,7 +13,7 @@ from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
-recalculateAllData = False
+#recalculateAllData = False
 
 MinQMinFindRatio = 1.05
 
@@ -71,12 +71,12 @@ def importFlyscan(path, filename):
         instrument_dict = filter_nested_dict(instrument_dict, keys_to_keep)
         # sample
         sample_group = file['/entry/sample']
-        sample_group = read_group_to_dict(sample_group)
+        sample_dict = read_group_to_dict(sample_group)
 
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
     #Package these results into dictionary
-    data_dict = {"Filename": os.path.splitext(filename)[0],
+    data_dict = {"filename": os.path.splitext(filename)[0],
                 "ARangles":ARangles, 
                 "TimePerPoint": TimePerPoint, 
                 "Monitor":Monitor, 
@@ -87,7 +87,7 @@ def importFlyscan(path, filename):
                 "AmpReqGain": AmpReqGain,
                 "metadata": metadata_dict,
                 "instrument": instrument_dict,
-                "sample": sample_group,
+                "sample": sample_dict,
                 }
     
     return data_dict
@@ -129,8 +129,8 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
             logging.warning(f"No suitable blank found for sample {scan_filename} (num: {sample_num}) in path '{scan_path}'.")
 
         # try:
-        #     #    processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=True)
-        #     results.append(processFlyscan(path, filename, blankPath=selected_blank_path,blankFilename=selected_blank_filename,deleteExisting=True))
+        #     #    processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)
+        #     results.append(processFlyscan(path, filename, blankPath=selected_blank_path,blankFilename=selected_blank_filename,recalculateAllData=True))
         # except:
         #     pass
         #     #print("Done processing the Flyscans")
@@ -138,7 +138,7 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
         logging.info(f"Found blank for {scan_filename} , blank name : {selected_blank_filename}")
     return selected_blank_path, selected_blank_filename   
 
-def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData):
+def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
       # will reduce the blank linked as input into Igor BL_R_Int 
       # after reducing this first time, data are saved in Nexus file for subsequent use. 
       # We get the BL_QRS and calibration data as result.
@@ -147,7 +147,7 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData)
     Filepath = os.path.join(blankPath, blankFilename)
     with h5py.File(Filepath, 'r+') as hdf_file:
             # Check if the group 'location' exists, if yes, either delete if asked for or use. 
-            if deleteExisting:
+            if recalculateAllData:
                 if location in hdf_file:
                     # Delete the group is exists and requested
                     del hdf_file[location]
@@ -167,7 +167,7 @@ def getBlankFlyscan(blankPath, blankFilename, deleteExisting=recalculateAllData)
                 BlI0Counts = Blank['RawData']['metadata']['trans_I0_counts']
                 BlI0Gain = Blank['RawData']['metadata']['trans_I0_gain']
                 Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
-                Blank["BlankData"].update({"BlankName":blankFilename})      # add the name of the blank file
+                Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
                 Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
                 Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
                 Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
@@ -295,7 +295,7 @@ def calibrateAndSubtractFlyscan(Sample):
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
     thickness = Sample["RawData"]["sample"]['thickness']
     BLPeakMax = Sample["BlankData"]["Maximum"]
-    BlankName = Sample["BlankData"]["BlankName"]
+    blankname = Sample["BlankData"]["blankname"]
     #Igor:	variable SlitLength=0.5*((4*pi)/wavelength)*sin(PhotoDiodeSize/(2*SDDistance))
     slitLength = 0.5*((4*np.pi)/wavelength)*np.sin(UPDSize/(2*SDD))
     OmegaFactor= (UPDSize/SDD)*np.radians(FWHMBlank)
@@ -309,7 +309,7 @@ def calibrateAndSubtractFlyscan(Sample):
             "SMR_Error":SMR_Error,
             "Kfactor":Kfactor,
             "OmegaFactor":OmegaFactor,
-            "BlankName":BlankName,
+            "blankname":blankname,
             "thickness":thickness,
             "slitLength":slitLength,
             "units":"[cm2/cm3]"
@@ -802,6 +802,9 @@ def read_group_to_dict(group):
             elif hasattr(data, 'size') and data.size == 1:
                 # Convert to a scalar (number or string)
                 data = data.item()
+                if isinstance(data, bytes):
+                    # Decode bytes to string, the above does not seem to catch this? 
+                    data = data.decode('utf-8')
             data_dict[key] = data
         elif isinstance(item, h5py.Group):
             # If the item is a group, recursively read its contents
@@ -818,35 +821,35 @@ def filter_nested_dict(d, keys_to_keep):
     else:
         return d    
 
-def results_to_dataset(results):
-    results = copy.deepcopy(results)
-    ds = xr.Dataset()
-    ds['USAXS_int'] = ('q',results['reducedData']['UPD'])
-    ds['q'] = results['reducedData']['Q_array']
-    del results['reducedData']['UPD']
-    del results['reducedData']['Q_array']
-    ds.update(results['reducedData'])
-    for our_name,raw_name in [('AR_angle','ARangles'),
-                              ('TimePerPoint','TimePerPoint'),
-                              ('Monitor','Monitor'),
-                              ('UPD','UPD_array'),
-                             ]:
-        ds[our_name] = ('flyscan_bin',results['RawData'][raw_name])
-        del results['RawData'][raw_name]
-    for our_name,raw_name in [('AmpGain','AmpGain'),
-                              ('AmpReqGain','AmpReqGain'),
-                              ('amp_change_channel','Channel')
-                             ]:
-        ds[our_name] = ('amp_change_channel',results['RawData'][raw_name])
-        del results['RawData'][raw_name]
+# def results_to_dataset(results):
+#     results = copy.deepcopy(results)
+#     ds = xr.Dataset()
+#     ds['USAXS_int'] = ('q',results['reducedData']['UPD'])
+#     ds['q'] = results['reducedData']['Q_array']
+#     del results['reducedData']['UPD']
+#     del results['reducedData']['Q_array']
+#     ds.update(results['reducedData'])
+#     for our_name,raw_name in [('AR_angle','ARangles'),
+#                               ('TimePerPoint','TimePerPoint'),
+#                               ('Monitor','Monitor'),
+#                               ('UPD','UPD_array'),
+#                              ]:
+#         ds[our_name] = ('flyscan_bin',results['RawData'][raw_name])
+#         del results['RawData'][raw_name]
+#     for our_name,raw_name in [('AmpGain','AmpGain'),
+#                               ('AmpReqGain','AmpReqGain'),
+#                               ('amp_change_channel','Channel')
+#                              ]:
+#         ds[our_name] = ('amp_change_channel',results['RawData'][raw_name])
+#         del results['RawData'][raw_name]
                                       
-    ds.attrs.update(results['RawData']['metadata'])
-    del results['RawData']['metadata']
-    ds.attrs['instrument'] = results['RawData']['instrument']
-    del results['RawData']['instrument']
-    ds.update(results['RawData'])
+#     ds.attrs.update(results['RawData']['metadata'])
+#     del results['RawData']['metadata']
+#     ds.attrs['instrument'] = results['RawData']['instrument']
+#     del results['RawData']['instrument']
+#     ds.update(results['RawData'])
 
-    return ds
+#     return ds
 
 
 '''

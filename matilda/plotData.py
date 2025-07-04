@@ -39,7 +39,7 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     plt.figure(figsize=style["figsize"])
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
-        label = data_dict["RawData"]["Filename"]
+        label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q"]
         UPD = data_dict["reducedData"]["Intensity"]
         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
@@ -71,7 +71,7 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
         if data_dict["CalibratedData"]["Intensity"] is not None:
-            label = data_dict["RawData"]["Filename"]
+            label = data_dict["RawData"]["filename"]
             Q_array = data_dict["CalibratedData"]["Q"]
             UPD = data_dict["CalibratedData"]["Intensity"]
             plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
@@ -115,7 +115,7 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
     plt.figure(figsize=(6, 6))
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
-        label = data_dict["RawData"]["Filename"]
+        label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q"]
         UPD = data_dict["reducedData"]["Intensity"]
         plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
@@ -157,7 +157,7 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]
         if data_dict["CalibratedData"]["Intensity"] is not None:
-            label = data_dict["RawData"]["Filename"]
+            label = data_dict["RawData"]["filename"]
             Q_array = data_dict["CalibratedData"]["Q"]
             Intensity = data_dict["CalibratedData"]["Intensity"]
             plt.plot(Q_array, Intensity, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle

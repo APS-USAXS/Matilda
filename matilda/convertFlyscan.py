@@ -1,5 +1,5 @@
 ''' 
-processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)
+processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)
         For example of use see: test_matildaLocal() at the end of this file. 
         Does:
         Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
@@ -43,13 +43,11 @@ from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrectio
 from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
 from desmearing import desmearData
 
-recalculateAllData = False
-
 
 # Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
-def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
+def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
@@ -57,7 +55,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
         required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
         required_items = {'definition': 'NXcanSAS'}
         SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if deleteExisting:
+        if recalculateAllData:
             # Delete the groups which may have een created by previously run saveNXcanSAS
             location = 'entry/QRS_data/'
             if location is not None and location in hdf_file:
@@ -77,8 +75,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
 
 
         #Now, we will read the data from the file, if the exist. 
-        # More checks... if we have BlankName, full NXcanSAS need to exist or recalculate
-        # if BlankName=None, then we just need the QRS_data group.   
+        # More checks... if we have blankname, full NXcanSAS need to exist or recalculate
+        # if blankname=None, then we just need the QRS_data group.   
 
         NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         location = None
@@ -113,7 +111,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
                 and blankFilename != filename
                 and "blank" not in filename.lower()
             ):
-                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,deleteExisting=recalculateAllData)
+                Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
@@ -146,7 +144,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
                                                 "SMR_dQ":None,
                                                 "Kfactor":None,
                                                 "OmegaFactor":None,
-                                                "BlankName":None,
+                                                "blankname":None,
                                                 "thickness":None,
                                                 "units":"[cm2/cm3]",
                                                 "Intensity":None,
@@ -164,7 +162,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
                                             "SMR_dQ":None,
                                             "Kfactor":None,
                                             "OmegaFactor":None,
-                                            "BlankName":None,
+                                            "blankname":None,
                                             "thickness":None,
                                             "units":"[cm2/cm3]",
                                             "Intensity":None,
@@ -180,13 +178,12 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, deleteExi
     return Sample
 
 
-# TODO: remove deleteExisting=True for operations
-def reduceFlyscanToQR(path, filename, deleteExisting=recalculateAllData):
+def reduceFlyscanToQR(path, filename, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     location = 'entry/displayData/'
     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
             # Check if the group 'displayData' exists
-            if deleteExisting:
+            if recalculateAllData:
                 # Delete the group
                 del hdf_file[location]
                 logging.info("Deleted existing group 'entry/displayData'.")
@@ -223,10 +220,10 @@ def test_matildaLocal():
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
     samplePath = r"\\Mac\Home\Desktop\Data\set1"
-    sampleName="AB3_R_0318.h5"
+    samplename="AB3_R_0318.h5"
     blankPath=r"\\Mac\Home\Desktop\Data\set1" 
     blankFilename="TapeBlank_R_0317.h5"
-    Sample = processFlyscan(samplePath,sampleName,blankPath=blankPath,blankFilename=blankFilename,deleteExisting=False)    
+    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
     
     # # this is for testing save/restore from Nexus file... 
     # testme=False 
@@ -249,7 +246,7 @@ def test_matildaLocal():
     #     saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
     Sample = {}
-    Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", sampleName)
+    Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", samplename)
     #pprint.pprint(Data)
     #Sample['CalibratedData']=Data
     # Q = Sample["reducedData"]["Q"]

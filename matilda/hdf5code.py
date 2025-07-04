@@ -1,11 +1,6 @@
 '''
     this contains needed hdf5 support for matilda
     used by saving blank BL_QRS data. 
-    use code: 
-    save_dict_to_hdf5(data_dict, 'data.h5') to save a dictionary to an hdf5 file.
-    use code: load_dict_from_hdf5('data.h5') to load a dictionary from an hdf5 file.
-    use code: load_dict_from_hdf5('data.h5','root:DisplayData/') to load a dictionary from an hdf5 file.
-
 '''
 import h5py
 import os
@@ -13,6 +8,7 @@ import numpy as np
 import six  #what is this for???
 import datetime
 import logging
+
 
 def readGenericNXcanSAS(path, filename):
     '''
@@ -62,7 +58,7 @@ def readGenericNXcanSAS(path, filename):
             units=Int_attributes['units']
             Kfactor = Int_attributes["Kfactor"]
             OmegaFactor = Int_attributes["OmegaFactor"]
-            BlankName = Int_attributes["BlankName"]
+            blankname = Int_attributes["blankname"]
             thickness = Int_attributes["thickness"]
             label = Int_attributes["label"]
 
@@ -107,7 +103,7 @@ def readGenericNXcanSAS(path, filename):
             'dQ_Attributes':dQ_attributes,
             "Kfactor":Kfactor,
             "OmegaFactor":OmegaFactor,
-            "BlankName":BlankName,
+            "blankname":blankname,
             "thickness":thickness,
             'label':label,
         }
@@ -123,13 +119,13 @@ def saveNXcanSAS(Sample,path, filename):
     units = Sample["CalibratedData"]["units"]
     Kfactor = Sample["CalibratedData"]["Kfactor"] if "Kfactor" in Sample["CalibratedData"] else None
     OmegaFactor = Sample["CalibratedData"]["OmegaFactor"] if "OmegaFactor" in Sample["CalibratedData"] else None
-    BlankName = Sample["CalibratedData"]["BlankName"] if "BlankName" in Sample["CalibratedData"] else None
+    blankname = Sample["CalibratedData"]["blankname"] if "blankname" in Sample["CalibratedData"] else None
     thickness = Sample["CalibratedData"]["thickness"] if "thickness" in Sample["CalibratedData"] else None
-    label = Sample["RawData"]["Filename"]
+    label = Sample["RawData"]["filename"]
     timeStamp = Sample["RawData"]["metadata"]["timeStamp"]
-    SampleName = Sample["RawData"]["sample"]["name"]
-    if isinstance(SampleName, bytes):
-        SampleName = SampleName.decode('utf-8')
+    samplename = Sample["RawData"]["sample"]["name"]
+    if isinstance(samplename, bytes):
+        samplename = samplename.decode('utf-8')
 
 
     if "SMR_Int" in Sample["CalibratedData"]:
@@ -176,7 +172,7 @@ def saveNXcanSAS(Sample,path, filename):
         nxentry = f['entry']
         nxentry.attrs['NX_class'] = 'NXentry'
         nxentry.attrs['canSAS_class'] = 'SASentry'
-        nxentry.attrs['default']  = SampleName   #modify with the most reduced data.
+        nxentry.attrs['default']  = samplename   #modify with the most reduced data.
         
         #add definition as NXsas - this is location of raw AND reduced data
         # Check if 'definition' dataset exists in the entry group and delete it if present
@@ -188,7 +184,7 @@ def saveNXcanSAS(Sample,path, filename):
         if Intensity is not None:
             logging.info(f"Wrote Desmeared NXcanSAS group for file {filename}. ")
             # create the NXsubentry group for Desmeared reduced data. 
-            newDataPath = "entry/"+SampleName
+            newDataPath = "entry/"+samplename
             if newDataPath in f:
                 logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
                 del f[newDataPath]
@@ -197,11 +193,11 @@ def saveNXcanSAS(Sample,path, filename):
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
             nxDataEntry.attrs['default'] = 'sasdata'
-            nxDataEntry.attrs['title'] = SampleName
+            nxDataEntry.attrs['title'] = samplename
             #add definition as NXcanSas
             nxDataEntry.create_dataset('definition', data='NXcanSAS')
             #add title as NXcanSas
-            nxDataEntry.create_dataset('title', data=SampleName)
+            nxDataEntry.create_dataset('title', data=samplename)
             #add run (compulsory)
             nxDataEntry.create_dataset('run', data="run_identifier")
 
@@ -218,7 +214,7 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['units'] = '1/cm'
             ds.attrs['uncertainties'] = 'Idev'
             ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
-            ds.attrs['BlankName'] = BlankName
+            ds.attrs['blankname'] = blankname
             ds.attrs['thickness'] = thickness
             ds.attrs['label'] = label
             ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
@@ -246,7 +242,7 @@ def saveNXcanSAS(Sample,path, filename):
             logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
             # add the SMR data
             # create the NXsubentry group for Desmeared reduced data. 
-            newDataPath = "entry/"+SampleName+"_SMR"
+            newDataPath = "entry/"+samplename+"_SMR"
             if newDataPath in f:
                 logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
                 del f[newDataPath]
@@ -255,11 +251,11 @@ def saveNXcanSAS(Sample,path, filename):
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
             nxDataEntry.attrs['default'] = 'sasdata'
-            nxDataEntry.attrs['title'] = SampleName
+            nxDataEntry.attrs['title'] = samplename
             #add definition as NXcanSas
             nxDataEntry.create_dataset('definition', data='NXcanSAS')
             #add title as NXcanSas
-            nxDataEntry.create_dataset('title', data=SampleName)
+            nxDataEntry.create_dataset('title', data=samplename)
             #add run (compulsory)
             nxDataEntry.create_dataset('run', data="run_identifier")
 
@@ -278,7 +274,7 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
             ds.attrs['Kfactor'] = Kfactor
             ds.attrs['OmegaFactor'] = OmegaFactor
-            ds.attrs['BlankName'] = BlankName
+            ds.attrs['blankname'] = blankname
             ds.attrs['thickness'] = thickness
             ds.attrs['label'] = label
 
@@ -334,7 +330,7 @@ def saveNXcanSAS(Sample,path, filename):
             ds = nxDataEntry.create_dataset('Intensity', data=BL_R_Int)
             ds.attrs['units'] = 'arb'
             ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
-            ds.attrs['BlankName']=BlankName 
+            ds.attrs['blankname']=blankname 
             # R_Qvec axis data
             ds = nxDataEntry.create_dataset('Q', data=BL_Q_vec)
             ds.attrs['units'] = '1/angstrom'
@@ -359,6 +355,7 @@ def readMyNXcanSAS(path, filename):
     Returns:
     dict: A dictionary containing the read data.
     """
+    isUSAXS = False
     Sample = dict()
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r') as f:
@@ -402,9 +399,12 @@ def readMyNXcanSAS(path, filename):
         # location is the first of entries from SASentries which contains string _SMR
         location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
         logging.debug(f"Found SMR entry at: {location}")
+        if 'CalibratedData' not in Sample:
+            Sample['CalibratedData'] = dict()
+        
         if location is not None and location in f:
-            if 'CalibratedData' not in Sample:
-                Sample['CalibratedData'] = dict()
+            isUSAXS = True      #have SMR data, assume USAXS setup
+
             dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['SMR_Int'] = dataset[()]
@@ -421,8 +421,6 @@ def readMyNXcanSAS(path, filename):
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset[()]
         else:
-            if 'CalibratedData' not in Sample:
-                Sample['CalibratedData'] = dict()
             Sample["CalibratedData"] ["SMR_Qvec"] = None,
             Sample["CalibratedData"] ["SMR_Int"] = None,
             Sample["CalibratedData"] ["SMR_Error"] = None,
@@ -432,13 +430,11 @@ def readMyNXcanSAS(path, filename):
      
         location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         logging.debug(f"Found NXcanSAS entry at: {location}")
-        if location is not None and location in f:
-            if 'CalibratedData' not in Sample:
-                Sample['CalibratedData'] = dict()
-            if 'RawData' not in Sample:          
-                Sample['RawData'] = dict()
-                Sample['RawData']['sample'] = dict()
+        if 'RawData' not in Sample:          
+            Sample['RawData'] = dict()
+            Sample["RawData"]["sample"]=dict()
 
+        if location is not None and location in f:
             dataset = f[location + "sasdata/I"]
             if dataset is not None:
                 Sample['CalibratedData']['Intensity'] = dataset[()]
@@ -456,30 +452,80 @@ def readMyNXcanSAS(path, filename):
                 Sample["RawData"]["sample"]["name"] = dataset[()]
             attributes = f[location + "sasdata/I"].attrs
             Sample['CalibratedData']['units'] = attributes['units']
-            Sample['CalibratedData']['BlankName'] = attributes["BlankName"]
+            Sample['CalibratedData']['blankname'] = attributes["blankname"]
             Sample['CalibratedData']['thickness'] = attributes["thickness"]
-            Sample["RawData"]["Filename"] = attributes["label"]
+            Sample["RawData"]["filename"] = attributes["label"]
             Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
             Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
         else:
-            if 'CalibratedData' not in Sample:
-                Sample['CalibratedData'] = dict()
-            if 'RawData' not in Sample:
-                Sample['RawData'] = dict()
-
-            Sample["RawData"]["Filename"] = filename
-            Sample["RawData"]["sample"] = dict()
+            Sample["RawData"]["filename"] = filename
             Sample['CalibratedData']['Intensity'] = None
             Sample['CalibratedData']['Q'] = None
             Sample['CalibratedData']['Error'] = None
             Sample['CalibratedData']['Kfactor'] = None
             Sample['CalibratedData']['OmegaFactor'] = None
-            Sample['CalibratedData']['BlankName'] = None
+            Sample['CalibratedData']['blankname'] = None
             Sample['CalibratedData']['thickness'] = None
             Sample['CalibratedData']['units'] = None
             Sample['CalibratedData']['Error'] = None
 
-     
+        #and now we need to read the other groups, which are raw data... 
+        if isUSAXS : 
+            #metadata
+            keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain','detector_distance',
+                            'timeStamp','I0AmpGain',
+                            'trans_pin_counts','trans_pin_gain','trans_pin_time','trans_I0_counts','trans_I0_gain',
+                            'UPDsize', 'trans_I0_counts', 'trans_I0_gain', 'upd_bkg0', 'upd_bkg1','upd_bkg2','upd_bkg3',
+                            'upd_bkgErr0','upd_bkgErr1','upd_bkgErr2','upd_bkgErr3','upd_bkgErr4','upd_bkg_err0',
+                            'upd_bkg4','DDPCA300_gain0','DDPCA300_gain1','DDPCA300_gain2','DDPCA300_gain3','DDPCA300_gain4',
+                            'SAD_mm', 'SDD_mm', 'thickness', 'title', 'useSBUSAXS',
+                            'intervals', 'VToFFactor',
+                            'upd_amp_change_mask_time0','upd_amp_change_mask_time1','upd_amp_change_mask_time2','upd_amp_change_mask_time3','upd_amp_change_mask_time4',
+                        ]
+            metadata_group = f['/entry/metadata']
+            metadata_dict = read_group_to_dict(metadata_group)
+            metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+            # we need this key to be there also... COpy of the other one. 
+            I0Gain=metadata_dict["I0AmpGain"]   
+            metadata_dict["I0Gain"]=I0Gain
+            #Instrument
+            keys_to_keep = ['monochromator', 'energy', 'wavelength']
+            instrument_group = f['/entry/instrument']
+            instrument_dict = read_group_to_dict(instrument_group)
+            instrument_dict = filter_nested_dict(instrument_dict, keys_to_keep)
+            # sample
+            sample_group = f['/entry/sample']
+            sample_dict = read_group_to_dict(sample_group)
+
+            Sample["RawData"]["metadata"] = metadata_dict
+            Sample["RawData"]["instrument"] = instrument_dict
+            Sample["RawData"]["sample"].update(sample_dict)
+        else:       #this is SWAXS
+            #metadata
+            instrument_group = f['/entry/instrument']
+            instrument_dict = read_group_to_dict(instrument_group)
+            del instrument_dict['detector']['data']
+            #metadata
+            keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_cts_gated',
+                            'TR_cts_gated','TR_cts','TR_gain','I0_Sample',
+                            'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrPD','Pin_TrPDgain',
+                            'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
+                            'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
+                            'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
+                            'scaler_freq', 'StartTime',                     
+                        ]        
+            metadata_group = f['/entry/Metadata']
+            metadata_dict = read_group_to_dict(metadata_group)
+            metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+            sample_group = f['entry/sample']
+            sample_dict = read_group_to_dict(sample_group)
+            control_group = f['/entry/control']
+            control_dict = read_group_to_dict(control_group)
+            Sample["RawData"]["instrument"] = instrument_dict
+            Sample["RawData"]["metadata"] = metadata_dict
+            Sample["RawData"]["sample"].update(sample_dict)
+            Sample["RawData"]["control"] = control_dict
+ 
         return Sample
 
 
@@ -536,10 +582,47 @@ def load_dict_from_hdf5(hdf_file, location):
             if isinstance(item, h5py._hl.group.Group):
                 ans[key] = recursively_load_dict_contents_from_group(h5file, path + key + '/')
             else:
-                ans[key] = item[()]
+                tempItem = item[()]
+                if isinstance(tempItem, bytes):             # Convert bytes to string
+                    tempItem = tempItem.decode('utf-8')
+                ans[key] = tempItem
         return ans
 
     return recursively_load_dict_contents_from_group(hdf_file,location)
+
+# Function to recursively read a group and store its datasets in a dictionary
+def read_group_to_dict(group):
+    data_dict = {}
+    for key, item in group.items():
+        if isinstance(item, h5py.Dataset):
+            # Read the dataset
+            data = item[()]
+             # Check if the dataset is bytes
+            if isinstance(data, bytes):
+                # Decode bytes to string
+                data = data.decode('utf-8')
+            # Check if the dataset is an array with a single element
+            elif hasattr(data, 'size') and data.size == 1:
+                # Convert to a scalar (number or string)
+                data = data.item()
+                if isinstance(data, bytes):
+                    # Decode bytes to string, the above does not seem to catch this? 
+                    data = data.decode('utf-8')
+            data_dict[key] = data
+        elif isinstance(item, h5py.Group):
+            # If the item is a group, recursively read its contents
+            data_dict[key] = read_group_to_dict(item)
+    return data_dict
+
+
+# this should not fail if keys on the list are not present
+def filter_nested_dict(d, keys_to_keep):
+    if isinstance(d, dict):
+        return {k: filter_nested_dict(v, keys_to_keep) for k, v in d.items() if k in keys_to_keep and k in d}
+    elif isinstance(d, list):
+        return [filter_nested_dict(item, keys_to_keep) for item in d]
+    else:
+        return d    
 
 
 # def find_NXcanSAS_entries(group, path=''):

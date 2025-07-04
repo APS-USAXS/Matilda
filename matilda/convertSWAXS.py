@@ -2,11 +2,11 @@
     convertSWAXScalibrated.py
         New, calibrated SAXS/WAXS code. 
     use: 
-    process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExisting=False)
+    process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
 
     returns dictionary of this type:
-            result["SampleName"]=sampleName
-            result["BlankName"]=blankName
+            result["samplename"]=samplename
+            result["blankname"]=blankname
             result["reducedData"] =  {"Intensity":np.ravel(intensity), 
                               "Q":np.ravel(q),
                               "Error":np.ravel(error)}
@@ -18,11 +18,6 @@
     Convert SAXS and WAXS area detector data from the HDF5 format to the 1Ddata
     Converts Nika parameters to Fit2D format and then uses pyFAI to convert to poni format
     Both SAXS and WAXS data give sufficiently same data as Nika to be considered same.  
-    TODO: 
-    Add background path and name as input, set to None as default, if set as input then do subtarcting and calibration.
-        If not provided, stop with reduction before subtraction and return None for calibrated data. 
-    Store both reduced data and NXcanSAS data in original hdf file, read from file if they exist and skip data reduction. 
-    Only some metadata are kept to keep all more reasonable on size
 '''
 
 
@@ -42,8 +37,6 @@ from supportNikaFunctions import convert_Nika_to_Fit2D
 from readfromtiled import FindLastBlankScan
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
-recalculateAllData = True
-
 # TODO: split into multiple steps as needed
 # Import images for sample and blank as separate calls and get sample and blank objects
 #   calibration step, calculate corrections, apply corrections
@@ -54,7 +47,7 @@ recalculateAllData = True
 
 
 ## main code here
-def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExisting=recalculateAllData):
+def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
@@ -63,7 +56,7 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
         required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
         required_items = {'definition': 'NXcanSAS'}
         SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if deleteExisting:
+        if recalculateAllData:
             # Delete the groups which may have een created by previously run saveNXcanSAS
             location = 'entry/QRS_data/'
             if location is not None and location in hdf_file:
@@ -100,31 +93,31 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
                 plan_name="WAXS"
 
             Sample["reducedData"] = reduceADData(Sample, useRawData=True)   #this generates Int vs Q for raw data plot
-            # q = Sample["reducedData"]["Q"]
-            # intensity = Sample["reducedData"]["Intensity"]
-            # error = Sample["reducedData"]["Error"]            
-            # sampleName = Sample["RawData"]["SampleName"]
+                                        # q = Sample["reducedData"]["Q"]
+                                        # intensity = Sample["reducedData"]["Intensity"]
+                                        # error = Sample["reducedData"]["Error"]            
+                                        # samplename = Sample["RawData"]["samplename"]
             
             if blankPath is not None and blankFilename is not None:               
                 blank = importADData(blankPath, blankFilename)               #this is for blank path and blank name
                 Sample["BlankData"] = reduceADData(blank, useRawData=True)   #this generates Int vs Q for blank data plot
-                # qcalib = Sample["BlankData"]["Q"]
-                # intensity = Sample["BlankData"]["Intensity"]
-                # error = Sample["BlankData"]["Error"]            
-                # blankName = Sample["RawData"]["BlankName"] 
+                                        # qcalib = Sample["BlankData"]["Q"]
+                                        # intensity = Sample["BlankData"]["Intensity"]
+                                        # error = Sample["BlankData"]["Error"]            
+                                        # blankname = Sample["RawData"]["blankname"] 
                 Sample["calib2DData"] = calibrateAD2DData(Sample, blank)
-                #returns 2D calibrated data
-                    # result = {"data":calib2Ddata,
-                    #           "BlankName":blankName,
-                    #           "transmission":transmission
+                                    #returns 2D calibrated data
+                                        # result = {"data":calib2Ddata,
+                                        #           "blankname":blankname,
+                                        #           "transmission":transmission
                 Sample["CalibratedData"] = reduceADData(Sample, useRawData=False)  #this generates Calibrated 1D data.
-                #returns :   
-                # qcalib= Sample["CalibratedData"]["Q"]
-                # dqcalib= Sample["CalibratedData"]["dQ"]
-                # intcalib= Sample["CalibratedData"]["Intensity"]
-                # errcalib= Sample["CalibratedData"]["Error"]
-                # Sample["CalibratedData"]["units"]
-                # blankName = Sample["calib2DData"]["BlankName"]
+                                        #returns :   
+                                        # qcalib= Sample["CalibratedData"]["Q"]
+                                        # dqcalib= Sample["CalibratedData"]["dQ"]
+                                        # intcalib= Sample["CalibratedData"]["Intensity"]
+                                        # errcalib= Sample["CalibratedData"]["Error"]
+                                        # Sample["CalibratedData"]["units"]
+                                        # blankname = Sample["calib2DData"]["blankname"]
             else:
                 Sample["CalibratedData"]=dict()
                 Sample["CalibratedData"]["Q"] = None
@@ -133,7 +126,7 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
                 Sample["CalibratedData"]["Error"] = None
                 Sample["CalibratedData"]["units"] = None
                 Sample["calib2DData"]=dict()
-                Sample["calib2DData"]["BlankName"] = None
+                Sample["calib2DData"]["blankname"] = None
 
         hdf_file.flush()
         # The 'with' statement will automatically close the file when the block ends
@@ -144,23 +137,23 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, deleteExis
 
 def reduceADToQR(path, filename):
         tempFilename= os.path.splitext(filename)[0]
-        tempSample = {"RawData":{"Filename": tempFilename}}
-        # label = data_dict["RawData"]["Filename"]
+        tempSample = {"RawData":{"filename": tempFilename}}
+        # label = data_dict["RawData"]["filename"]
         # Q_array = data_dict["reducedData"]["Q_array"]
         # Intensity = data_dict["reducedData"]["PD_intensity"]
         tempSample["reducedData"]=ImportAndReduceAD(path, filename)
         #pp.pprint(tempSample)
-        #pp.pprint(tempSample["RawData"]["Filename"])
+        #pp.pprint(tempSample["RawData"]["filename"])
         return tempSample
 
 
 ## main code here
-def ImportAndReduceAD(path, filename, deleteExisting=False):
+def ImportAndReduceAD(path, filename, recalculateAllData=False):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/displayData/'
     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
         # Check if the group 'displayData' exists
-        if deleteExisting:
+        if recalculateAllData:
             # Delete the group
             del hdf_file[location]
             logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
@@ -182,9 +175,13 @@ def ImportAndReduceAD(path, filename, deleteExisting=False):
             logging.info(f"Read file :{filename}")
             dataset = hdf_file['/entry/data/data'] 
             my2DData = np.array(dataset)
-            #metadata
+            #sample
+            sample_group = hdf_file['/entry/sample']
+            sample_dict = read_group_to_dict(sample_group)
+            #instrument
             instrument_group = hdf_file['/entry/instrument']
             instrument_dict = read_group_to_dict(instrument_group)
+            del instrument_dict['detector']['data'] #this is original of 2-d data, we do not need to cary it here second time. 
             #metadata
             keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_gated',
                             'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrI0gain','Pin_TrPD','Pin_TrPDgain',
@@ -196,6 +193,11 @@ def ImportAndReduceAD(path, filename, deleteExisting=False):
             metadata_group = hdf_file['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
+            #need to append these structures to RAW data so we can optionally save them in Igor
+            Sample["RawData"]=dict()
+            Sample["RawData"]["metadata"]= metadata_dict
+            Sample["RawData"]["instrument"]= instrument_dict
+            Sample["RawData"]["sample"]= sample_dict
             # wavelength, keep in A for Fit2D
             wavelength = instrument_dict["monochromator"]["wavelength"]
             # pixel_size, keep in mm, converted in convert_Nika_to_Fit2D to micron for Fit2D and then to m for pyFAI... 
@@ -283,6 +285,7 @@ def importADData(path, filename):
             #metadata
             instrument_group = hdf_file['/entry/instrument']
             instrument_dict = read_group_to_dict(instrument_group)
+            del instrument_dict['detector']['data']
             #metadata
             keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_cts_gated',
                             'TR_cts_gated','TR_cts','TR_gain','I0_Sample',
@@ -301,8 +304,8 @@ def importADData(path, filename):
             control_dict = read_group_to_dict(control_group)
             Sample["RawData"] = dict()
             Sample["RawData"]["data"] = my2DData
-            Sample["RawData"]["Filename"] = filename
-            Sample["RawData"]["SampleName"] = sample_dict["name"]
+            Sample["RawData"]["filename"] = filename
+            Sample["RawData"]["samplename"] = sample_dict["name"]
             Sample["RawData"]["instrument"] = instrument_dict
             Sample["RawData"]["metadata"] = metadata_dict
             Sample["RawData"]["sample"] = sample_dict
@@ -325,7 +328,7 @@ def calibrateAD2DData(Sample, Blank):
         SampleMeasurementTime = entry:control:preset
         Corrfactor = entry:Metadata:I_scaling
     '''
-    blankName = Blank["RawData"]["SampleName"]
+    blankname = Blank["RawData"]["filename"]     
     sampleThickness=Sample["RawData"]["sample"]["thickness"]
     #sampleMeasurementTime=Sample["RawData"]["control"]["preset"]
     corrFactor=Sample["RawData"]["metadata"]["I_scaling"]
@@ -378,7 +381,7 @@ def calibrateAD2DData(Sample, Blank):
     #Int = Corrfactor / (sampleI0 / sampleI0gain) / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
     #Wreturn the calibrated data, Blank name and may be some parameters? 
     result = {"data":calib2Ddata,
-            "BlankName":blankName,
+            "blankname":blankname,
             "transmission":transmission
             }
     return result
@@ -392,13 +395,13 @@ def reduceADData(Sample, useRawData=True):
         if useRawData:
             my2DData = Sample["RawData"]["data"]
             my2DRAWdata = Sample["RawData"]["data"]
-            blankName =  ""
+            blankname =  ""
         else:
             my2DData = Sample["calib2DData"]["data"] 
             my2DRAWdata = Sample["RawData"]["data"]
-            blankName =  Sample["calib2DData"]["BlankName"]
+            blankname =  Sample["calib2DData"]["blankname"]
 
-        sampleName = Sample["RawData"]["SampleName"]
+        samplename = Sample["RawData"]["samplename"]
         metadata_dict = Sample["RawData"]["metadata"]
         instrument_dict = Sample["RawData"]["instrument"]
         #extract numbers needed to reduce the data here. 
@@ -476,8 +479,8 @@ def reduceADData(Sample, useRawData=True):
         result["dQ"] = dQ
         result["Intensity"] = intensity
         result["Error"] = sigma
-        result["sampleName"]=sampleName
-        result["BlankName"]=blankName
+        result["samplename"]=samplename
+        result["blankname"]=blankname
         result["units"]="[cm2/cm3]"
         #and these are for compatiblity with USAXS
         result["Kfactor"]=None
@@ -487,13 +490,13 @@ def reduceADData(Sample, useRawData=True):
 
 # def reduceADToQR(path, filename):
 #         tempFilename= os.path.splitext(filename)[0]
-#         tempSample = {"RawData":{"Filename": tempFilename}}
-#         # label = data_dict["RawData"]["Filename"]
+#         tempSample = {"RawData":{"filename": tempFilename}}
+#         # label = data_dict["RawData"]["filename"]
 #         # Q_array = data_dict["reducedData"]["Q_array"]
 #         # Intensity = data_dict["reducedData"]["PD_intensity"]
 #         tempSample["reducedData"]=ImportAndReduceAD(path, filename)
 #         #pp.pprint(tempSample)
-#         #pp.pprint(tempSample["RawData"]["Filename"])
+#         #pp.pprint(tempSample["RawData"]["filename"])
 #         return tempSample
 
 
@@ -534,45 +537,45 @@ def PlotResults(data_dict):
 
 if __name__ == "__main__":
     Sample = dict()
-    Sample=process2Ddata("./TestData/TestSet/02_21_Megan_waxs","PU_25C_2_0063.hdf")
-    PlotResults(Sample)
+    ##Sample=process2Ddata("./TestData/TestSet/02_21_Megan_waxs","PU_25C_2_0063.hdf")
+    #PlotResults(Sample)
     #Sample["reducedData"]=test("/home/parallels/Github/Matilda/TestData","LaB6_45deg.tif")
     #pp.pprint(Sample)
     #PlotResults(Sample)
 
 
 
-## test for tilts using LaB6 45 deg tilted detector from GSAXS-II goes here
-# to the best of my undestanding, the images loaded from tiff file are mirrored and the values here are just weird. 
-# def test(path, filename):
-#     # read data from tiff file and read the data 
-#     # tiff files are actually loaded differently than HDF5 files. Looks like they are mirrored. 
-#     my2DData = tiff.imread(path+'/'+filename)
-#     wavelength = 0.10798 # in A
-#     # pixel_size
-#     pixel_size1 = 0.1 # x in Nika, in mm
-#     #pixel_size2 = 0.1 # y in Nika, in mm
-#     # detector_distance, in mm
-#     detector_distance = 1004.91 # in Nika, in mm 
-#     # Nika BCX and BCY in pixels
-#     BCY = 886.7     # this is for hdf5 x in Nika
-#     BCX = 1048.21   # this is for hdf5 y in Nika
-#     # read Nika HorTilt and VertTilt 
-#     VertTilt  = -44.7   # this is negative value for horizontal tilt in Nika
-#     HorTilt = 0.02      # this is value for vertical tilt in Nika, not sure if this shoudl be negative. 
-#     # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
-#     my_poni = convert_Nika_to_Fit2D(detector_distance, pixel_size1, BCX, BCY, HorTilt, VertTilt, wavelength)
-#     # setup integrator geometry
-#     ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
-#                        rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
-#                        wavelength=my_poni.wavelength)
-#     #create mask here. Duplicate the my2DData and set all values to be masked to NaN, not used here. 
-#     mask = np.copy(my2DData)
-#     mask = 0*mask           # set all values to zero
-#     # Perform azimuthal integration
-#     # You can specify the number of bins for the integration
-#     #set npt to larger of dimmension of my2DData  `
-#     npt = max(my2DData.shape)
-#     q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
-#     result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
-#     return result
+                ## test for tilts using LaB6 45 deg tilted detector from GSAXS-II goes here
+                # to the best of my undestanding, the images loaded from tiff file are mirrored and the values here are just weird. 
+                # def test(path, filename):
+                #     # read data from tiff file and read the data 
+                #     # tiff files are actually loaded differently than HDF5 files. Looks like they are mirrored. 
+                #     my2DData = tiff.imread(path+'/'+filename)
+                #     wavelength = 0.10798 # in A
+                #     # pixel_size
+                #     pixel_size1 = 0.1 # x in Nika, in mm
+                #     #pixel_size2 = 0.1 # y in Nika, in mm
+                #     # detector_distance, in mm
+                #     detector_distance = 1004.91 # in Nika, in mm 
+                #     # Nika BCX and BCY in pixels
+                #     BCY = 886.7     # this is for hdf5 x in Nika
+                #     BCX = 1048.21   # this is for hdf5 y in Nika
+                #     # read Nika HorTilt and VertTilt 
+                #     VertTilt  = -44.7   # this is negative value for horizontal tilt in Nika
+                #     HorTilt = 0.02      # this is value for vertical tilt in Nika, not sure if this shoudl be negative. 
+                #     # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
+                #     my_poni = convert_Nika_to_Fit2D(detector_distance, pixel_size1, BCX, BCY, HorTilt, VertTilt, wavelength)
+                #     # setup integrator geometry
+                #     ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
+                #                        rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
+                #                        wavelength=my_poni.wavelength)
+                #     #create mask here. Duplicate the my2DData and set all values to be masked to NaN, not used here. 
+                #     mask = np.copy(my2DData)
+                #     mask = 0*mask           # set all values to zero
+                #     # Perform azimuthal integration
+                #     # You can specify the number of bins for the integration
+                #     #set npt to larger of dimmension of my2DData  `
+                #     npt = max(my2DData.shape)
+                #     q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
+                #     result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
+                #     return result

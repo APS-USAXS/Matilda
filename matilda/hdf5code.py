@@ -161,6 +161,7 @@ def saveNXcanSAS(Sample,path, filename):
         f.attrs['file_time']        = timeStamp 
         f.attrs['instrument']       = '12IDE USAXS'
         f.attrs['creator']          = 'Matilda NeXus writer'
+        f.attrs['Matilda_version']  = '1.0.0' # version 2025-07-06
         f.attrs['NeXus_version']    = '4.3.0' #2025-5-9 4.3.0 is rc, it is current. 
         f.attrs['HDF5_version']     = six.u(h5py.version.hdf5_version)
         f.attrs['h5py_version']     = six.u(h5py.version.version)

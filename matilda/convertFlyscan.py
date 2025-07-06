@@ -94,10 +94,10 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
         
         else:
             Sample = dict()
-            Sample["RawData"]=importFlyscan(path, filename)                 #import data
-            Sample["reducedData"]= calculatePD_Fly(Sample)                  # Creates PD_Intensity with corrected gains and background subtraction
-            Sample["reducedData"].update(calculatePDErrorFly(Sample))          # Calculate UPD error, mostly the same as in Igor                
-            Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
+            Sample["RawData"]=importFlyscan(path, filename)                         #import data
+            Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
+            Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                
+            Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   #Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
                                                     Sample["reducedData"]["Q"], 
                                                     Sample["reducedData"]["UPD_gains"], 

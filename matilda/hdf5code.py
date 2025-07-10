@@ -272,7 +272,7 @@ def saveNXcanSAS(Sample,path, filename):
             ds = nxdata.create_dataset('I', data=SMR_Int)
             ds.attrs['units'] = '1/cm'
             ds.attrs['uncertainties'] = 'Idev'
-            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['long_name'] = 'Intensity[cm2/cm3]'    # suggested X axis plot label
             ds.attrs['Kfactor'] = Kfactor
             ds.attrs['OmegaFactor'] = OmegaFactor
             ds.attrs['blankname'] = blankname

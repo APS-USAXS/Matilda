@@ -145,10 +145,15 @@ def saveNXcanSAS(Sample,path, filename):
     R_Qvec = Sample["reducedData"]["Q"]
     R_Error=Sample["reducedData"]["Error"]
 
-    BL_R_Int = Sample["BlankData"]["Intensity"]
-    BL_Q_vec = Sample["BlankData"]["Q"]
-    BL_Error = Sample["BlankData"]["Error"]    
-
+    if "BlankData" in Sample:
+        BL_R_Int = Sample["BlankData"]["Intensity"]
+        BL_Q_vec = Sample["BlankData"]["Q"]
+        BL_Error = Sample["BlankData"]["Error"]    
+    else:
+        BL_R_Int = None
+        BL_Q_vec = None
+        BL_Error = None
+        
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)

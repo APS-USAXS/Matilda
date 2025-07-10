@@ -149,6 +149,16 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
         plt.grid(True)
         # Add legend
         plt.legend()
+        #limit the maximum range of the plot to at most 10 decades from max:
+        # Get the current limits
+        xlim = plt.xlim()   #returns a tuple of the form (xmin, xmax)
+        ylim = plt.ylim()   #returns a tuple of the form (ymin, ymax)
+        # Calculate the new limits, we want to keep tha max and limit the min to larger of existing value and max/1e10
+        new_xlim = (max(xlim[0], xlim[1] / 10**5), xlim[1])
+        new_ylim = (max(ylim[0], ylim[1] / 10**5), ylim[1])
+        # Set the new limits
+        plt.xlim(new_xlim)
+        plt.ylim(new_ylim)
         # Save the plot as a JPEG image
         plt.savefig(os.path.join(imagePath, 'saxs.jpg'), format='jpg', dpi=300)
         #plt.show()

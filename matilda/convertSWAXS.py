@@ -155,9 +155,8 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
         # Check if the group 'displayData' exists
         if recalculateAllData:
             # Delete the group
-            if location in hdf_file:
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
+            del hdf_file[location]
+            logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
 
         if location in hdf_file:
             # exists, so lets reuse the data from the file

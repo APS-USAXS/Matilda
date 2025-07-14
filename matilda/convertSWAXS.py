@@ -155,8 +155,9 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
         # Check if the group 'displayData' exists
         if recalculateAllData:
             # Delete the group
-            del hdf_file[location]
-            logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
+            if location in hdf_file:
+                del hdf_file[location]
+                logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
 
         if location in hdf_file:
             # exists, so lets reuse the data from the file
@@ -257,12 +258,26 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
         #   set npt to larger of dimmension of my2DData
         if usingWAXS:
             npt = max(my2DData.shape)
+            q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
         else:
             npt=200 
-        #npt = 1000  # Number of bins, if should be lower
+            # using azimuth_range=(-30,30) shoudl limit the range of data to what Nika is using for SAXS. 
+            q, intensity = ai.integrate1d(my2DData, npt, mask=mask,azimuth_range=(-30,30), correctSolidAngle=True, unit="q_A^-1")
+
         # Perform azimuthal integration
-        q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
-        #logging.info(f"Finished 2d to 1D conversion")
+        # logging.info(f"Finished 2d to 1D conversion")
+        # this is using two dimentions. 
+        # intensity, q, chi = ai.integrate2d(my2DData, npt_rad=npt, npt_azim=6,azimuth_range=(-30,30), mask=mask, correctSolidAngle=True, unit="q_A^-1")
+        # Q, Chi = np.meshgrid(q, chi)
+        # # Plot the intensity as a heatmap
+        # plt.figure(figsize=(10, 8))
+        # plt.pcolormesh(Q, Chi, intensity, shading='auto', cmap='viridis')
+        # plt.colorbar(label='Intensity')
+        # plt.xlabel('q (nm^-1)')
+        # plt.ylabel('Chi (degrees)')
+        # plt.title('Intensity as a function of q and Chi')
+        # plt.show()
+  
         Sample["reducedData"] = dict()
         Sample["reducedData"]["Q_array"] = q
         Sample["reducedData"]["Intensity"] = intensity
@@ -537,6 +552,7 @@ def PlotResults(data_dict):
 
 if __name__ == "__main__":
     Sample = dict()
+    Sample = ImportAndReduceAD("//Mac/Home/Desktop/Test", "R6016ACT_T4_H_1081.hdf", recalculateAllData=True)
     ##Sample=process2Ddata("./TestData/TestSet/02_21_Megan_waxs","PU_25C_2_0063.hdf")
     #PlotResults(Sample)
     #Sample["reducedData"]=test("/home/parallels/Github/Matilda/TestData","LaB6_45deg.tif")

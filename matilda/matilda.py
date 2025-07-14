@@ -74,7 +74,7 @@ from plotData import plotUSAXSResults, plotSWAXSResults
 imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 #imagePath = '/home/parallels/Desktop/'  # Path to save images
 
-NumberOfDaysToLookBack = 5  # Number of days to look back for scans
+NumberOfDaysToLookBack = 0  # Number of days to look back for scans
 NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 
 #recalculateAllData = False  # Set to True to recalculate all data, False to use existing data

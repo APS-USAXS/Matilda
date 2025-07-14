@@ -117,19 +117,19 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
             )
       
     logging.info(f"{uri=}")
-    #print(f"{uri=}")
-    #additional methods to match data:
-    #&filter[regex][condition][key]=plan_name
-    #&filter[regex][condition][pattern]={plan_name}     #use regex to match plan_name
-    #filter[regex][condition][key]=title
-    #&filter[regex][condition][key]={title}             #use regex to match title  
-    #and
+    #additional keywords:
     #[noteq] - not equal
     #[contains] - seems same as eq in use, and cannot be made into case insensitive. Not useful. 
     #[in] - in a list of values
     #[notin] - not in a list of values
     #[comparison] - comparison with lt, gt, le, ge for numerical values
-
+    #working examples:
+    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time
+    #returns list of "Blank" samples, not not ist of samples contains "blank" in name
+    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)water*blank&sort=-time
+    #returns last scan which conatins case independent "water blank" in name
+    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
+    #returns last scan which conatisn case independet "water blank" in name
 
     try:
         r = requests.get(uri).json()
@@ -162,7 +162,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                 f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
                 f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
                 f"&filter[time_range][condition][timezone]={tz}"                    # time range
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
@@ -235,25 +235,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 )
                    
     logging.info(f"{uri=}")
-    #print(f"{uri=}")
-    #additional methods to match data:
-    #&filter[regex][condition][key]=plan_name
-    #&filter[regex][condition][pattern]={plan_name}     #use regex to match plan_name
-    #filter[regex][condition][key]=title
-    #&filter[regex][condition][key]={title}             #use regex to match title  
-    #and
-    #[noteq] - not equal
-    #[contains] - seems same as eq in use, and cannot be made into case insensitive. Not useful. 
-    #[in] - in a list of values
-    #[notin] - not in a list of values
-    #[comparison] - comparison with lt, gt, le, ge for numerical values
-    #working example:
-    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time
-    #returns list of "Blank" samples, not not ist of samples contains "blank" in name
-    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)water*blank&sort=-time
-    #returns last scan which conatins case independent "water blank" in name
-    #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
-    #returns last scan which conatisn case independet "water blank" in name
+
     
     try:
         r = requests.get(uri).json()
@@ -280,7 +262,6 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #print (FindLastScanData("WAXS",10,LastNdays=1))
     #print(f"Search for {plan_name=}")
     # Find all runs in a catalog between these two ISO8601 dates.
-    # TODO - manage the times by rembering last call and only asking for data since last time
     #start_time = time.time()    #current time in seconds
     end_time = time.time()
     tz = "US/Central"
@@ -326,12 +307,9 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #print(f"{uri=}")
     try:
         r = requests.get(uri).json()
-        #print(f'Search of {catalog=} has {len(r["data"])} runs.')
-        #print_results_summary(r)
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
         #print(ScanList)
-        #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 

@@ -553,7 +553,7 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         half_max = amplitude / 2
 
         # but next calculation needs to be done over larger q range
-        threshold = amplitude/3
+        threshold = amplitude / 5   #seems to be failing occasionally to find low enough calculated intensity to cross 50%
         mask = ydata_clean >= threshold
         xdata_calc = xdata_clean[mask]
         ydata_calc = ydata_clean[mask]

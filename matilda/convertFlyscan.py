@@ -219,11 +219,11 @@ def test_matildaLocal():
     #     print("File found")
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    samplePath = r"\\Mac\Home\Desktop\Data\set1"
-    samplename="AB3_R_0318.h5"
-    blankPath=r"\\Mac\Home\Desktop\Data\set1" 
-    blankFilename="TapeBlank_R_0317.h5"
-    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
+    samplePath = "/home/parallels/Desktop/Test"
+    samplename="MSI05_1973.h5"
+    blankPath="/home/parallels/Desktop/Test" 
+    blankFilename="AirBlank_1967.h5"
+    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    
     
     # # this is for testing save/restore from Nexus file... 
     # testme=False 
@@ -245,8 +245,8 @@ def test_matildaLocal():
     #     #removed file
     #     saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
 
-    Sample = {}
-    Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", samplename)
+    #Sample = {}
+    #Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", samplename)
     #pprint.pprint(Data)
     #Sample['CalibratedData']=Data
     # Q = Sample["reducedData"]["Q"]

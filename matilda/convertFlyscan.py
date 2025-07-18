@@ -94,10 +94,10 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
         
         else:
             Sample = dict()
-            Sample["RawData"]=importFlyscan(path, filename)                         #import data
+            Sample["RawData"]=importFlyscan(path, filename)                         # import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
             Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                
-            Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   #Beam center correction
+            Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   # Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
                                                     Sample["reducedData"]["Q"], 
                                                     Sample["reducedData"]["UPD_gains"], 
@@ -220,7 +220,7 @@ def test_matildaLocal():
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
     samplePath = "/home/parallels/Desktop/Test"
-    samplename="MSI05_1973.h5"
+    samplename="MSI08_800C_2min_2028.h5"
     blankPath="/home/parallels/Desktop/Test" 
     blankFilename="AirBlank_1967.h5"
     Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    

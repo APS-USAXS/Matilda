@@ -19,6 +19,13 @@ RETVAL=0
 SLEEP_DELAY=1.5  # wait for process, sometimes
 MATILDA_CONDA_ENV=matilda
 
+REQUIRED_HOST=usaxscontrol.xray.aps.anl.gov
+
+if [ "${HOSTNAME}" != "${REQUIRED_HOST}" ]; then
+    echo "Do not run this on ${HOSTNAME}, run it on '${REQUIRED_HOST}' as user 'usaxs'"
+    exit 1
+fi
+
 
 
 activate_conda(){

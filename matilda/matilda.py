@@ -292,7 +292,7 @@ if __name__ == "__main__":
             logging.info("Processing the Step scans")
             ListOfScans = FindLastScanData("uascan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
             #need to check, if we have same list as before and if yes, skip everything
-            if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
+            if ListOfScans == listofStepScansOld or len(ListOfScans) == 0:
                 logging.info('No new Step scans data found')
             else:
                 #path, filename = ListOfScans[-1]
@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
             logging.info("Processing the WAXS")
             ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
+            if ListOfScans == listofWAXSOld or len(ListOfScans) == 0:
                 logging.info('No new WAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)

@@ -318,7 +318,8 @@ if __name__ == "__main__":
 
             logging.info("Processing the WAXS")
             ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            if ListOfScans == listofWAXSOld or len(ListOfScans) == 0:
+            #if ListOfScans == listofWAXSOld or len(ListOfScans) == 0:
+            if len(ListOfScans) == 0:
                 logging.info('No new WAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)

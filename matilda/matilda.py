@@ -318,8 +318,8 @@ if __name__ == "__main__":
 
             logging.info("Processing the WAXS")
             ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            #if ListOfScans == listofWAXSOld or len(ListOfScans) == 0:
-            if len(ListOfScans) == 0:
+            if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
+                 #if len(ListOfScans) == 0:
                 logging.info('No new WAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
@@ -327,8 +327,9 @@ if __name__ == "__main__":
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)      
                 plotSWAXSResults(results, imagePath, isSAXS = False)  
-                listofWAXSOld = ListOfScans 
+                listOfWAXSOld = ListOfScans 
 
+            logging.info('Sleeping for 10 seconds')
             time.sleep(10)
     except KeyboardInterrupt:
             logging.info('Keyboard interrupt') 

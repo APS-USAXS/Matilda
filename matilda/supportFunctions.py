@@ -649,8 +649,11 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
 
     def linear_fit(x, a, b):
         return a + b * x
+    
+    #we need to find i where qvector > 0.0003
+    startIndex = find_crossing_index(qvector, 0.0003)
 
-    for i in range(40, len(intensity)):
+    for i in range(startIndex, len(intensity)):
         if UPD_gains[i] == 1:
             tmp_time = rwave_smooth_times[0]
         elif UPD_gains[i] == 2:
@@ -701,6 +704,12 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
     intensity[intensity < MaxInt*1e-11 ] = MaxInt*1e-11
     return  {"Intensity":intensity,
               "Error":r_error} 
+
+def find_crossing_index(array, target_value):
+    for index, value in enumerate(array):
+        if value >= target_value:
+            return index
+    return 0.1*len(array)  # Return None if the target value is not crossed
 
 # subtract QRS data
 def subtract_data(X1, Y1, E1, X2, Y2, E2):

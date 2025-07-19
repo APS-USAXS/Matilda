@@ -510,7 +510,12 @@ def readMyNXcanSAS(path, filename):
             #metadata
             instrument_group = f['/entry/instrument']
             instrument_dict = read_group_to_dict(instrument_group)
-            del instrument_dict['detector']['data']
+            #occasionally this fails since 'data' does not exist. 
+            # now, why this shoudl tno exists is mystery for me... 
+            try:
+                del instrument_dict['detector']['data']
+            except KeyError:
+                pass
             #metadata
             keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_cts_gated',
                             'TR_cts_gated','TR_cts','TR_gain','I0_Sample',

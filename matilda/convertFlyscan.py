@@ -80,7 +80,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
 
         NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         location = None
-        if blankFilename is not None and blankPath is not None:
+        if blankFilename is not None and blankPath is not None and "blank" not in filename.lower():
             location = NXcanSASentry        # require we have desmeared data
         else:
             location = 'entry/QRS_data/'            # all we want here are QRS data
@@ -88,7 +88,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
         if location is not None and location in hdf_file:
             # exists, so lets reuse the data from the file
             Sample = dict()
-            Sample = readMyNXcanSAS(path, filename)
+            Sample = readMyNXcanSAS(path, filename, isUSAXS = True)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
         
@@ -220,10 +220,11 @@ def test_matildaLocal():
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
     samplePath = "/home/parallels/Desktop/Test"
-    samplename="MSI08_800C_2min_2028.h5"
+    samplename="MSI07.h5"
     blankPath="/home/parallels/Desktop/Test" 
     blankFilename="AirBlank_1967.h5"
-    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    
+    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
+    #Sample = processFlyscan(samplePath,blankFilename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
     
     # # this is for testing save/restore from Nexus file... 
     # testme=False 

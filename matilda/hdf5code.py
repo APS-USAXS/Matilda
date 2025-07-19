@@ -350,7 +350,7 @@ def saveNXcanSAS(Sample,path, filename):
 
     logging.info(f"Wrote NXcanSAS data to file: {filename}")
 
-def readMyNXcanSAS(path, filename):
+def readMyNXcanSAS(path, filename, isUSAXS = False):
     """
     Read My own data from NXcanSAS data in Nexus file.
     
@@ -360,8 +360,7 @@ def readMyNXcanSAS(path, filename):
 
     Returns:
     dict: A dictionary containing the read data.
-    """
-    isUSAXS = False
+    """    
     Sample = dict()
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r') as f:

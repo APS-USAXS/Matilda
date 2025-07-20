@@ -118,6 +118,8 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                                         # errcalib= Sample["CalibratedData"]["Error"]
                                         # Sample["CalibratedData"]["units"]
                                         # blankname = Sample["calib2DData"]["blankname"]
+                Sample = fixOversubtractedData(Sample)
+                                        #this simply finds min for Intensity and if it is negatgive, adds to it 1.1*min value. 
             else:
                 Sample["CalibratedData"]=dict()
                 Sample["CalibratedData"]["Q"] = None
@@ -134,6 +136,14 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
     saveNXcanSAS(Sample,path, filename)
     return Sample
 
+def fixOversubtractedData(Sample):
+    '''
+    here we take 1D data Sample["CalibratedData"]["Intensity"] and fix them if they are negative
+    '''
+    minIntVal = Sample["CalibratedData"]["Intensity"].min()
+    if minIntVal < 0:
+        Sample["CalibratedData"]["Intensity"] = Sample["CalibratedData"]["Intensity"] - 1.1*minIntVal
+    return Sample
 
 def reduceADToQR(path, filename):
         tempFilename= os.path.splitext(filename)[0]

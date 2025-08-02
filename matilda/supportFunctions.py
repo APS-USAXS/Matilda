@@ -501,8 +501,6 @@ def rebinData(data_dict,num_points=200, isSMRData=False):
 ## Common steps go here
 def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     # Find Peak center and create Q vector.
-        #RawData=data_dict["rawData"]
-        #reducedData = data_dict["reducedData"]
     ARangles = data_dict["RawData"]["ARangles"]
     instrument_dict = data_dict["RawData"]["instrument"]
     if isBlank:
@@ -529,8 +527,8 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
 
     
     if useGauss:
+        # this thing likely does not work, too many changes later in teh code are not reflcted in useGauss block. 
         # Initial guess for the parameters: amplitude, mean, and standard deviation, 2 fgor d parameter
-        
         initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0001]
         # Fit the Gaussian function to the filtered data
         popt, _ = curve_fit(gaussian, xdata_filtered, ydata_filtered, p0=initial_guess)
@@ -540,26 +538,43 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         fwhm = 2 * np.abs(np.sqrt(2 * np.log(2)) * sigma)        
         # Calculate the predicted y values using the fitted parameters
         y_pred = gaussian(xdata_filtered, *popt)       
+        usedGauss=1
     else:
         initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0001, 1.98]
-        #print(initial_guess)
         popt, _ = curve_fit(modifiedGauss, xdata_filtered, ydata_filtered, p0=initial_guess)
 
         # Extract the fitted parameters
         amplitude, x0, sigma, exponent = popt
+        usedGauss=0
+
+        # if the fit is too wide, we need to force use of Gaussian
+        # tested 8-2-2025 and matches Igor code with samples with extreme MSAXS
+        # will not likely work for 440!
+        if sigma > 0.0004 :
+            # Initial guess for the parameters: amplitude, mean, and standard deviation
+            initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0007]
+            # Fit the Gaussian function to the filtered data
+            popt, _ = curve_fit(gaussian, xdata_filtered, ydata_filtered, p0=initial_guess)
+            # Extract the fitted parameters
+            amplitude, x0, sigma = popt
+            usedGauss=1
+
       
         # Calculate the FWHM
         # Calculate the half maximum
         half_max = amplitude / 2
 
         # but next calculation needs to be done over larger q range
-        threshold = amplitude / 5   #seems to be failing occasionally to find low enough calculated intensity to cross 50%
+        threshold = amplitude / 5   #with small Q range seems to be failing occasionally to find low enough calculated intensity to cross 50%
         mask = ydata_clean >= threshold
         xdata_calc = xdata_clean[mask]
         ydata_calc = ydata_clean[mask]
      
         # Calculate the predicted y values using the fitted parameters
-        ydata_calc = modifiedGauss(xdata_calc, *popt)
+        if usedGauss :
+            ydata_calc = gaussian(xdata_calc, *popt)       
+        else :
+            ydata_calc = modifiedGauss(xdata_calc, *popt)
 
         # Find where the array crosses the half maximum
         crossings = np.where((ydata_calc[:-1] < half_max) & (ydata_calc[1:] >= half_max) |
@@ -584,11 +599,23 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
             y2 = xdata_calc[i+1]
             xdata_calch = y1 + (indices[-1] - i) * (y2 - y1)           
             fwhm = np.abs(xdata_calch - xdata_calcl)
+        elif len(indices) == 1:
+            # this is case when due to MSAXS we did not measure low intensity enough at negativev peak side.
+            i = int(np.floor(indices[0]))
+            y1 = xdata_calc[i]
+            y2 = xdata_calc[i+1]
+            xdata_calcl = y1 + (indices[0] - i) * (y2 - y1)
+            # take 2* distacne of the one crossing we have
+            fwhm = np.abs(2*(x0 - xdata_calcl))
         else:
+            # something went miserably wrong here. 
             fwhm = np.nan  # FWHM cannot be determined
 
         # Calculate the residuals
-        y_pred = modifiedGauss(xdata_filtered, *popt)
+        if usedGauss :
+            y_pred = gaussian(xdata_filtered, *popt)       
+        else :
+            y_pred = modifiedGauss(xdata_filtered, *popt)
 
     #use above calculated y_pred to get residuals
     residuals = ydata_filtered - y_pred

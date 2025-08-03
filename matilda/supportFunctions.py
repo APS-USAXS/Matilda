@@ -538,27 +538,27 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         fwhm = 2 * np.abs(np.sqrt(2 * np.log(2)) * sigma)        
         # Calculate the predicted y values using the fitted parameters
         y_pred = gaussian(xdata_filtered, *popt)       
-        usedGauss=1
+        #usedGauss=1
     else:
         initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0001, 1.98]
         popt, _ = curve_fit(modifiedGauss, xdata_filtered, ydata_filtered, p0=initial_guess)
 
         # Extract the fitted parameters
         amplitude, x0, sigma, exponent = popt
-        usedGauss=0
+        #usedGauss=0
 
         # Modified Gauss shoudl fit mre or less always, except when peak is Loreizan shape.
         # But, if the fit is too wide, we may want to use Gaussian as that fits same with less parameters. 
         # tested 8-2-2025 and matches Igor code with samples with extreme MSAXS
         # will not likely work for MSAXS with 440!
-        if sigma > 0.0005 :
-            # Initial guess for the parameters: amplitude, mean, and standard deviation
-            initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0007]
-            # Fit the Gaussian function to the filtered data
-            popt, _ = curve_fit(gaussian, xdata_filtered, ydata_filtered, p0=initial_guess)
-            # Extract the fitted parameters
-            amplitude, x0, sigma = popt
-            usedGauss=1
+        # if sigma > 0.0005 :
+        #     # Initial guess for the parameters: amplitude, mean, and standard deviation
+        #     initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0007]
+        #     # Fit the Gaussian function to the filtered data
+        #     popt, _ = curve_fit(gaussian, xdata_filtered, ydata_filtered, p0=initial_guess)
+        #     # Extract the fitted parameters
+        #     amplitude, x0, sigma = popt
+        #     usedGauss=1
 
       
         # Calculate the FWHM
@@ -571,10 +571,10 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         ydata_calc = ydata_clean[mask]
      
         # Calculate the predicted y values using the fitted parameters
-        if usedGauss :
-            ydata_calc = gaussian(xdata_calc, *popt)       
-        else :
-            ydata_calc = modifiedGauss(xdata_calc, *popt)
+        # if usedGauss :
+        #     ydata_calc = gaussian(xdata_calc, *popt)       
+        # else :
+        ydata_calc = modifiedGauss(xdata_calc, *popt)
 
         # Find where the array crosses the half maximum
         crossings = np.where((ydata_calc[:-1] < half_max) & (ydata_calc[1:] >= half_max) |
@@ -612,10 +612,10 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
             fwhm = np.nan  # FWHM cannot be determined
 
         # Calculate the residuals
-        if usedGauss :
-            y_pred = gaussian(xdata_filtered, *popt)       
-        else :
-            y_pred = modifiedGauss(xdata_filtered, *popt)
+        # if usedGauss :
+        #     y_pred = gaussian(xdata_filtered, *popt)       
+        #else :
+        y_pred = modifiedGauss(xdata_filtered, *popt)
 
     #use above calculated y_pred to get residuals
     residuals = ydata_filtered - y_pred

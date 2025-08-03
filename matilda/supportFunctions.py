@@ -547,10 +547,11 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         amplitude, x0, sigma, exponent = popt
         usedGauss=0
 
-        # if the fit is too wide, we need to force use of Gaussian
+        # Modified Gauss shoudl fit mre or less always, except when peak is Loreizan shape.
+        # But, if the fit is too wide, we may want to use Gaussian as that fits same with less parameters. 
         # tested 8-2-2025 and matches Igor code with samples with extreme MSAXS
-        # will not likely work for 440!
-        if sigma > 0.0004 :
+        # will not likely work for MSAXS with 440!
+        if sigma > 0.0005 :
             # Initial guess for the parameters: amplitude, mean, and standard deviation
             initial_guess = [np.max(ydata_filtered), xdata_filtered[np.argmax(ydata_filtered)], 0.0007]
             # Fit the Gaussian function to the filtered data
@@ -561,7 +562,6 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
 
       
         # Calculate the FWHM
-        # Calculate the half maximum
         half_max = amplitude / 2
 
         # but next calculation needs to be done over larger q range

@@ -266,13 +266,15 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
         
         #   You can specify the number of bins for the integration
         #   set npt to larger of dimmension of my2DData
+        #   error_model= "azimuthal" or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)
+
         if usingWAXS:
             npt = max(my2DData.shape)
-            q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
+            q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask, error_model= "azimuthal", correctSolidAngle=True, unit="q_A^-1")
         else:
             npt=200 
-            # using azimuth_range=(-30,30) shoudl limit the range of data to what Nika is using for SAXS. 
-            q, intensity = ai.integrate1d(my2DData, npt, mask=mask,azimuth_range=(-30,30), correctSolidAngle=True, unit="q_A^-1")
+            # using azimuth_range=(-30,30) should limit the range of data to what Nika is using for SAXS. 
+            q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask,azimuth_range=(-30,30), error_model= "azimuthal", correctSolidAngle=True, unit="q_A^-1")
 
         # Perform azimuthal integration
         # logging.info(f"Finished 2d to 1D conversion")
@@ -291,6 +293,7 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
         Sample["reducedData"] = dict()
         Sample["reducedData"]["Q_array"] = q
         Sample["reducedData"]["Intensity"] = intensity
+        Sample["reducedData"]["Error"] = sigma
         save_dict_to_hdf5(Sample, location, hdf_file)
         logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
         result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
@@ -492,8 +495,10 @@ def reduceADData(Sample, useRawData=True):
             npt=200 
         #npt = 1000  # Number of bins, if should be lower
         # Perform azimuthal integration
-        q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, error_model="poisson", unit="q_A^-1")
-        # fake q resolution as distrance between the subsequent q poiints
+        #   error_model= "azimuthal" or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)
+  
+        q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, error_model="azimuthal", unit="q_A^-1")
+        # fake q resolution as distrance between the subsequent q points
         dQ = np.zeros_like(q)
         dQ[1:-1] = 0.5 * (q[2:] - q[:-2])
         dQ[0] = q[1] - q[0]

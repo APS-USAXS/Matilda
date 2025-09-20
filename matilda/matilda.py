@@ -330,6 +330,6 @@ if __name__ == "__main__":
                 listOfWAXSOld = ListOfScans 
 
             logging.info('Sleeping for 10 seconds')
-            time.sleep(10)
+            time.sleep(15)
     except KeyboardInterrupt:
             logging.info('Keyboard interrupt') 

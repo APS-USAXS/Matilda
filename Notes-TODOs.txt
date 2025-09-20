@@ -2,30 +2,30 @@ Notes and TODOs
 
 TODO:
 
-For web page display
-    Normalize R flyscan/SAXS/WAXS data
-        done: Make Modified Gauss peak fit working and get FWHM. 
-        done: Rebin R data to lower resolution
-        done: Save R data into hdf5 file for graphing
-        done: For graphing, read R data if present, reduce if not present
-    Reduce size of data being stored with web page display (R data)
-Real data reduction:
-    Find last Blank, reduce if necessary, append appropriate (R?) data
-    For each sample
-        Subtract Blank with proper normalization, transmission, Q alignement
-        Calibrate to absolute scale/calibration
-        Reduce number of points if needed
-        Save data into Nexus format
+SAXS:
 
-
-Code to read and write NXcanSAS data is here:
-
-https://github.com/usnistgov/PyHyperScattering/blob/main/src/PyHyperScattering/FileIO.py
-
-https://github.com/usnistgov/PyHyperScattering/blob/main/src/PyHyperScattering/Nexus.py
-
-
-Nika parameters conversion Peter :
-https://github.com/usnistgov/PyHyperScattering/blob/main/src/PyHyperScattering/PFGeneralIntegrator.py#L744
-
-
+Fix following bug from step scan:
+2025-09-19 15:39:13 - INFO - Found blank for GC_SMR3600_0016.hdf , blank name : Blank_0015.hdf
+2025-09-19 15:39:13 - INFO - 2D data processing: path /share1/USAXS_data/2025-09/09_19_setup/data/data_saxs, filename GC_SMR3600_0016.hdf, blank path /share1/USAXS_data/2025-09/09_19_setup/data/data_saxs, blank filename Blank_0015.hdf
+2025-09-19 15:39:13 - ERROR - Error processing AD scan GC_SMR3600_0016.hdf: "Unable to synchronously open object (object 'dQw' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 251, in processADscans
+    result = process2Ddata(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertSWAXS.py", line 82, in process2Ddata
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 422, in readMyNXcanSAS
+    dataset = f[location + "sasdata/dQw"]
+              ~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'dQw' doesn't exist)"
+2025-09-19 15:39:13 - INFO - Looking for proper Blanks for to process scan: Blank_0015.hdf in path: /share1/USAXS_data/2025-09/09_19_setup/data/data_saxs
+2025-09-19 15:39:13 - INFO - Found blank for Blank_0015.hdf: Blank_0007.hdf (num: 7) in path /share1/USAXS_data/2025-09/09_19_setup/data/data_saxs

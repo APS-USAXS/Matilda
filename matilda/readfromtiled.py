@@ -263,12 +263,13 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #print(f"Search for {plan_name=}")
     # Find all runs in a catalog between these two ISO8601 dates.
     #start_time = time.time()    #current time in seconds
-    end_time = time.time()
-    # we need to fix file not ready issue. SOmetimes the last file is simply not ready 
-    # when we are asking for it. Let;s try to ask for files at least 10 second before now. 
-    offsetTime = 10
-    # this shifts the querried time by offsetTime seconds to past, providing file flush out time. 
-    end_time = end_time + offsetTime
+    # we need to fix file not ready issue. Sometimes the last file is simply not ready 
+    # when we are asking for it. Let's try to ask for files at least 30 second before now. 
+    offsetTime = 20
+    if plan_name == "Flyscan" or plan_name == "uascan":
+        offsetTime = 95
+    # this shifts the querried time by offsetTime seconds to past, providing file flush out the files. 
+    end_time = time.time() - offsetTime
     tz = "US/Central"
     if LastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days
@@ -281,10 +282,12 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "/api/v1/search"
             f"/{catalog}"
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            #"&filter[contains][condition][exit_status]"                         # filter by exist status key present
+            #&filter[comparison][condition][operator]=gt&filter[comparison][condition][key]=duration&filter[comparison][condition][value]=0.1
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
             f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds - offsetTime
             f"&filter[time_range][condition][timezone]={tz}"                    # time range
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
@@ -299,6 +302,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "/api/v1/search"
             f"/{catalog}"
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
+            #"&filter[contains][condition][exit_status]"                         # filter by exist status key present
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
             "&sort=-time"                                                       # sort by time, -time gives last scans first

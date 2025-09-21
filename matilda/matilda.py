@@ -329,7 +329,7 @@ if __name__ == "__main__":
                 plotSWAXSResults(results, imagePath, isSAXS = False)  
                 listOfWAXSOld = ListOfScans 
 
-            logging.info('Sleeping for 10 seconds')
+            logging.info('Sleeping for 15 seconds')
             time.sleep(15)
     except KeyboardInterrupt:
             logging.info('Keyboard interrupt') 

@@ -23,18 +23,18 @@ classifiers = [
 
 
 dependencies = [
-    "numpy",
-    "xarray",
-    "tqdm",
-    "netcdf4",
-    "pandas",
-    "scipy",
     "h5py",
+    "matplotlib"
+    "netcdf4",
+    "numpy",
+    "pandas",
+    "pip",
     "pyfai",
     "requests",
+    "scipy",
     "tifffile",
-    "pip",
-    "matplotlib"
+    "tqdm",
+    "xarray",
 ]
 
 [tool.hatch.build.targets.wheel]

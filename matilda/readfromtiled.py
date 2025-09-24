@@ -115,6 +115,11 @@ def print_results_summary(r):
 def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
+        md = r["data"][v]["attributes"]["metadata"]
+        success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+        if not success:
+            continue  # skip this run
+
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
         #print(md)
         #plan_name = md["plan_name"]
@@ -188,7 +193,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
     #http://10.211.55.7:8020/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
     #returns last scan which conatisn case independet "water blank" in name
 
-    try: # TODO: #9 apply successful_run(uid) here?
+    try:
         r = requests.get(uri).json()
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
@@ -294,7 +299,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
     logging.info(f"{uri=}")
 
     
-    try:  # TODO: #9 apply successful_run(uid) here?
+    try: 
         r = requests.get(uri).json()
         #print(f'Search of {catalog=} has {len(r["data"])} runs.')
         #print_results_summary(r)
@@ -371,7 +376,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
           
     logging.info(f"{uri=}")
     #print(f"{uri=}")
-    try:  # TODO: #9 apply successful_run(uid) here?
+    try: 
         r = requests.get(uri).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)

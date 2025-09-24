@@ -22,7 +22,6 @@ import socket
 import logging
 
 
-
 def iso_to_ts(isotime):
     return datetime.datetime.fromisoformat(isotime).timestamp()
 
@@ -38,7 +37,60 @@ else:
 
 port = 8020
 catalog = "usaxs"
+TILED_TIMEOUT = 10  # seconds
 
+def tiled_get(
+        *, 
+        router: str = "search",  # "search" and "metadata" are common"
+        uid: str = None,
+        timeout: float = TILED_TIMEOUT,
+        **params: dict,  # Tiled options after the ? in the URL
+    ) -> dict:
+    """
+    Call 'requests.get()' with our server & catalog details.
+
+    EXAMPLES::
+
+        # information about the last run
+        params = {"page[limit]": 3, "sort": "-time"}
+        run_info = tiled_get(**params)
+
+        # metadata of a specific run
+        run_md_info = tiled_get(router="metadata", uid="f3b1c4e5-7f3a-4a3b-8c9d-3e2f1b4c5d6e")
+        md = run_md_info["data"]["attributes"]["metadata"]
+    """
+    url = f"http://{server}:{port}/api/v1/{router}/{catalog}"
+    if isinstance(uid, str):
+        url += f"/{uid}"
+    response = requests.get(url, params=params, timeout=timeout)
+    return response.json()
+
+
+def successful_run(uid=None):
+    """
+    Was the Bluesky run with this uid successful?
+
+    When 'uid' is None, then report about the last run in the catalog.
+
+    EXAMPLES:
+
+        successful_run()  # last run
+        successful_run("f3b1c4e5-7f3a-4a3b-8c9d-3e2f1b4c5d6e")  # specific run
+    """
+    if uid is None:
+        params = {
+            "page[offset]": 0,
+            "page[limit]": 1,
+            "sort": "-time",
+        }
+        run_json = tiled_get(**params)
+        last_run_index = 0  # when sorted by reverse time
+        md = run_json["data"][last_run_index]["attributes"]["metadata"]
+    else:
+        run_json = tiled_get(router="metadata", uid=uid)
+        md = run_json["data"]["attributes"]["metadata"]
+    success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+    return success
 
 
 def print_results_summary(r):

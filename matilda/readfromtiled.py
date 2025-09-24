@@ -294,7 +294,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
     logging.info(f"{uri=}")
 
     
-    try:
+    try:  # TODO: #9 apply successful_run(uid) here?
         r = requests.get(uri).json()
         #print(f'Search of {catalog=} has {len(r["data"])} runs.')
         #print_results_summary(r)
@@ -371,7 +371,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
           
     logging.info(f"{uri=}")
     #print(f"{uri=}")
-    try:
+    try:  # TODO: #9 apply successful_run(uid) here?
         r = requests.get(uri).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)

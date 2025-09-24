@@ -20,6 +20,7 @@ import datetime
 import time
 import socket
 import logging
+from typing import Any, Optional
 
 
 def iso_to_ts(isotime):
@@ -41,10 +42,10 @@ TILED_TIMEOUT = 10  # seconds
 
 def tiled_get(
         *, 
-        router: str = "search",  # "search" and "metadata" are common"
-        uid: str = None,
-        timeout: float = TILED_TIMEOUT,
-        **params: dict,  # Tiled options after the ? in the URL
+        router: Optional[str] = "search",  # "search" and "metadata" are common"
+        timeout: Optional[float] = TILED_TIMEOUT,
+        uid: Optional[str] = None,
+        **params: Optional[dict[str, Any]],  # Tiled options after the ? in the URL
     ) -> dict:
     """
     Call 'requests.get()' with our server & catalog details.
@@ -66,11 +67,15 @@ def tiled_get(
     return response.json()
 
 
-def successful_run(uid=None):
+def successful_run(uid: Optional[str] = None) -> bool:
     """
     Was the Bluesky run with this uid successful?
 
     When 'uid' is None, then report about the last run in the catalog.
+
+    This involves searching for a key in the 'stop' document.
+    The tiled server does not have direct way to query for keys that
+    are not in the 'start' document.
 
     EXAMPLES:
 
@@ -83,12 +88,12 @@ def successful_run(uid=None):
             "page[limit]": 1,
             "sort": "-time",
         }
-        run_json = tiled_get(**params)
-        last_run_index = 0  # when sorted by reverse time
-        md = run_json["data"][last_run_index]["attributes"]["metadata"]
+        run_info = tiled_get(**params)
+        last_run_index = 0  # when sorted by reverse time (params["sort"] value)
+        md = run_info["data"][last_run_index]["attributes"]["metadata"]
     else:
-        run_json = tiled_get(router="metadata", uid=uid)
-        md = run_json["data"]["attributes"]["metadata"]
+        run_info = tiled_get(router="metadata", uid=uid)
+        md = run_info["data"]["attributes"]["metadata"]
     success = (md.get("stop") or {}).get("exit_status", "?") == "success"
     return success
 

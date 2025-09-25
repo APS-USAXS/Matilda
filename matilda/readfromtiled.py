@@ -20,7 +20,7 @@ import datetime
 import time
 import socket
 import logging
-
+from typing import Any, Optional
 
 
 def iso_to_ts(isotime):
@@ -38,7 +38,64 @@ else:
 
 port = 8020
 catalog = "usaxs"
+TILED_TIMEOUT = 10  # seconds
 
+def tiled_get(
+        *, 
+        router: Optional[str] = "search",  # "search" and "metadata" are common"
+        timeout: Optional[float] = TILED_TIMEOUT,
+        uid: Optional[str] = None,
+        **params: Optional[dict[str, Any]],  # Tiled options after the ? in the URL
+    ) -> dict:
+    """
+    Call 'requests.get()' with our server & catalog details.
+
+    EXAMPLES::
+
+        # information about the last run
+        params = {"page[limit]": 3, "sort": "-time"}
+        run_info = tiled_get(**params)
+
+        # metadata of a specific run
+        run_md_info = tiled_get(router="metadata", uid="f3b1c4e5-7f3a-4a3b-8c9d-3e2f1b4c5d6e")
+        md = run_md_info["data"]["attributes"]["metadata"]
+    """
+    url = f"http://{server}:{port}/api/v1/{router}/{catalog}"
+    if isinstance(uid, str):
+        url += f"/{uid}"
+    response = requests.get(url, params=params, timeout=timeout)
+    return response.json()
+
+
+def successful_run(uid: Optional[str] = None) -> bool:
+    """
+    Was the Bluesky run with this uid successful?
+
+    When 'uid' is None, then report about the last run in the catalog.
+
+    This involves searching for a key in the 'stop' document.
+    The tiled server does not have direct way to query for keys that
+    are not in the 'start' document.
+
+    EXAMPLES:
+
+        successful_run()  # last run
+        successful_run("f3b1c4e5-7f3a-4a3b-8c9d-3e2f1b4c5d6e")  # specific run
+    """
+    if uid is None:
+        params = {
+            "page[offset]": 0,
+            "page[limit]": 1,
+            "sort": "-time",
+        }
+        run_info = tiled_get(**params)
+        last_run_index = 0  # when sorted by reverse time (params["sort"] value)
+        md = run_info["data"][last_run_index]["attributes"]["metadata"]
+    else:
+        run_info = tiled_get(router="metadata", uid=uid)
+        md = run_info["data"]["attributes"]["metadata"]
+    success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+    return success
 
 
 def print_results_summary(r):
@@ -58,6 +115,11 @@ def print_results_summary(r):
 def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
+        md = r["data"][v]["attributes"]["metadata"]
+        success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+        if not success:
+            continue  # skip this run
+
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
         #print(md)
         #plan_name = md["plan_name"]

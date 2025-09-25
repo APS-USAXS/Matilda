@@ -5,9 +5,9 @@
     0.3   2025-06-01
 
     useful functions are:
-    readTiled.FindLastScanData(plan_name,NumScans=10, LastNdays=1)
-    readTiled.FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0)
-    readTiled.FindLastBlankScan(plan_name,NumScans=1, lastNdays=0)
+    readfromtiled.FindLastScanData(plan_name,NumScans=10, LastNdays=1)
+    readfromtiled.FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0)
+    readfromtiled.FindLastBlankScan(plan_name,NumScans=1, lastNdays=0)
 
     method used builds on https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
     and follows Igor code to get the right data sets

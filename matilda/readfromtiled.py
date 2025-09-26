@@ -124,9 +124,6 @@ def convert_results(r):
             logging.info(f"Skipping unfinished/aborted scan: {uid} of type : {tempPlanName}")
             continue
 
-        #print(md)
-        #plan_name = md["plan_name"]
-        #scan_id = r["data"][v]["id"]
         #started = ts_to_iso(md["time"])
         hdf5_file = md["hdf5_file"]
         hdf5_path = md["hdf5_path"]

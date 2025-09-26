@@ -324,11 +324,11 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #start_time = time.time()    #current time in seconds
     # we need to fix file not ready issue. Sometimes the last file is simply not ready 
     # when we are asking for it. Let's try to ask for files at least 30 second before now. 
-    offsetTime = 20
-    if plan_name == "Flyscan" or plan_name == "uascan":
-        offsetTime = 95
+    #offsetTime = 20
+    ##if plan_name == "Flyscan" or plan_name == "uascan":
+     #   offsetTime = 95
     # this shifts the querried time by offsetTime seconds to past, providing file flush out the files. 
-    end_time = time.time() - offsetTime
+    end_time = time.time() #- offsetTime
     tz = "US/Central"
     if LastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days

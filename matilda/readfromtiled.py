@@ -161,8 +161,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
              "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
             )
     else:
         uri = (
@@ -177,8 +176,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
             )
       
     logging.info(f"{uri=}")

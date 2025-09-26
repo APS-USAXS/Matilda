@@ -116,10 +116,11 @@ def convert_results(r):
     OutputList=[]
     logging.info(f"Parsing data")
     for v in range(len(r["data"])):
-        md = r["data"][v]["attributes"]["metadata"]
-        #md = r["data"][v]["attributes"]["metadata"]["selected"]
-        plan_name = md["selected"]["plan_name"]
-        success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+        # md = r["data"][v]["attributes"]["metadata"]
+        # #md = r["data"][v]["attributes"]["metadata"]["selected"]
+        # plan_name = md["selected"]["plan_name"]
+        # success = (md.get("stop") or {}).get("exit_status", "?") == "success"
+        success = successful_run(r["data"][v]["id"])
         if not success and plan_name is "Flyscan":
             logging.info(f"Skipping a scan which has not succeeded.")
             continue  # skip this run

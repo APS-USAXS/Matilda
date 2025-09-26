@@ -116,8 +116,9 @@ def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
         md = r["data"][v]["attributes"]["metadata"]
+        plan_name = md["plan_name"]
         success = (md.get("stop") or {}).get("exit_status", "?") == "success"
-        if not success:
+        if not success and plan_name is "Flyscan":
             logging.info(f"Skipping a scan which has not succeeded.")
             continue  # skip this run
 
@@ -142,7 +143,8 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
     if lastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = time.time() - (lastNdays * 86400)
-        end_time = time.time()    #current time in seconds
+        end_time = time.time()      # current time in seconds
+        end_time = end_time - 10    # this is to fix SAXS/WAXS possibly not being done. 
         tz = "US/Central"
         uri = (
             f"http://{server}:{port}"

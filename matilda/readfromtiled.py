@@ -118,6 +118,7 @@ def convert_results(r):
         md = r["data"][v]["attributes"]["metadata"]
         success = (md.get("stop") or {}).get("exit_status", "?") == "success"
         if not success:
+            logging.info(f"Skipping a scan which has not succeeded.")
             continue  # skip this run
 
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 

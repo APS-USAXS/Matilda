@@ -117,7 +117,8 @@ def convert_results(r):
     logging.info(f"Parsing data")
     for v in range(len(r["data"])):
         md = r["data"][v]["attributes"]["metadata"]
-        plan_name = md["plan_name"]
+        #md = r["data"][v]["attributes"]["metadata"]["selected"]
+        plan_name = md["selected"]["plan_name"]
         success = (md.get("stop") or {}).get("exit_status", "?") == "success"
         if not success and plan_name is "Flyscan":
             logging.info(f"Skipping a scan which has not succeeded.")
@@ -163,8 +164,8 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            #"&select_metadata={plan_name:start.plan_name,time:start.time,\
-            #scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"
+            "&select_metadata={plan_name:start.plan_name,time:start.time,\
+            scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"
                                                                                 # select metadata
             )
     else:
@@ -180,8 +181,8 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            #"&select_metadata={plan_name:start.plan_name,time:start.time,\
-            #scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   
+            "&select_metadata={plan_name:start.plan_name,time:start.time,\
+            scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   
                                                                                 # select metadata
             )
       
@@ -238,8 +239,8 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-                #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
                 )
         else:
             # if LastNdays is not set, then we will ask for all data
@@ -255,8 +256,8 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-                #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
                 )
     else:
         if lastNdays > 0:
@@ -281,8 +282,8 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-                #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
                 )
         else:
             # if LastNdays is not set, then we will ask for all data
@@ -300,8 +301,8 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-                #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+                "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
                 )
                    
     logging.info(f"{uri=}")
@@ -362,8 +363,8 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-            #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
             )
     else:
         # if LastNdays is not set, then we will ask for all data
@@ -378,8 +379,8 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            #"&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
-            #hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
+            "&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,\
+            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
             )
           
     logging.info(f"{uri=}")

@@ -118,7 +118,7 @@ def convert_results(r):
         md = r["data"][v]["attributes"]["metadata"]
         plan_name = md["selected"]["plan_name"]
         success = (md.get("stop") or {}).get("exit_status", "?") == "success"
-        if not success and plan_name is "Flyscan":
+        if not success and (plan_name == "Flyscan"):
             logging.info(f"Skipping a scan which has not succeeded.")
             continue  # skip this run
 

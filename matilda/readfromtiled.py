@@ -118,7 +118,8 @@ def convert_results(r):
         uid = r["data"][v]["id"]
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
         success = successful_run(uid)
-        if not success and (md["plan_name"] == "Flyscan"):
+        #if not success and (md["plan_name"] == "Flyscan"):
+        if not success :
             logging.info(f"Skipping unsuccessful scan: {uid}")
             continue
 

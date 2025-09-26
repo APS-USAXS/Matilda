@@ -236,7 +236,7 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirst
     that is smaller than the sample's number.
     """
     results=[]
-    logging.info("Processing of SAXS/WAXS with blanks")    
+    #logging.info("Processing of SAXS/WAXS with blanks")    
     for scan_path, scan_filename in ListOfScans:
         try:
             if forceFirstBlank:

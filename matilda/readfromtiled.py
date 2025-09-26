@@ -120,7 +120,8 @@ def convert_results(r):
         success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
-            logging.info(f"Skipping unsuccessful scan: {uid} of type : {md["plan_name"]}")
+            tempPlanName=md["plan_name"]
+            logging.info(f"Skipping unfinished/aborted scan: {uid} of type : {tempPlanName}")
             continue
 
         #print(md)
@@ -183,7 +184,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
                                                                                 # select metadata
             )
       
-    logging.info(f"{uri=}")
+    #logging.info(f"{uri=}")
     #additional keywords:
     #[noteq] - not equal
     #[contains] - seems same as eq in use, and cannot be made into case insensitive. Not useful. 
@@ -200,14 +201,13 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
 
     try:
         r = requests.get(uri).json()
-        logging.info(f"Got json for : {plan_name}")
+        #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 
         # url communication failed, happens and should not crash anything.
-        # this is workaround.   
         logging.error('Could not get data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.error(f"Failed {uri=}")
         return []
@@ -302,22 +302,16 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
                 hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
                 )
                    
-    logging.info(f"{uri=}")
+    #logging.info(f"{uri=}")
 
-    
     try:
         r = requests.get(uri).json()
-        #print(f'Search of {catalog=} has {len(r["data"])} runs.')
-        #print_results_summary(r)
-        # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
-        #print(ScanList)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 
         # url communication failed, happens and shoudl not crash anything.
-        # this is workaround.   
         logging.error('Could not get data from tiled server at  usaxscontrol.xray.aps.anl.gov')
         logging.error(f"Failed {uri=}")
         return []
@@ -380,18 +374,16 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}"   # select metadata
             )
           
-    logging.info(f"{uri=}")
+    #logging.info(f"{uri=}")
     #print(f"{uri=}")
     try:
         r = requests.get(uri).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
-        #print(ScanList)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 
         # url communication failed, happens and shoudl not crash anything.
-        # this is workaround.   
         logging.error('Could not get data from tiled server at  usaxscontrol.xray.aps.anl.gov')
         logging.error(f"Failed {uri=}")
         return []

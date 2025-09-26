@@ -96,7 +96,7 @@ def importFlyscan(path, filename):
 # this finds the best blank scan for any scan.
 # rules: same folder and order number lower than the sample scan., the closest one. 
 def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
-    logging.info(f"Looking for proper Blanks for to process scan: {scan_filename} in path: {scan_path}")
+    #logging.info(f"Looking for proper Blanks for to process scan: {scan_filename} in path: {scan_path}")
 
     sample_base, sample_num, sample_ext = _parse_filename_info(scan_filename)
 

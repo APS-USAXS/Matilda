@@ -120,7 +120,7 @@ def convert_results(r):
         success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
-            logging.info(f"Skipping unsuccessful scan: {uid}")
+            logging.info(f"Skipping unsuccessful scan: {uid} of type : {md["plan_name"]}")
             continue
 
         #print(md)

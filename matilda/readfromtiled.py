@@ -115,14 +115,13 @@ def print_results_summary(r):
 def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
-        md = r["data"][v]["attributes"]["metadata"]
-        plan_name = md["selected"]["plan_name"]
-        success = (md.get("stop") or {}).get("exit_status", "?") == "success"
-        if not success and (plan_name == "Flyscan"):
-            logging.info(f"Skipping a scan which has not succeeded.")
-            continue  # skip this run
-
+        uid = r["data"][v]["id"]
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
+        success = successful_run(uid)
+        if not success and (md["plan_name"] == "Flyscan"):
+            logging.info(f"Skipping unsuccessful scan: {uid}")
+            continue
+
         #print(md)
         #plan_name = md["plan_name"]
         #scan_id = r["data"][v]["id"]

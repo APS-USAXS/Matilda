@@ -144,7 +144,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = time.time() - (lastNdays * 86400)
         end_time = time.time()      # current time in seconds
-        end_time = end_time - 10    # this is to fix SAXS/WAXS possibly not being done. 
+        end_time = end_time         # this is to fix SAXS/WAXS possibly not being done. 
         tz = "US/Central"
         uri = (
             f"http://{server}:{port}"

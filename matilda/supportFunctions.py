@@ -7,6 +7,7 @@ import os
 import copy
 import re
 import pprint as pp
+from pathlib import Path
 
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
@@ -108,7 +109,8 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
         logging.debug(f"Parsed sample {scan_filename}: base='{sample_base}', num={sample_num}, ext='{sample_ext}'")
         candidate_blanks = []
         for bl_path, bl_filename in ListOfBlanks:
-            if bl_path == scan_path:  # Blank must be in the same path
+            #if bl_path == scan_path:  # Blank must be in the same path
+            if Path(bl_path).parents[1] == Path(scan_path).parents[1]:                  # new setup - they just need to be in the same user folder, not whole. paths  
                 blank_base, blank_num, blank_ext = _parse_filename_info(bl_filename)
                 if blank_base and blank_num is not None and blank_ext == sample_ext:
                     if blank_num < sample_num:

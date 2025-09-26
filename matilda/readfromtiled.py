@@ -114,18 +114,14 @@ def print_results_summary(r):
 
 def convert_results(r):
     OutputList=[]
-    logging.info(f"Parsing data")
     for v in range(len(r["data"])):
-        # md = r["data"][v]["attributes"]["metadata"]
-        # #md = r["data"][v]["attributes"]["metadata"]["selected"]
-        # plan_name = md["selected"]["plan_name"]
-        # success = (md.get("stop") or {}).get("exit_status", "?") == "success"
-        success = successful_run(r["data"][v]["id"])
-        if not success and plan_name is "Flyscan":
-            logging.info(f"Skipping a scan which has not succeeded.")
-            continue  # skip this run
-
+        uid = r["data"][v]["id"]
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
+        success = successful_run(uid)
+        if not success and (md["plan_name"] == "Flyscan"):
+            logging.info(f"Skipping unsuccessful scan: {uid}")
+            continue
+
         #print(md)
         #plan_name = md["plan_name"]
         #scan_id = r["data"][v]["id"]
@@ -135,7 +131,6 @@ def convert_results(r):
         #print(f" path: {hdf5_path=} {hdf5_file=}")
         if hdf5_file is not None:
             OutputList.append([hdf5_path,hdf5_file])
-    logging.info(f"Succeeded, here is OutputList: {OutputList}")
     return OutputList
         
 #print(f'Search of {catalog=} has {len(r["data"])} runs.')

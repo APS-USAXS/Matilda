@@ -114,10 +114,8 @@ def print_results_summary(r):
 
 def convert_results(r):
     OutputList=[]
-    logging.info(f"Parsing data")
     for v in range(len(r["data"])):
         md = r["data"][v]["attributes"]["metadata"]
-        #md = r["data"][v]["attributes"]["metadata"]["selected"]
         plan_name = md["selected"]["plan_name"]
         success = (md.get("stop") or {}).get("exit_status", "?") == "success"
         if not success and plan_name is "Flyscan":
@@ -134,7 +132,6 @@ def convert_results(r):
         #print(f" path: {hdf5_path=} {hdf5_file=}")
         if hdf5_file is not None:
             OutputList.append([hdf5_path,hdf5_file])
-    logging.info(f"Succeeded, here is OutputList: {OutputList}")
     return OutputList
         
 #print(f'Search of {catalog=} has {len(r["data"])} runs.')

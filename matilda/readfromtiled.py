@@ -114,6 +114,7 @@ def print_results_summary(r):
 
 def convert_results(r):
     OutputList=[]
+    logging.info(f"Parsing data")
     for v in range(len(r["data"])):
         md = r["data"][v]["attributes"]["metadata"]
         plan_name = md["plan_name"]
@@ -132,6 +133,7 @@ def convert_results(r):
         #print(f" path: {hdf5_path=} {hdf5_file=}")
         if hdf5_file is not None:
             OutputList.append([hdf5_path,hdf5_file])
+    logging.info(f"Succeeded, here is OutputList: {OutputList}")
     return OutputList
         
 #print(f'Search of {catalog=} has {len(r["data"])} runs.')
@@ -158,7 +160,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
             f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
             f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
             f"&filter[time_range][condition][timezone]={tz}"                    # time range
-             "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&sort=-time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
             #"&select_metadata={plan_name:start.plan_name,time:start.time,\
@@ -200,6 +202,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
 
     try:
         r = requests.get(uri).json()
+        logging.info(f"Got json for : {plan_name}")
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")

@@ -8,12 +8,16 @@ import copy
 import re
 import pprint as pp
 from pathlib import Path
+import matplotlib.pyplot as plt
+
 
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
+#this is to enable graphs in R data clacualtion for debugging. 
+debugme = 0
 #recalculateAllData = False
 
 MinQMinFindRatio = 1.05
@@ -451,7 +455,8 @@ def calculatePD_Fly(data_dict):
         #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
     Frequency= 1e6      #VToFFactor[0]/10   #this is frequency of clock fed into mca1/10 for HDF5 writer 1.3 and higher
     TimeInSec = TimePerPoint/Frequency
-    #print("Exp. time :", sum(TimeInSec))
+    Totaltime= sum(TimeInSec)
+    print(f"{Totaltime}")
     for i in range(0, len(Channel)-1, 1):
         startPnt=Channel[i]
         deadtimeName = 'upd_amp_change_mask_time'+str(int(AmpReqGain[i]))
@@ -468,7 +473,35 @@ def calculatePD_Fly(data_dict):
         #Correct UPD for gains and monitor counts and amplifier gain. 
         # Frequency=1e6  #this is to keep in sync with Igor code. 
     PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0Gain)  
+    # Igor fixes negative intensities here by removing oversubtraction...
+    # Need to find minimum value over last 80% of data points, avoiding start of data.
+    startIndex = int(np.round(0.2 * len(PD_Intensity)))
+    MinIntensity = np.nanmin(PD_Intensity[startIndex:-1])
+    if MinIntensity < 0:
+        maxIntensity = np.nanmax(PD_Intensity)
+        PD_Intensity = PD_Intensity + 1.1*np.abs(MinIntensity) + 0.3e-10*maxIntensity
+        #		WaveIn += Indra_PDIntBackFixScaleVmin * abs(V_min) + MaxValue * Indra_PDIntBackFixScaleVmax
+        #Constant Indra_PDIntBackFixScaleVmin     = 1.1
+        #Constant Indra_PDIntBackFixScaleVmax     = 0.3e-10
+        
+    if debugme:
+        plt.figure()
+        plt.plot(ARangles, np.log10(UPD_array), label='UPD_array')
+        plt.plot(ARangles, np.log10(TimeInSec*updBkg), label='TimeInSec*updBkg')
+        #plt.plot(ARangles, np.log10(TimeInSec), label='TimeInSec')
+        #plt.plot(ARangles, np.log10(Monitor), label='Monitor')
+        plt.plot(ARangles, np.log10(PD_Intensity), label='PD_Intensity')
+        plt.xlabel('ARangles')
+        plt.ylabel('Log10 Value')
+        plt.title('Debug Plot of Raw Data Components')
+        plt.legend()
+        plt.show()
+
+
     PD_error = 0.01*PD_Intensity   #this is fake error for QR conversion,recalculated in calculatePDerror
+    # Igor has code to avoid 0 uncertainties. Not needed here, this is recalculated anyway. 
+    
+    
     result = {"Intensity":PD_Intensity,
               "Error":PD_error,
               "UPD_gains":GainsIndx,

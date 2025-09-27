@@ -93,6 +93,7 @@ handler = RotatingFileHandler(log_file, maxBytes=200000, backupCount=1)
 logging.basicConfig(
     handlers=[handler],
     level=logging.INFO,        # Set the logging level
+    #level=logging.DEBUG,       # Set the logging level
     format='%(asctime)s - %(levelname)s - %(message)s',  # Format of the log messages
     datefmt='%Y-%m-%d %H:%M:%S'  # Date format
 )
@@ -237,6 +238,7 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirst
     """
     results=[]
     #logging.info("Processing of SAXS/WAXS with blanks")    
+    logging.info("Processing of SAXS/WAXS with blanks")    
     for scan_path, scan_filename in ListOfScans:
         try:
             if forceFirstBlank:
@@ -283,6 +285,7 @@ if __name__ == "__main__":
             else:
                 #path, filename = ListOfScans[-1]
                 listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
+                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processFlyscans(ListOfScans, listOfBlanks)
@@ -298,6 +301,7 @@ if __name__ == "__main__":
             else:
                 #path, filename = ListOfScans[-1]
                 listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
+                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processStepscans(ListOfScans, listOfBlanks)
@@ -311,6 +315,7 @@ if __name__ == "__main__":
                 logging.info('No new SAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)
@@ -324,6 +329,7 @@ if __name__ == "__main__":
                 logging.info('No new WAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)      

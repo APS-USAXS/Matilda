@@ -219,10 +219,11 @@ def test_matildaLocal():
     #     print("File found")
     #open the file
     #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    samplePath = "Z:/Experiments/USAXS_data/2025/2025-07/07_20_Tifani/07_20_Tifani_usaxs"
-    samplename="MnCoO4_init1_2870.h5"
+    #samplePath = "Z:/Experiments/USAXS_data/2025/2025-07/07_20_Tifani/07_20_Tifani_usaxs"
+    samplePath = "/home/parallels/Desktop/testdata/hematite/hematite_usaxs"
+    samplename="hematite_48C_98min_0050.h5"
     blankPath=samplePath 
-    blankFilename="GlassBlank_2868.h5"
+    blankFilename="CapillaryBlank_0006.h5"
     Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    
     #Sample = processFlyscan(samplePath,blankFilename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
     

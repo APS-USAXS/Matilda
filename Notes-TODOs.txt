@@ -3,3 +3,227 @@ Notes and TODOs
 TODO:
 
 
+2025-09-23 10:58:08 - INFO - uri='http://usaxscontrol.xray.aps.anl.gov:8020/api/v1/search/usaxs?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]="uascan"&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&filter[time_range][condition][since]=1758556688.947114&filter[time_range][condition][until]=1758643088.9471157&filter[time_range][condition][timezone]=US/Central&sort=-time&fields=metadata&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,                hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}'
+2025-09-23 10:58:08 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'Kush0_blank_0006.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0003.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-09-23 10:58:08 - INFO - Got list : [['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D6_0012.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D5_0011.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D4_0010.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D3_0009.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D2_0008.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'CNC_D1_0007.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'Kush0_blank_0006.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'GC_SRM3600_0004.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0003.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-09-23 10:58:08 - INFO - Got blank list : [['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs', 'Kush0_blank_0006.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0003.h5'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-09-23 10:58:08 - INFO - Processing of Step scans with blanks
+2025-09-23 10:58:08 - INFO - Looking for proper Blanks for to process scan: CNC_D6_0012.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:08 - INFO - Found blank for CNC_D6_0012.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:08 - INFO - Found blank for CNC_D6_0012.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:08 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D6_0012.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:08 - ERROR - Error processing scan CNC_D6_0012.h5: [Errno 2] Unable to synchronously open file (unable to open file: name = '/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs/CNC_D6_0012.h5', errno = 2, error message = 'No such file or directory', flags = 1, o_flags = 2)
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 39, in processStepscan
+    with h5py.File(Filepath, 'r+') as hdf_file:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/files.py", line 240, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+FileNotFoundError: [Errno 2] Unable to synchronously open file (unable to open file: name = '/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs/CNC_D6_0012.h5', errno = 2, error message = 'No such file or directory', flags = 1, o_flags = 2)
+2025-09-23 10:58:08 - INFO - Looking for proper Blanks for to process scan: CNC_D5_0011.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:08 - INFO - Found blank for CNC_D5_0011.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:08 - INFO - Found blank for CNC_D5_0011.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:08 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D5_0011.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:09 - INFO - Used existing Blank data from Kush0_blank_0006.h5
+2025-09-23 10:58:09 - INFO - Desmearing convergence reached after 12 iterations. Final avg error: 288688.9321 (target < 0.5). Diff: 0.0140 (target < 0.02).
+2025-09-23 10:58:09 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs/CNC_D5_0011.h5
+2025-09-23 10:58:09 - INFO - Wrote Desmeared NXcanSAS group for file CNC_D5_0011.h5. 
+2025-09-23 10:58:09 - INFO - Wrote SMR NXcanSAS group for file CNC_D5_0011.h5. 
+2025-09-23 10:58:09 - INFO - Wrote QRS group for file CNC_D5_0011.h5. 
+2025-09-23 10:58:09 - INFO - Wrote Blank data group for file CNC_D5_0011.h5. 
+2025-09-23 10:58:09 - INFO - Wrote NXcanSAS data to file: CNC_D5_0011.h5
+2025-09-23 10:58:09 - INFO - Looking for proper Blanks for to process scan: CNC_D4_0010.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:09 - INFO - Found blank for CNC_D4_0010.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:09 - INFO - Found blank for CNC_D4_0010.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:09 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D4_0010.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:09 - ERROR - Error processing scan CNC_D4_0010.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-09-23 10:58:09 - INFO - Looking for proper Blanks for to process scan: CNC_D3_0009.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:09 - INFO - Found blank for CNC_D3_0009.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:09 - INFO - Found blank for CNC_D3_0009.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:09 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D3_0009.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:10 - ERROR - Error processing scan CNC_D3_0009.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-09-23 10:58:10 - INFO - Looking for proper Blanks for to process scan: CNC_D2_0008.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:10 - INFO - Found blank for CNC_D2_0008.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:10 - INFO - Found blank for CNC_D2_0008.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:10 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D2_0008.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:10 - ERROR - Error processing scan CNC_D2_0008.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-09-23 10:58:10 - INFO - Looking for proper Blanks for to process scan: CNC_D1_0007.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:10 - INFO - Found blank for CNC_D1_0007.h5: Kush0_blank_0006.h5 (num: 6) in path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:10 - INFO - Found blank for CNC_D1_0007.h5 , blank name : Kush0_blank_0006.h5
+2025-09-23 10:58:10 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename CNC_D1_0007.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, blank filename Kush0_blank_0006.h5
+2025-09-23 10:58:10 - ERROR - Error processing scan CNC_D1_0007.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-09-23 10:58:10 - INFO - Looking for proper Blanks for to process scan: Kush0_blank_0006.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs
+2025-09-23 10:58:10 - WARNING - No suitable blank found for sample Kush0_blank_0006.h5 (num: 6) in path '/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs'.
+2025-09-23 10:58:10 - INFO - Found blank for Kush0_blank_0006.h5 , blank name : None
+2025-09-23 10:58:10 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_usaxs, filename Kush0_blank_0006.h5, blank path None, blank filename None
+2025-09-23 10:58:11 - ERROR - Error processing scan Kush0_blank_0006.h5: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 527, in readMyNXcanSAS
+    metadata_group = f['/entry/Metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+2025-09-23 10:58:11 - INFO - Looking for proper Blanks for to process scan: GC_SRM3600_0004.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs
+2025-09-23 10:58:11 - INFO - Found blank for GC_SRM3600_0004.h5: AirBlank_0003.h5 (num: 3) in path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs
+2025-09-23 10:58:11 - INFO - Found blank for GC_SRM3600_0004.h5 , blank name : AirBlank_0003.h5
+2025-09-23 10:58:11 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs, filename GC_SRM3600_0004.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs, blank filename AirBlank_0003.h5
+2025-09-23 10:58:11 - ERROR - Error processing scan GC_SRM3600_0004.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-09-23 10:58:11 - INFO - Looking for proper Blanks for to process scan: AirBlank_0003.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs
+2025-09-23 10:58:11 - INFO - Found blank for AirBlank_0003.h5: AirBlank_0002.h5 (num: 2) in path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs
+2025-09-23 10:58:11 - INFO - Found blank for AirBlank_0003.h5 , blank name : AirBlank_0002.h5
+2025-09-23 10:58:11 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs, filename AirBlank_0003.h5, blank path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs, blank filename AirBlank_0002.h5
+2025-09-23 10:58:11 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs/AirBlank_0003.h5
+2025-09-23 10:58:11 - INFO - Wrote QRS group for file AirBlank_0003.h5. 
+2025-09-23 10:58:12 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_0003.h5. Overwriting.
+2025-09-23 10:58:12 - INFO - Wrote NXcanSAS data to file: AirBlank_0003.h5
+2025-09-23 10:58:12 - INFO - Looking for proper Blanks for to process scan: AirBlank_0002.h5 in path: /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs
+2025-09-23 10:58:12 - WARNING - No suitable blank found for sample AirBlank_0002.h5 (num: 2) in path '/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs'.
+2025-09-23 10:58:12 - INFO - Found blank for AirBlank_0002.h5 , blank name : None
+2025-09-23 10:58:12 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-09/09_23_Jeffries/data/data_usaxs, filename AirBlank_0002.h5, blank path None, blank filename None
+2025-09-23 10:58:12 - ERROR - Error processing scan AirBlank_0002.h5: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 219, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 77, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 527, in readMyNXcanSAS
+    metadata_group = f['/entry/Metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+2025-09-23 10:58:12 - INFO - Got 2 USAXS data sets to plot
+2025-09-23 10:58:13 - INFO - Processing the SAXS
+2025-09-23 10:58:13 - INFO - uri='http://usaxscontrol.xray.aps.anl.gov:8020/api/v1/search/usaxs?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]="SAXS"&filter[time_range][condition][since]=1758556673.2499359&filter[time_range][condition][until]=1758643073.2499359&filter[time_range][condition][timezone]=US/Central&sort=-time&fields=metadata&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}'
+2025-09-23 10:58:13 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_saxs', 'AgBehenateLaB6_0005.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_saxs', 'GC_SRM3600_0004.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_saxs', 'AirBlank_0003.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-09-23 10:58:13 - INFO - No new SAXS data found
+2025-09-23 10:58:13 - INFO - Processing the WAXS
+2025-09-23 10:58:13 - INFO - uri='http://usaxscontrol.xray.aps.anl.gov:8020/api/v1/search/usaxs?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]="WAXS"&filter[time_range][condition][since]=1758556673.2773974&filter[time_range][condition][until]=1758643073.2773974&filter[time_range][condition][timezone]=US/Central&sort=-time&fields=metadata&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,            hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}'
+2025-09-23 10:58:13 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-09/09_23_Jeffries/Kush/Kush_waxs', 'AgBehenateLaB6_0005.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_waxs', 'GC_SRM3600_0004.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_waxs', 'AirBlank_0003.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-09/09_23_Jeffries/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-09-23 10:58:13 - INFO - No new WAXS data found

@@ -136,13 +136,12 @@ def convert_results(r):
 #print_results_summary(r)
 
 
-def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
+def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #this filters for specific time AND for specific plan_name
     if lastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = time.time() - (lastNdays * 86400)
         end_time = time.time()      # current time in seconds
-        end_time = end_time         # this is to fix SAXS/WAXS possibly not being done. 
         tz = "US/Central"
         uri = (
             f"http://{server}:{port}"
@@ -210,7 +209,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0):
         return []
     
 
-def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=0):
+def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
     #this filters for last collected Blank for specific plan_name
     if path is None:
         if lastNdays > 0:
@@ -321,7 +320,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #print (FindLastScanData("WAXS",10,LastNdays=1))
     #print(f"Search for {plan_name=}")
     # Find all runs in a catalog between these two ISO8601 dates.
-    #start_time = time.time()    #current time in seconds
+    start_time = 0
     # we need to fix file not ready issue. Sometimes the last file is simply not ready 
     # when we are asking for it. Let's try to ask for files at least 30 second before now. 
     #offsetTime = 20

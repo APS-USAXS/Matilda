@@ -49,7 +49,9 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     plt.ylabel(style["ylabel"])
     plt.xscale(style["xscale"])
     plt.yscale(style["yscale"])
-    plt.xlim(style["xlim"])
+    #plt.xlim(style["xlim"])
+    plt.xlim()          #autoscales
+    plt.ylim()          #autoscales
     plt.grid(style["grid"])
     # Add legend
     plt.legend()
@@ -60,7 +62,7 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     # Calculate the new limits,for y we want to keep the max and limit the min to larger of existing value and max/1e12
     # for x we want to keep min or force 1e-5 (440 resolution) is min is smaller. 
     new_xlim = (max(xlim[0], 1e-5), xlim[1])
-    new_ylim = (max(ylim[0], ylim[1] / 10**12), ylim[1])
+    new_ylim = (max(ylim[0], ylim[1] / 10**14), ylim[1])
     # Set the new limits
     plt.xlim(new_xlim)
     plt.ylim(new_ylim)
@@ -92,7 +94,8 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     plt.ylabel(style["ylabel"])
     plt.xscale(style["xscale"])
     plt.yscale(style["yscale"])
-    plt.xlim(style["xlim"])
+    plt.xlim()          #autoscales
+    plt.ylim()          #autoscales
     plt.grid(style["grid"])
     # Add legend
     plt.legend()
@@ -103,7 +106,7 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     # Calculate the new limits,for y we want to keep the max and limit the min to larger of existing value and max/1e12
     # for x we want to keep min or force 1e-5 (440 resolution) is min is smaller. 
     new_xlim = (max(xlim[0], 1e-5), xlim[1])
-    new_ylim = (max(ylim[0], ylim[1] / 10**12), ylim[1])    # Set the new limits
+    new_ylim = (max(ylim[0], ylim[1] / 10**14), ylim[1])    # Set the new limits
     plt.xlim(new_xlim)
     plt.ylim(new_ylim)
     # Save the plot as a JPEG image

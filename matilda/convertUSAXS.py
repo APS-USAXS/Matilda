@@ -28,11 +28,12 @@ from supportFunctions import subtract_data #read_group_to_dict, filter_nested_di
 from hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
 from desmearing import desmearData
+from plotData import plotUSAXSResults
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
-# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+# If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
@@ -506,6 +507,12 @@ def CorrectUPDGainsStep(data_dict):
 
 if __name__ == "__main__":
     Sample = dict()
+    Samples = []
+
+    # "\\Mac\Home\Desktop\TestData\uascan"
+    Sample = processStepscan("//Mac/Home/Desktop/TestData/uascan", "Good24hNP_0052.h5", blankPath="/Mac/Home/Desktop/TestData/uascan", blankFilename="Dow_blank_0040.h5", recalculateAllData=True)
+    Samples.append(Sample)
+    plotUSAXSResults(Samples, "//Mac/Home/Desktop/TestData/uascan", isFlyscan=False)
     #Sample = reduceStepScanToQR("/home/parallels/Github/Matilda/TestData","USAXS_step.h5")
    # Sample = reduceStepScanToQR(r"C:\Users\ilavsky\Documents\GitHub\Matilda\TestData","USAXS_step.h5")
     #Sample["RawData"]=ImportStepScan("/home/parallels/Github/Matilda","USAXS_step.h5")

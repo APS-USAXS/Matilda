@@ -285,7 +285,7 @@ if __name__ == "__main__":
             else:
                 #path, filename = ListOfScans[-1]
                 listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
-                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
+                #listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processFlyscans(ListOfScans, listOfBlanks)
@@ -301,7 +301,7 @@ if __name__ == "__main__":
             else:
                 #path, filename = ListOfScans[-1]
                 listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
-                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
+                #listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processStepscans(ListOfScans, listOfBlanks)
@@ -315,7 +315,7 @@ if __name__ == "__main__":
                 logging.info('No new SAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
-                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
+                #listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)
@@ -329,7 +329,7 @@ if __name__ == "__main__":
                 logging.info('No new WAXS data found')
             else:
                 listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
-                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
+                #listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processADscans(ListOfScans, listOfBlanks)      

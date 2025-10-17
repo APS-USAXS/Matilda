@@ -98,7 +98,7 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                                         # error = Sample["reducedData"]["Error"]            
                                         # samplename = Sample["RawData"]["samplename"]
             
-            if blankPath is not None and blankFilename is not None:               
+            if blankPath is not None and blankFilename is not None and "blank" not in filename.lower():               
                 blank = importADData(blankPath, blankFilename)               #this is for blank path and blank name
                 Sample["BlankData"] = reduceADData(blank, useRawData=True)   #this generates Int vs Q for blank data plot
                                         # qcalib = Sample["BlankData"]["Q"]

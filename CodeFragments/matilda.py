@@ -210,12 +210,8 @@ def plotUSAXSResults(ListOfresults, isFlyscan=True):
     current_hostname = socket.gethostname()
     if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
         if isFlyscan:
-            #logging.info(f"Ready to savefig") 
-            plt.savefig('/home/joule/WEBUSAXS/www_live/usaxs.jpg', format='jpg', dpi=300)
-            #logging.info(f"After to savefig") 
             plt.savefig('/home/joule/WEBUSAXS/www_live/usaxs.jpg', format='jpg', dpi=300)
         else:
-            plt.savefig('/home/joule/WEBUSAXS/www_live/stepusaxs.jpg', format='jpg', dpi=300) # this step scan
             plt.savefig('/home/joule/WEBUSAXS/www_live/stepusaxs.jpg', format='jpg', dpi=300) # this step scan
         plt.close()
     else:
@@ -260,7 +256,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
             plt.close()
         else:
             plt.savefig('saxs.jpg', format='jpg', dpi=300)
-        plt.show()
+            plt.show()
     else:
         plt.title('Plot of WAXS Intensity vs. Q')   
         plt.xlabel('Q [1/A]')
@@ -277,7 +273,7 @@ def plotSWAXSResults(ListOfresults, isSAXS = True):
             plt.close()
         else:
             plt.savefig('waxs.jpg', format='jpg', dpi=300)
-        plt.show()
+            plt.show()
 
 
 if __name__ == "__main__":

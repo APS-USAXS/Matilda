@@ -374,28 +374,28 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
         location = 'entry/QRS_data/'
         if location in f:
             Sample['reducedData'] = dict()
-            dataset = f[location + "Intensity"]
+            dataset = _get_h5_value(f, location + "Intensity")
             if dataset is not None:
-                Sample['reducedData']['Intensity'] = dataset[()]
-            dataset = f[location + "Q"]
+                Sample['reducedData']['Intensity'] = dataset
+            dataset = _get_h5_value(f, location + "Q")
             if dataset is not None:
-                Sample['reducedData']['Q'] = dataset[()]
-            dataset = f[location + "Error"]
+                Sample['reducedData']['Q'] = dataset
+            dataset = _get_h5_value(f, location + "Error")
             if dataset is not None:
-                Sample['reducedData']['Error'] = dataset[()]
+                Sample['reducedData']['Error'] = dataset
 
         location = 'entry/Blank_data/'
         if location in f:
             Sample['BlankData'] = dict()
-            dataset = f[location + "Intensity"]
+            dataset = _get_h5_value(f, location + "Intensity")
             if dataset is not None:
-                Sample['BlankData']['Intensity'] = dataset[()]
-            dataset = f[location + "Q"]
+                Sample['BlankData']['Intensity'] = dataset
+            dataset = _get_h5_value(f, location + "Q")
             if dataset is not None:
-                Sample['BlankData']['Q'] = dataset[()]
-            dataset = f[location + "Error"]
+                Sample['BlankData']['Q'] = dataset
+            dataset = _get_h5_value(f, location + "Error")
             if dataset is not None:
-                Sample['BlankData']['Error'] = dataset[()]
+                Sample['BlankData']['Error'] = dataset
             # BL_R_Int = Sample["BlankData"]["Intensity"]
             # BL_Q_vec = Sample["BlankData"]["Q"]
             # BL_Error = Sample["BlankData"]["Error"]    
@@ -410,21 +410,21 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
         if location is not None and location in f:
             isUSAXS = True      #have SMR data, assume USAXS setup
 
-            dataset = f[location + "sasdata/I"]
+            dataset = _get_h5_value(f, location + "sasdata/I")
             if dataset is not None:
-                Sample['CalibratedData']['SMR_Int'] = dataset[()]
-            dataset = f[location + "sasdata/Q"]
+                Sample['CalibratedData']['SMR_Int'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/Q")
             if dataset is not None:
-                Sample['CalibratedData']['SMR_Qvec'] = dataset[()]
-            dataset = f[location + "sasdata/Idev"]
+                Sample['CalibratedData']['SMR_Qvec'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/Idev")
             if dataset is not None:
-                Sample['CalibratedData']['SMR_Error'] = dataset[()]
-            dataset = f[location + "sasdata/dQw"]
+                Sample['CalibratedData']['SMR_Error'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/dQw")
             if dataset is not None:
-                Sample['CalibratedData']['SMR_dQ'] = dataset[()]
-            dataset = f[location + "sasdata/dQl"]
+                Sample['CalibratedData']['SMR_dQ'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/dQl")
             if dataset is not None:
-                Sample['CalibratedData']['slitLength'] = dataset[()]
+                Sample['CalibratedData']['slitLength'] = dataset
         else:
             Sample["CalibratedData"] ["SMR_Qvec"] = None,
             Sample["CalibratedData"] ["SMR_Int"] = None,
@@ -440,28 +440,31 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
             Sample["RawData"]["sample"]=dict()
 
         if location is not None and location in f:
-            dataset = f[location + "sasdata/I"]
+            dataset = _get_h5_value(f, location + "sasdata/I")
             if dataset is not None:
-                Sample['CalibratedData']['Intensity'] = dataset[()]
-            dataset = f[location + "sasdata/Q"]
+                Sample['CalibratedData']['Intensity'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/Q")
             if dataset is not None:
-                Sample['CalibratedData']['Q'] = dataset[()]
-            dataset = f[location + "sasdata/Idev"]
+                Sample['CalibratedData']['Q'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/Idev")
             if dataset is not None:
-                Sample['CalibratedData']['Error'] = dataset[()]
-            dataset = f[location + "sasdata/Qdev"]
+                Sample['CalibratedData']['Error'] = dataset
+            dataset = _get_h5_value(f, location + "sasdata/Qdev")
             if dataset is not None:
-                Sample['CalibratedData']['dQ'] = dataset[()]            
-            dataset = f[location + "title"]
+                Sample['CalibratedData']['dQ'] = dataset
+            dataset = _get_h5_value(f, location + "title")
             if dataset is not None:
-                Sample["RawData"]["sample"]["name"] = dataset[()]
-            attributes = f[location + "sasdata/I"].attrs
-            Sample['CalibratedData']['units'] = attributes['units']
-            Sample['CalibratedData']['blankname'] = attributes["blankname"]
-            Sample['CalibratedData']['thickness'] = attributes["thickness"]
-            Sample["RawData"]["filename"] = attributes["label"]
-            Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
-            Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
+                Sample["RawData"]["sample"]["name"] = dataset
+
+            location = location+'/sasdata/'
+            if "I" in f[location]:
+                attributes = f[location + "I"].attrs
+                Sample['CalibratedData']['units'] = attributes['units']
+                Sample['CalibratedData']['blankname'] = attributes["blankname"]
+                Sample['CalibratedData']['thickness'] = attributes["thickness"]
+                Sample["RawData"]["filename"] = attributes["label"]
+                Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
+                Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
         else:
             Sample["RawData"]["filename"] = filename
             Sample['CalibratedData']['Intensity'] = None
@@ -538,7 +541,11 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
  
         return Sample
 
-
+def _get_h5_value(h5file, path):
+    """Return dataset value at path or None if missing."""
+    if path in h5file:
+        return h5file[path][()]
+    return None
 
 def save_dict_to_hdf5(dic, location, h5file):
     """

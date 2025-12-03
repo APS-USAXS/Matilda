@@ -1,7 +1,7 @@
-'''
+"""
     this contains needed hdf5 support for matilda
-    used by saving blank BL_QRS data. 
-'''
+    used by saving blank BL_QRS data.
+"""
 import h5py
 import os
 import numpy as np
@@ -11,9 +11,9 @@ import logging
 
 
 def readGenericNXcanSAS(path, filename):
-    '''
+    """
     read data from NXcanSAS data in Nexus file. Ignore NXsas data and anything else
-    '''
+    """
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r') as f:
         # Start at the root

@@ -507,8 +507,9 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
 
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
-            # we need this key to be there also... COpy of the other one. 
-            I0Gain=metadata_dict["I0AmpGain"]   
+            # we need this key to be there also... Copy of the other one.
+            # Ensure I0AmpGain exists; default to 1e6 if missing.
+            metadata_dict["I0AmpGain"] = metadata_dict.get("I0AmpGain", 1e6)
             metadata_dict["I0Gain"]=I0Gain
             #Instrument
             keys_to_keep = ['monochromator', 'energy', 'wavelength']

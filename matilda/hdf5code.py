@@ -510,7 +510,7 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
             # we need this key to be there also... Copy of the other one.
             # Ensure I0AmpGain exists; default to 1e6 if missing.
             metadata_dict["I0AmpGain"] = metadata_dict.get("I0AmpGain", 1e6)
-            metadata_dict["I0Gain"]=I0Gain
+            metadata_dict["I0Gain"] = metadata_dict["I0AmpGain"]
             #Instrument
             keys_to_keep = ['monochromator', 'energy', 'wavelength']
             instrument_group = f['/entry/instrument']

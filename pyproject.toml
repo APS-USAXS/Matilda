@@ -14,7 +14,7 @@ readme = "README.md"
 authors = [
     { name = "Jan Ilavsky", email = "ilavsky@anl.gov" },
 ]
-license = { file = "LICENSE" }
+# license = { file = "LICENSE" }
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -24,7 +24,7 @@ classifiers = [
 
 dependencies = [
     "h5py",
-    "matplotlib"
+    "matplotlib",
     "netcdf4",
     "numpy",
     "pandas",

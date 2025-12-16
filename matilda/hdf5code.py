@@ -490,7 +490,21 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
                             'intervals', 'VToFFactor',
                             'upd_amp_change_mask_time0','upd_amp_change_mask_time1','upd_amp_change_mask_time2','upd_amp_change_mask_time3','upd_amp_change_mask_time4',
                         ]
-            metadata_group = f['/entry/metadata']
+            # Prefer the "classic" location, but fall back to the Bluesky one.
+            metadata_group = None
+            for md_path in (
+                    "/entry/metadata",
+                    "/entry/instrument/bluesky/metadata",
+            ):
+                if md_path in f:
+                    metadata_group = f[md_path]
+                    break
+            if metadata_group is None:
+                raise KeyError(
+                    f"Could not find metadata group in {filename}. "
+                    "Tried: /entry/metadata and /entry/instrument/bluesky/metadata"
+                )
+
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
             # we need this key to be there also... COpy of the other one. 

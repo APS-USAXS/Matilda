@@ -510,9 +510,9 @@ if __name__ == "__main__":
     Samples = []
 
     # "\\Mac\Home\Desktop\TestData\uascan"
-    Sample = processStepscan("//Mac/Home/Desktop/TestData/uascan", "Good24hNP_0052.h5", blankPath="/Mac/Home/Desktop/TestData/uascan", blankFilename="Dow_blank_0040.h5", recalculateAllData=True)
+    Sample = processStepscan("/Users/ilavsky/Desktop/Test440", "T07_04_440_4min_1025.h5", blankPath="/Users/ilavsky/Desktop/Test440", blankFilename="center_BLANK_1022.h5", recalculateAllData=True)
     Samples.append(Sample)
-    plotUSAXSResults(Samples, "//Mac/Home/Desktop/TestData/uascan", isFlyscan=False)
+    plotUSAXSResults(Samples, "/Users/ilavsky/Desktop/Test440", isFlyscan=False)
     #Sample = reduceStepScanToQR("/home/parallels/Github/Matilda/TestData","USAXS_step.h5")
    # Sample = reduceStepScanToQR(r"C:\Users\ilavsky\Documents\GitHub\Matilda\TestData","USAXS_step.h5")
     #Sample["RawData"]=ImportStepScan("/home/parallels/Github/Matilda","USAXS_step.h5")

@@ -205,7 +205,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #returns last scan which conatins case independent "water blank" in name
     #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
     #returns last scan which conatisn case independet "water blank" in name
-
+    #print(uri)
     try:
         r = requests.get(uri).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 

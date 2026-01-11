@@ -1,0 +1,985 @@
+2025-12-16 09:35:43 - INFO - New round of processing started at : 2025-12-16 09:35:43.862104
+2025-12-16 09:35:43 - INFO - Processing the Flyscans
+2025-12-16 09:35:43 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:35:43 - INFO - No new Flyscan data found
+2025-12-16 09:35:43 - INFO - Processing the Step scans
+2025-12-16 09:35:43 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:35:44 - INFO - No new Step scans data found
+2025-12-16 09:35:44 - INFO - Processing the SAXS
+2025-12-16 09:35:44 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:35:44 - INFO - No new SAXS data found
+2025-12-16 09:35:44 - INFO - Processing the WAXS
+2025-12-16 09:35:44 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:35:44 - INFO - No new WAXS data found
+2025-12-16 09:35:44 - INFO - Sleeping for 15 seconds
+2025-12-16 09:35:59 - INFO - New round of processing started at : 2025-12-16 09:35:59.261930
+2025-12-16 09:35:59 - INFO - Processing the Flyscans
+2025-12-16 09:35:59 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:35:59 - INFO - No new Flyscan data found
+2025-12-16 09:35:59 - INFO - Processing the Step scans
+2025-12-16 09:35:59 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:35:59 - INFO - No new Step scans data found
+2025-12-16 09:35:59 - INFO - Processing the SAXS
+2025-12-16 09:35:59 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:35:59 - INFO - No new SAXS data found
+2025-12-16 09:35:59 - INFO - Processing the WAXS
+2025-12-16 09:35:59 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:35:59 - INFO - No new WAXS data found
+2025-12-16 09:35:59 - INFO - Sleeping for 15 seconds
+2025-12-16 09:36:14 - INFO - New round of processing started at : 2025-12-16 09:36:14.673887
+2025-12-16 09:36:14 - INFO - Processing the Flyscans
+2025-12-16 09:36:14 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:36:14 - INFO - No new Flyscan data found
+2025-12-16 09:36:14 - INFO - Processing the Step scans
+2025-12-16 09:36:14 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:36:14 - INFO - No new Step scans data found
+2025-12-16 09:36:14 - INFO - Processing the SAXS
+2025-12-16 09:36:14 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:14 - INFO - No new SAXS data found
+2025-12-16 09:36:14 - INFO - Processing the WAXS
+2025-12-16 09:36:15 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:15 - INFO - No new WAXS data found
+2025-12-16 09:36:15 - INFO - Sleeping for 15 seconds
+2025-12-16 09:36:30 - INFO - New round of processing started at : 2025-12-16 09:36:30.088565
+2025-12-16 09:36:30 - INFO - Processing the Flyscans
+2025-12-16 09:36:30 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:36:30 - INFO - No new Flyscan data found
+2025-12-16 09:36:30 - INFO - Processing the Step scans
+2025-12-16 09:36:30 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:36:30 - INFO - No new Step scans data found
+2025-12-16 09:36:30 - INFO - Processing the SAXS
+2025-12-16 09:36:30 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:30 - INFO - No new SAXS data found
+2025-12-16 09:36:30 - INFO - Processing the WAXS
+2025-12-16 09:36:30 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:30 - INFO - No new WAXS data found
+2025-12-16 09:36:30 - INFO - Sleeping for 15 seconds
+2025-12-16 09:36:45 - INFO - New round of processing started at : 2025-12-16 09:36:45.501447
+2025-12-16 09:36:45 - INFO - Processing the Flyscans
+2025-12-16 09:36:45 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:36:45 - INFO - No new Flyscan data found
+2025-12-16 09:36:45 - INFO - Processing the Step scans
+2025-12-16 09:36:45 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:36:45 - INFO - No new Step scans data found
+2025-12-16 09:36:45 - INFO - Processing the SAXS
+2025-12-16 09:36:45 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:45 - INFO - No new SAXS data found
+2025-12-16 09:36:45 - INFO - Processing the WAXS
+2025-12-16 09:36:45 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:36:45 - INFO - No new WAXS data found
+2025-12-16 09:36:45 - INFO - Sleeping for 15 seconds
+2025-12-16 09:37:00 - INFO - New round of processing started at : 2025-12-16 09:37:00.903371
+2025-12-16 09:37:00 - INFO - Processing the Flyscans
+2025-12-16 09:37:00 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:37:00 - INFO - No new Flyscan data found
+2025-12-16 09:37:00 - INFO - Processing the Step scans
+2025-12-16 09:37:01 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:37:01 - INFO - No new Step scans data found
+2025-12-16 09:37:01 - INFO - Processing the SAXS
+2025-12-16 09:37:01 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:01 - INFO - No new SAXS data found
+2025-12-16 09:37:01 - INFO - Processing the WAXS
+2025-12-16 09:37:01 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:01 - INFO - No new WAXS data found
+2025-12-16 09:37:01 - INFO - Sleeping for 15 seconds
+2025-12-16 09:37:16 - INFO - New round of processing started at : 2025-12-16 09:37:16.424172
+2025-12-16 09:37:16 - INFO - Processing the Flyscans
+2025-12-16 09:37:16 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:37:16 - INFO - No new Flyscan data found
+2025-12-16 09:37:16 - INFO - Processing the Step scans
+2025-12-16 09:37:16 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:37:16 - INFO - No new Step scans data found
+2025-12-16 09:37:16 - INFO - Processing the SAXS
+2025-12-16 09:37:16 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:16 - INFO - No new SAXS data found
+2025-12-16 09:37:16 - INFO - Processing the WAXS
+2025-12-16 09:37:16 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:16 - INFO - No new WAXS data found
+2025-12-16 09:37:16 - INFO - Sleeping for 15 seconds
+2025-12-16 09:37:31 - INFO - New round of processing started at : 2025-12-16 09:37:31.832518
+2025-12-16 09:37:31 - INFO - Processing the Flyscans
+2025-12-16 09:37:31 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:37:31 - INFO - No new Flyscan data found
+2025-12-16 09:37:31 - INFO - Processing the Step scans
+2025-12-16 09:37:31 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:37:31 - INFO - No new Step scans data found
+2025-12-16 09:37:31 - INFO - Processing the SAXS
+2025-12-16 09:37:32 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:32 - INFO - No new SAXS data found
+2025-12-16 09:37:32 - INFO - Processing the WAXS
+2025-12-16 09:37:32 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:32 - INFO - No new WAXS data found
+2025-12-16 09:37:32 - INFO - Sleeping for 15 seconds
+2025-12-16 09:37:47 - INFO - New round of processing started at : 2025-12-16 09:37:47.857416
+2025-12-16 09:37:47 - INFO - Processing the Flyscans
+2025-12-16 09:37:47 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:37:47 - INFO - No new Flyscan data found
+2025-12-16 09:37:47 - INFO - Processing the Step scans
+2025-12-16 09:37:48 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:37:48 - INFO - No new Step scans data found
+2025-12-16 09:37:48 - INFO - Processing the SAXS
+2025-12-16 09:37:48 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:48 - INFO - No new SAXS data found
+2025-12-16 09:37:48 - INFO - Processing the WAXS
+2025-12-16 09:37:48 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:37:48 - INFO - No new WAXS data found
+2025-12-16 09:37:48 - INFO - Sleeping for 15 seconds
+2025-12-16 09:38:03 - INFO - New round of processing started at : 2025-12-16 09:38:03.433874
+2025-12-16 09:38:03 - INFO - Processing the Flyscans
+2025-12-16 09:38:03 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:38:03 - INFO - No new Flyscan data found
+2025-12-16 09:38:03 - INFO - Processing the Step scans
+2025-12-16 09:38:03 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:38:03 - INFO - No new Step scans data found
+2025-12-16 09:38:03 - INFO - Processing the SAXS
+2025-12-16 09:38:03 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:03 - INFO - No new SAXS data found
+2025-12-16 09:38:03 - INFO - Processing the WAXS
+2025-12-16 09:38:03 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:03 - INFO - No new WAXS data found
+2025-12-16 09:38:03 - INFO - Sleeping for 15 seconds
+2025-12-16 09:38:18 - INFO - New round of processing started at : 2025-12-16 09:38:18.849939
+2025-12-16 09:38:18 - INFO - Processing the Flyscans
+2025-12-16 09:38:18 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:38:18 - INFO - No new Flyscan data found
+2025-12-16 09:38:18 - INFO - Processing the Step scans
+2025-12-16 09:38:18 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:38:19 - INFO - No new Step scans data found
+2025-12-16 09:38:19 - INFO - Processing the SAXS
+2025-12-16 09:38:19 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:19 - INFO - No new SAXS data found
+2025-12-16 09:38:19 - INFO - Processing the WAXS
+2025-12-16 09:38:19 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:19 - INFO - No new WAXS data found
+2025-12-16 09:38:19 - INFO - Sleeping for 15 seconds
+2025-12-16 09:38:34 - INFO - New round of processing started at : 2025-12-16 09:38:34.284111
+2025-12-16 09:38:34 - INFO - Processing the Flyscans
+2025-12-16 09:38:34 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:38:34 - INFO - No new Flyscan data found
+2025-12-16 09:38:34 - INFO - Processing the Step scans
+2025-12-16 09:38:34 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:38:34 - INFO - No new Step scans data found
+2025-12-16 09:38:34 - INFO - Processing the SAXS
+2025-12-16 09:38:34 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:34 - INFO - No new SAXS data found
+2025-12-16 09:38:34 - INFO - Processing the WAXS
+2025-12-16 09:38:34 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:34 - INFO - No new WAXS data found
+2025-12-16 09:38:34 - INFO - Sleeping for 15 seconds
+2025-12-16 09:38:49 - INFO - New round of processing started at : 2025-12-16 09:38:49.710932
+2025-12-16 09:38:49 - INFO - Processing the Flyscans
+2025-12-16 09:38:49 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:38:49 - INFO - No new Flyscan data found
+2025-12-16 09:38:49 - INFO - Processing the Step scans
+2025-12-16 09:38:49 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:38:49 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:38:49 - INFO - No new Step scans data found
+2025-12-16 09:38:49 - INFO - Processing the SAXS
+2025-12-16 09:38:50 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:50 - INFO - No new SAXS data found
+2025-12-16 09:38:50 - INFO - Processing the WAXS
+2025-12-16 09:38:50 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:38:50 - INFO - No new WAXS data found
+2025-12-16 09:38:50 - INFO - Sleeping for 15 seconds
+2025-12-16 09:39:05 - INFO - New round of processing started at : 2025-12-16 09:39:05.166490
+2025-12-16 09:39:05 - INFO - Processing the Flyscans
+2025-12-16 09:39:05 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:39:05 - INFO - No new Flyscan data found
+2025-12-16 09:39:05 - INFO - Processing the Step scans
+2025-12-16 09:39:05 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:39:05 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:39:05 - INFO - No new Step scans data found
+2025-12-16 09:39:05 - INFO - Processing the SAXS
+2025-12-16 09:39:05 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:05 - INFO - No new SAXS data found
+2025-12-16 09:39:05 - INFO - Processing the WAXS
+2025-12-16 09:39:05 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:05 - INFO - No new WAXS data found
+2025-12-16 09:39:05 - INFO - Sleeping for 15 seconds
+2025-12-16 09:39:20 - INFO - New round of processing started at : 2025-12-16 09:39:20.644405
+2025-12-16 09:39:20 - INFO - Processing the Flyscans
+2025-12-16 09:39:20 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:39:20 - INFO - No new Flyscan data found
+2025-12-16 09:39:20 - INFO - Processing the Step scans
+2025-12-16 09:39:20 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:39:20 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:39:20 - INFO - No new Step scans data found
+2025-12-16 09:39:20 - INFO - Processing the SAXS
+2025-12-16 09:39:20 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:20 - INFO - No new SAXS data found
+2025-12-16 09:39:20 - INFO - Processing the WAXS
+2025-12-16 09:39:21 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:21 - INFO - No new WAXS data found
+2025-12-16 09:39:21 - INFO - Sleeping for 15 seconds
+2025-12-16 09:39:36 - INFO - New round of processing started at : 2025-12-16 09:39:36.092663
+2025-12-16 09:39:36 - INFO - Processing the Flyscans
+2025-12-16 09:39:36 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:39:36 - INFO - No new Flyscan data found
+2025-12-16 09:39:36 - INFO - Processing the Step scans
+2025-12-16 09:39:36 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:39:36 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:39:36 - INFO - No new Step scans data found
+2025-12-16 09:39:36 - INFO - Processing the SAXS
+2025-12-16 09:39:36 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:36 - INFO - No new SAXS data found
+2025-12-16 09:39:36 - INFO - Processing the WAXS
+2025-12-16 09:39:36 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:36 - INFO - No new WAXS data found
+2025-12-16 09:39:36 - INFO - Sleeping for 15 seconds
+2025-12-16 09:39:51 - INFO - New round of processing started at : 2025-12-16 09:39:51.544181
+2025-12-16 09:39:51 - INFO - Processing the Flyscans
+2025-12-16 09:39:51 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:39:51 - INFO - No new Flyscan data found
+2025-12-16 09:39:51 - INFO - Processing the Step scans
+2025-12-16 09:39:51 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:39:51 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:39:51 - INFO - No new Step scans data found
+2025-12-16 09:39:51 - INFO - Processing the SAXS
+2025-12-16 09:39:51 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:51 - INFO - No new SAXS data found
+2025-12-16 09:39:51 - INFO - Processing the WAXS
+2025-12-16 09:39:51 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:39:51 - INFO - No new WAXS data found
+2025-12-16 09:39:51 - INFO - Sleeping for 15 seconds
+2025-12-16 09:40:06 - INFO - New round of processing started at : 2025-12-16 09:40:06.990595
+2025-12-16 09:40:06 - INFO - Processing the Flyscans
+2025-12-16 09:40:07 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:40:07 - INFO - No new Flyscan data found
+2025-12-16 09:40:07 - INFO - Processing the Step scans
+2025-12-16 09:40:07 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:40:07 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:40:07 - INFO - No new Step scans data found
+2025-12-16 09:40:07 - INFO - Processing the SAXS
+2025-12-16 09:40:07 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:07 - INFO - No new SAXS data found
+2025-12-16 09:40:07 - INFO - Processing the WAXS
+2025-12-16 09:40:07 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:07 - INFO - No new WAXS data found
+2025-12-16 09:40:07 - INFO - Sleeping for 15 seconds
+2025-12-16 09:40:22 - INFO - New round of processing started at : 2025-12-16 09:40:22.429236
+2025-12-16 09:40:22 - INFO - Processing the Flyscans
+2025-12-16 09:40:22 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:40:22 - INFO - No new Flyscan data found
+2025-12-16 09:40:22 - INFO - Processing the Step scans
+2025-12-16 09:40:22 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:40:22 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:40:22 - INFO - No new Step scans data found
+2025-12-16 09:40:22 - INFO - Processing the SAXS
+2025-12-16 09:40:22 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:22 - INFO - No new SAXS data found
+2025-12-16 09:40:22 - INFO - Processing the WAXS
+2025-12-16 09:40:22 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:22 - INFO - No new WAXS data found
+2025-12-16 09:40:22 - INFO - Sleeping for 15 seconds
+2025-12-16 09:40:37 - INFO - New round of processing started at : 2025-12-16 09:40:37.849161
+2025-12-16 09:40:37 - INFO - Processing the Flyscans
+2025-12-16 09:40:37 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:40:37 - INFO - No new Flyscan data found
+2025-12-16 09:40:37 - INFO - Processing the Step scans
+2025-12-16 09:40:37 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:40:38 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:40:38 - INFO - No new Step scans data found
+2025-12-16 09:40:38 - INFO - Processing the SAXS
+2025-12-16 09:40:38 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:38 - INFO - No new SAXS data found
+2025-12-16 09:40:38 - INFO - Processing the WAXS
+2025-12-16 09:40:38 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:38 - INFO - No new WAXS data found
+2025-12-16 09:40:38 - INFO - Sleeping for 15 seconds
+2025-12-16 09:40:53 - INFO - New round of processing started at : 2025-12-16 09:40:53.325777
+2025-12-16 09:40:53 - INFO - Processing the Flyscans
+2025-12-16 09:40:53 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:40:53 - INFO - No new Flyscan data found
+2025-12-16 09:40:53 - INFO - Processing the Step scans
+2025-12-16 09:40:53 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:40:53 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:40:53 - INFO - No new Step scans data found
+2025-12-16 09:40:53 - INFO - Processing the SAXS
+2025-12-16 09:40:53 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:53 - INFO - No new SAXS data found
+2025-12-16 09:40:53 - INFO - Processing the WAXS
+2025-12-16 09:40:53 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:40:53 - INFO - No new WAXS data found
+2025-12-16 09:40:53 - INFO - Sleeping for 15 seconds
+2025-12-16 09:41:08 - INFO - New round of processing started at : 2025-12-16 09:41:08.749611
+2025-12-16 09:41:08 - INFO - Processing the Flyscans
+2025-12-16 09:41:08 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:41:08 - INFO - No new Flyscan data found
+2025-12-16 09:41:08 - INFO - Processing the Step scans
+2025-12-16 09:41:08 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:41:08 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:08 - INFO - No new Step scans data found
+2025-12-16 09:41:08 - INFO - Processing the SAXS
+2025-12-16 09:41:09 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:09 - INFO - No new SAXS data found
+2025-12-16 09:41:09 - INFO - Processing the WAXS
+2025-12-16 09:41:09 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:09 - INFO - No new WAXS data found
+2025-12-16 09:41:09 - INFO - Sleeping for 15 seconds
+2025-12-16 09:41:24 - INFO - New round of processing started at : 2025-12-16 09:41:24.254282
+2025-12-16 09:41:24 - INFO - Processing the Flyscans
+2025-12-16 09:41:24 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:41:24 - INFO - No new Flyscan data found
+2025-12-16 09:41:24 - INFO - Processing the Step scans
+2025-12-16 09:41:24 - INFO - Skipping unfinished/aborted scan: 787ef55b-68f6-4e2c-8b3d-035555f188af of type : uascan
+2025-12-16 09:41:24 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:24 - INFO - No new Step scans data found
+2025-12-16 09:41:24 - INFO - Processing the SAXS
+2025-12-16 09:41:24 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:24 - INFO - No new SAXS data found
+2025-12-16 09:41:24 - INFO - Processing the WAXS
+2025-12-16 09:41:24 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:24 - INFO - No new WAXS data found
+2025-12-16 09:41:24 - INFO - Sleeping for 15 seconds
+2025-12-16 09:41:39 - INFO - New round of processing started at : 2025-12-16 09:41:39.793424
+2025-12-16 09:41:39 - INFO - Processing the Flyscans
+2025-12-16 09:41:39 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:41:39 - INFO - No new Flyscan data found
+2025-12-16 09:41:39 - INFO - Processing the Step scans
+2025-12-16 09:41:39 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:39 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:39 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:39 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:39 - INFO - Processing of Step scans with blanks
+2025-12-16 09:41:40 - INFO - Found blank for AirBlank_20keV440_step_0010.h5: AirBlank_20keV440_step_0008.h5 (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs
+2025-12-16 09:41:40 - INFO - Found blank for AirBlank_20keV440_step_0010.h5 , blank name : AirBlank_20keV440_step_0008.h5
+2025-12-16 09:41:40 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename AirBlank_20keV440_step_0010.h5, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, blank filename AirBlank_20keV440_step_0008.h5
+2025-12-16 09:41:40 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs/AirBlank_20keV440_step_0010.h5
+2025-12-16 09:41:40 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.h5. 
+2025-12-16 09:41:40 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.h5
+2025-12-16 09:41:40 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.h5: AirBlank_20keV440_step_0008.h5 (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs
+2025-12-16 09:41:40 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.h5 , blank name : AirBlank_20keV440_step_0008.h5
+2025-12-16 09:41:40 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename GC_SRM3600_20keV440_step_0009.h5, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, blank filename AirBlank_20keV440_step_0008.h5
+2025-12-16 09:41:40 - ERROR - Error processing scan GC_SRM3600_20keV440_step_0009.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 221, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 78, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-12-16 09:41:40 - WARNING - No suitable blank found for sample AirBlank_20keV440_step_0008.h5 (num: 8) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs'.
+2025-12-16 09:41:40 - INFO - Found blank for AirBlank_20keV440_step_0008.h5 , blank name : None
+2025-12-16 09:41:40 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename AirBlank_20keV440_step_0008.h5, blank path None, blank filename None
+2025-12-16 09:41:41 - ERROR - Error processing scan AirBlank_20keV440_step_0008.h5: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 221, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 78, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 527, in readMyNXcanSAS
+    metadata_group = f['/entry/Metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+2025-12-16 09:41:41 - INFO - Got 1 USAXS data sets to plot
+2025-12-16 09:41:41 - INFO - Processing the SAXS
+2025-12-16 09:41:41 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:41 - INFO - No new SAXS data found
+2025-12-16 09:41:41 - INFO - Processing the WAXS
+2025-12-16 09:41:41 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:41 - INFO - No new WAXS data found
+2025-12-16 09:41:41 - INFO - Sleeping for 15 seconds
+2025-12-16 09:41:56 - INFO - New round of processing started at : 2025-12-16 09:41:56.990210
+2025-12-16 09:41:56 - INFO - Processing the Flyscans
+2025-12-16 09:41:57 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:41:57 - INFO - No new Flyscan data found
+2025-12-16 09:41:57 - INFO - Processing the Step scans
+2025-12-16 09:41:57 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:41:57 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:41:57 - INFO - No new Step scans data found
+2025-12-16 09:41:57 - INFO - Processing the SAXS
+2025-12-16 09:41:57 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:57 - INFO - No new SAXS data found
+2025-12-16 09:41:57 - INFO - Processing the WAXS
+2025-12-16 09:41:57 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:41:57 - INFO - No new WAXS data found
+2025-12-16 09:41:57 - INFO - Sleeping for 15 seconds
+2025-12-16 09:42:12 - INFO - New round of processing started at : 2025-12-16 09:42:12.466433
+2025-12-16 09:42:12 - INFO - Processing the Flyscans
+2025-12-16 09:42:12 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:42:12 - INFO - No new Flyscan data found
+2025-12-16 09:42:12 - INFO - Processing the Step scans
+2025-12-16 09:42:12 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:42:12 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:42:12 - INFO - No new Step scans data found
+2025-12-16 09:42:12 - INFO - Processing the SAXS
+2025-12-16 09:42:12 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:12 - INFO - No new SAXS data found
+2025-12-16 09:42:12 - INFO - Processing the WAXS
+2025-12-16 09:42:12 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:12 - INFO - No new WAXS data found
+2025-12-16 09:42:12 - INFO - Sleeping for 15 seconds
+2025-12-16 09:42:27 - INFO - New round of processing started at : 2025-12-16 09:42:27.959180
+2025-12-16 09:42:27 - INFO - Processing the Flyscans
+2025-12-16 09:42:28 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:42:28 - INFO - No new Flyscan data found
+2025-12-16 09:42:28 - INFO - Processing the Step scans
+2025-12-16 09:42:28 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:42:28 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:42:28 - INFO - No new Step scans data found
+2025-12-16 09:42:28 - INFO - Processing the SAXS
+2025-12-16 09:42:28 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:28 - INFO - No new SAXS data found
+2025-12-16 09:42:28 - INFO - Processing the WAXS
+2025-12-16 09:42:28 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:28 - INFO - No new WAXS data found
+2025-12-16 09:42:28 - INFO - Sleeping for 15 seconds
+2025-12-16 09:42:43 - INFO - New round of processing started at : 2025-12-16 09:42:43.413955
+2025-12-16 09:42:43 - INFO - Processing the Flyscans
+2025-12-16 09:42:43 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:42:43 - INFO - No new Flyscan data found
+2025-12-16 09:42:43 - INFO - Processing the Step scans
+2025-12-16 09:42:43 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:42:43 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:42:43 - INFO - No new Step scans data found
+2025-12-16 09:42:43 - INFO - Processing the SAXS
+2025-12-16 09:42:43 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:43 - INFO - No new SAXS data found
+2025-12-16 09:42:43 - INFO - Processing the WAXS
+2025-12-16 09:42:43 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:43 - INFO - No new WAXS data found
+2025-12-16 09:42:43 - INFO - Sleeping for 15 seconds
+2025-12-16 09:42:58 - INFO - New round of processing started at : 2025-12-16 09:42:58.896738
+2025-12-16 09:42:58 - INFO - Processing the Flyscans
+2025-12-16 09:42:59 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:42:59 - INFO - No new Flyscan data found
+2025-12-16 09:42:59 - INFO - Processing the Step scans
+2025-12-16 09:42:59 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:42:59 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:42:59 - INFO - No new Step scans data found
+2025-12-16 09:42:59 - INFO - Processing the SAXS
+2025-12-16 09:42:59 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:59 - INFO - No new SAXS data found
+2025-12-16 09:42:59 - INFO - Processing the WAXS
+2025-12-16 09:42:59 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:42:59 - INFO - No new WAXS data found
+2025-12-16 09:42:59 - INFO - Sleeping for 15 seconds
+2025-12-16 09:43:14 - INFO - New round of processing started at : 2025-12-16 09:43:14.445630
+2025-12-16 09:43:14 - INFO - Processing the Flyscans
+2025-12-16 09:43:14 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:43:14 - INFO - No new Flyscan data found
+2025-12-16 09:43:14 - INFO - Processing the Step scans
+2025-12-16 09:43:14 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:43:14 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:43:14 - INFO - No new Step scans data found
+2025-12-16 09:43:14 - INFO - Processing the SAXS
+2025-12-16 09:43:14 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:14 - INFO - No new SAXS data found
+2025-12-16 09:43:14 - INFO - Processing the WAXS
+2025-12-16 09:43:14 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:14 - INFO - No new WAXS data found
+2025-12-16 09:43:14 - INFO - Sleeping for 15 seconds
+2025-12-16 09:43:29 - INFO - New round of processing started at : 2025-12-16 09:43:29.910270
+2025-12-16 09:43:29 - INFO - Processing the Flyscans
+2025-12-16 09:43:30 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:43:30 - INFO - No new Flyscan data found
+2025-12-16 09:43:30 - INFO - Processing the Step scans
+2025-12-16 09:43:30 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:43:30 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:43:30 - INFO - No new Step scans data found
+2025-12-16 09:43:30 - INFO - Processing the SAXS
+2025-12-16 09:43:30 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:30 - INFO - No new SAXS data found
+2025-12-16 09:43:30 - INFO - Processing the WAXS
+2025-12-16 09:43:30 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:30 - INFO - No new WAXS data found
+2025-12-16 09:43:30 - INFO - Sleeping for 15 seconds
+2025-12-16 09:43:45 - INFO - New round of processing started at : 2025-12-16 09:43:45.386940
+2025-12-16 09:43:45 - INFO - Processing the Flyscans
+2025-12-16 09:43:45 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:43:45 - INFO - No new Flyscan data found
+2025-12-16 09:43:45 - INFO - Processing the Step scans
+2025-12-16 09:43:45 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:43:45 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:43:45 - INFO - No new Step scans data found
+2025-12-16 09:43:45 - INFO - Processing the SAXS
+2025-12-16 09:43:45 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:45 - INFO - No new SAXS data found
+2025-12-16 09:43:45 - INFO - Processing the WAXS
+2025-12-16 09:43:45 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:43:45 - INFO - No new WAXS data found
+2025-12-16 09:43:45 - INFO - Sleeping for 15 seconds
+2025-12-16 09:44:00 - INFO - New round of processing started at : 2025-12-16 09:44:00.840258
+2025-12-16 09:44:00 - INFO - Processing the Flyscans
+2025-12-16 09:44:00 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:44:00 - INFO - No new Flyscan data found
+2025-12-16 09:44:00 - INFO - Processing the Step scans
+2025-12-16 09:44:00 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:44:01 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:01 - INFO - No new Step scans data found
+2025-12-16 09:44:01 - INFO - Processing the SAXS
+2025-12-16 09:44:01 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:01 - INFO - No new SAXS data found
+2025-12-16 09:44:01 - INFO - Processing the WAXS
+2025-12-16 09:44:01 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:01 - INFO - No new WAXS data found
+2025-12-16 09:44:01 - INFO - Sleeping for 15 seconds
+2025-12-16 09:44:16 - INFO - New round of processing started at : 2025-12-16 09:44:16.300481
+2025-12-16 09:44:16 - INFO - Processing the Flyscans
+2025-12-16 09:44:16 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:44:16 - INFO - No new Flyscan data found
+2025-12-16 09:44:16 - INFO - Processing the Step scans
+2025-12-16 09:44:16 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:44:16 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:16 - INFO - No new Step scans data found
+2025-12-16 09:44:16 - INFO - Processing the SAXS
+2025-12-16 09:44:16 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:16 - INFO - No new SAXS data found
+2025-12-16 09:44:16 - INFO - Processing the WAXS
+2025-12-16 09:44:16 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:16 - INFO - No new WAXS data found
+2025-12-16 09:44:16 - INFO - Sleeping for 15 seconds
+2025-12-16 09:44:31 - INFO - New round of processing started at : 2025-12-16 09:44:31.758310
+2025-12-16 09:44:31 - INFO - Processing the Flyscans
+2025-12-16 09:44:31 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:44:31 - INFO - No new Flyscan data found
+2025-12-16 09:44:31 - INFO - Processing the Step scans
+2025-12-16 09:44:31 - INFO - Skipping unfinished/aborted scan: 3ec9928a-ea41-430b-aa90-0110847323e5 of type : uascan
+2025-12-16 09:44:31 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:31 - INFO - No new Step scans data found
+2025-12-16 09:44:31 - INFO - Processing the SAXS
+2025-12-16 09:44:32 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:32 - INFO - No new SAXS data found
+2025-12-16 09:44:32 - INFO - Processing the WAXS
+2025-12-16 09:44:32 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:32 - INFO - No new WAXS data found
+2025-12-16 09:44:32 - INFO - Sleeping for 15 seconds
+2025-12-16 09:44:47 - INFO - New round of processing started at : 2025-12-16 09:44:47.367591
+2025-12-16 09:44:47 - INFO - Processing the Flyscans
+2025-12-16 09:44:47 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:44:47 - INFO - No new Flyscan data found
+2025-12-16 09:44:47 - INFO - Processing the Step scans
+2025-12-16 09:44:47 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:47 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:47 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:47 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:44:47 - INFO - Processing of Step scans with blanks
+2025-12-16 09:44:47 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.h5: AirBlank_20keV440_step_0010.h5 (num: 10) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs
+2025-12-16 09:44:47 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.h5 , blank name : AirBlank_20keV440_step_0010.h5
+2025-12-16 09:44:47 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename GC_SRM3600_20keV440_step_0011.h5, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, blank filename AirBlank_20keV440_step_0010.h5
+2025-12-16 09:44:47 - INFO - Appended new Blank data to 'entry/blankData' in AirBlank_20keV440_step_0010.h5.
+2025-12-16 09:44:47 - INFO - Desmearing convergence reached after 10 iterations. Final avg error: 256305.7772 (target < 0.5). Diff: 0.0140 (target < 0.02).
+2025-12-16 09:44:47 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs/GC_SRM3600_20keV440_step_0011.h5
+2025-12-16 09:44:47 - INFO - Wrote Desmeared NXcanSAS group for file GC_SRM3600_20keV440_step_0011.h5. 
+2025-12-16 09:44:47 - INFO - Wrote SMR NXcanSAS group for file GC_SRM3600_20keV440_step_0011.h5. 
+2025-12-16 09:44:47 - INFO - Wrote QRS group for file GC_SRM3600_20keV440_step_0011.h5. 
+2025-12-16 09:44:47 - INFO - Wrote Blank data group for file GC_SRM3600_20keV440_step_0011.h5. 
+2025-12-16 09:44:47 - INFO - Wrote NXcanSAS data to file: GC_SRM3600_20keV440_step_0011.h5
+2025-12-16 09:44:47 - INFO - Found blank for AirBlank_20keV440_step_0010.h5: AirBlank_20keV440_step_0008.h5 (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs
+2025-12-16 09:44:47 - INFO - Found blank for AirBlank_20keV440_step_0010.h5 , blank name : AirBlank_20keV440_step_0008.h5
+2025-12-16 09:44:47 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename AirBlank_20keV440_step_0010.h5, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, blank filename AirBlank_20keV440_step_0008.h5
+2025-12-16 09:44:48 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs/AirBlank_20keV440_step_0010.h5
+2025-12-16 09:44:48 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.h5. 
+2025-12-16 09:44:48 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0010.h5. Overwriting.
+2025-12-16 09:44:48 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.h5
+2025-12-16 09:44:48 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.h5: AirBlank_20keV440_step_0008.h5 (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs
+2025-12-16 09:44:48 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.h5 , blank name : AirBlank_20keV440_step_0008.h5
+2025-12-16 09:44:48 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename GC_SRM3600_20keV440_step_0009.h5, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, blank filename AirBlank_20keV440_step_0008.h5
+2025-12-16 09:44:48 - ERROR - Error processing scan GC_SRM3600_20keV440_step_0009.h5: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 221, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 78, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 490, in readMyNXcanSAS
+    metadata_group = f['/entry/metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'metadata' doesn't exist)"
+2025-12-16 09:44:48 - WARNING - No suitable blank found for sample AirBlank_20keV440_step_0008.h5 (num: 8) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs'.
+2025-12-16 09:44:48 - INFO - Found blank for AirBlank_20keV440_step_0008.h5 , blank name : None
+2025-12-16 09:44:48 - INFO - Stepscan data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs, filename AirBlank_20keV440_step_0008.h5, blank path None, blank filename None
+2025-12-16 09:44:49 - ERROR - Error processing scan AirBlank_20keV440_step_0008.h5: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+Traceback (most recent call last):
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/matilda.py", line 221, in processStepscans
+    result = processStepscan(scan_path, scan_filename,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/convertUSAXS.py", line 78, in processStepscan
+    Sample = readMyNXcanSAS(path, filename)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/beams11/USAXS/Apps/Matilda/matilda/hdf5code.py", line 527, in readMyNXcanSAS
+    metadata_group = f['/entry/Metadata']
+                     ~^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "/home/beams/USAXS/.conda/envs/matilda/lib/python3.12/site-packages/h5py/_hl/group.py", line 360, in __getitem__
+    oid = h5o.open(self.id, self._e(name), lapl=self._lapl)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5o.pyx", line 257, in h5py.h5o.open
+KeyError: "Unable to synchronously open object (object 'Metadata' doesn't exist)"
+2025-12-16 09:44:49 - INFO - Got 2 USAXS data sets to plot
+2025-12-16 09:44:50 - INFO - Processing the SAXS
+2025-12-16 09:44:50 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:50 - INFO - No new SAXS data found
+2025-12-16 09:44:50 - INFO - Processing the WAXS
+2025-12-16 09:44:50 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:44:50 - INFO - No new WAXS data found
+2025-12-16 09:44:50 - INFO - Sleeping for 15 seconds
+2025-12-16 09:45:05 - INFO - New round of processing started at : 2025-12-16 09:45:05.769193
+2025-12-16 09:45:05 - INFO - Processing the Flyscans
+2025-12-16 09:45:05 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:45:05 - INFO - No new Flyscan data found
+2025-12-16 09:45:05 - INFO - Processing the Step scans
+2025-12-16 09:45:05 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:45:05 - INFO - No new Step scans data found
+2025-12-16 09:45:05 - INFO - Processing the SAXS
+2025-12-16 09:45:06 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:45:06 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:06 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:45:06 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:06 - INFO - Processing of SAXS/WAXS with blanks
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_step_0010.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:06 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:06 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:06 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.hdf. 
+2025-12-16 09:45:06 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_step_0009.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - Using existing processed data from file GC_SRM3600_20keV440_step_0009.hdf.
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_step_0008.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - Read file :AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:06 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0008.hdf. 
+2025-12-16 09:45:06 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0008.hdf. Overwriting.
+2025-12-16 09:45:06 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_0007.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0007.hdf.
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_0006.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_0006.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_0006.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - Read file :AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:06 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - Wrote QRS group for file AirBlank_20keV440_0006.hdf. 
+2025-12-16 09:45:06 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0006.hdf. Overwriting.
+2025-12-16 09:45:06 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_0005.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0005.hdf.
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_0004.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_20keV440_0004.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_0004.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:06 - INFO - Read file :AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:06 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - Wrote QRS group for file AirBlank_20keV440_0004.hdf. 
+2025-12-16 09:45:06 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0004.hdf. Overwriting.
+2025-12-16 09:45:06 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_0003.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:06 - INFO - Found blank for GC_SRM3600_0003.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_0003.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:06 - INFO - Using existing processed data from file GC_SRM3600_0003.hdf.
+2025-12-16 09:45:06 - WARNING - No suitable blank found for sample AirBlank_0002.hdf (num: 2) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs'.
+2025-12-16 09:45:06 - INFO - Found blank for AirBlank_0002.hdf , blank name : None
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_0002.hdf, blank path None, blank filename None
+2025-12-16 09:45:06 - INFO - Using existing processed data from file AirBlank_0002.hdf.
+2025-12-16 09:45:06 - WARNING - No suitable blank found for sample AgBehenateLaB6_0001.hdf (num: 1) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs'.
+2025-12-16 09:45:06 - INFO - Found blank for AgBehenateLaB6_0001.hdf , blank name : None
+2025-12-16 09:45:06 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AgBehenateLaB6_0001.hdf, blank path None, blank filename None
+2025-12-16 09:45:06 - INFO - Using existing processed data from file AgBehenateLaB6_0001.hdf.
+2025-12-16 09:45:07 - INFO - Processing the WAXS
+2025-12-16 09:45:07 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:45:07 - INFO - No new WAXS data found
+2025-12-16 09:45:07 - INFO - Sleeping for 15 seconds
+2025-12-16 09:45:22 - INFO - New round of processing started at : 2025-12-16 09:45:22.879193
+2025-12-16 09:45:22 - INFO - Processing the Flyscans
+2025-12-16 09:45:22 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:45:22 - INFO - No new Flyscan data found
+2025-12-16 09:45:22 - INFO - Processing the Step scans
+2025-12-16 09:45:23 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:45:23 - INFO - No new Step scans data found
+2025-12-16 09:45:23 - INFO - Processing the SAXS
+2025-12-16 09:45:23 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:23 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:23 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:23 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:23 - INFO - Processing of SAXS/WAXS with blanks
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.hdf: AirBlank_20keV440_step_0010.hdf (num: 10) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.hdf , blank name : AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_step_0011.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - Read file :GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:23 - INFO - Wrote Desmeared NXcanSAS group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:23 - INFO - Wrote QRS group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:23 - INFO - Wrote Blank data group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:23 - INFO - Wrote NXcanSAS data to file: GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_step_0010.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.hdf. 
+2025-12-16 09:45:23 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0010.hdf. Overwriting.
+2025-12-16 09:45:23 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_step_0009.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - Using existing processed data from file GC_SRM3600_20keV440_step_0009.hdf.
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_step_0008.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - Read file :AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0008.hdf. 
+2025-12-16 09:45:23 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0008.hdf. Overwriting.
+2025-12-16 09:45:23 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_0007.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0007.hdf.
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_0006.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_0006.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_0006.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:23 - INFO - Read file :AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:23 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - Wrote QRS group for file AirBlank_20keV440_0006.hdf. 
+2025-12-16 09:45:23 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0006.hdf. Overwriting.
+2025-12-16 09:45:23 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_20keV440_0005.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:23 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0005.hdf.
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_0004.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:23 - INFO - Found blank for AirBlank_20keV440_0004.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:23 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_20keV440_0004.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:23 - INFO - Read file :AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:23 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:24 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs/AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:24 - INFO - Wrote QRS group for file AirBlank_20keV440_0004.hdf. 
+2025-12-16 09:45:24 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0004.hdf. Overwriting.
+2025-12-16 09:45:24 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:24 - INFO - Found blank for GC_SRM3600_0003.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs
+2025-12-16 09:45:24 - INFO - Found blank for GC_SRM3600_0003.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:24 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename GC_SRM3600_0003.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:24 - INFO - Using existing processed data from file GC_SRM3600_0003.hdf.
+2025-12-16 09:45:24 - WARNING - No suitable blank found for sample AirBlank_0002.hdf (num: 2) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs'.
+2025-12-16 09:45:24 - INFO - Found blank for AirBlank_0002.hdf , blank name : None
+2025-12-16 09:45:24 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_saxs, filename AirBlank_0002.hdf, blank path None, blank filename None
+2025-12-16 09:45:24 - INFO - Using existing processed data from file AirBlank_0002.hdf.
+2025-12-16 09:45:24 - INFO - Processing the WAXS
+2025-12-16 09:45:24 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AgBehenateLaB6_0001.hdf']]
+2025-12-16 09:45:24 - INFO - No new WAXS data found
+2025-12-16 09:45:24 - INFO - Sleeping for 15 seconds
+2025-12-16 09:45:39 - INFO - New round of processing started at : 2025-12-16 09:45:39.868702
+2025-12-16 09:45:39 - INFO - Processing the Flyscans
+2025-12-16 09:45:39 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:45:39 - INFO - No new Flyscan data found
+2025-12-16 09:45:39 - INFO - Processing the Step scans
+2025-12-16 09:45:40 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:45:40 - INFO - No new Step scans data found
+2025-12-16 09:45:40 - INFO - Processing the SAXS
+2025-12-16 09:45:40 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:40 - INFO - No new SAXS data found
+2025-12-16 09:45:40 - INFO - Processing the WAXS
+2025-12-16 09:45:40 - INFO - Skipping unfinished/aborted scan: 227aa378-fe54-4a64-ba51-a8715d4a636c of type : WAXS
+2025-12-16 09:45:40 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:40 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:40 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:40 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:40 - INFO - Processing of SAXS/WAXS with blanks
+2025-12-16 09:45:40 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:40 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:40 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_step_0010.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:40 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:40 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:40 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:40 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.hdf. 
+2025-12-16 09:45:40 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:40 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:40 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:40 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_step_0009.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:40 - INFO - Using existing processed data from file GC_SRM3600_20keV440_step_0009.hdf.
+2025-12-16 09:45:40 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:40 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:40 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_step_0008.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:40 - INFO - Read file :AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:41 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:41 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:41 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0008.hdf. 
+2025-12-16 09:45:41 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0008.hdf. Overwriting.
+2025-12-16 09:45:41 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:41 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:41 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:41 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_0007.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:41 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0007.hdf.
+2025-12-16 09:45:41 - INFO - Found blank for AirBlank_20keV440_0006.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:41 - INFO - Found blank for AirBlank_20keV440_0006.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:41 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_0006.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:41 - INFO - Read file :AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:41 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:41 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:41 - INFO - Wrote QRS group for file AirBlank_20keV440_0006.hdf. 
+2025-12-16 09:45:41 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0006.hdf. Overwriting.
+2025-12-16 09:45:41 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:41 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:41 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:41 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_0005.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:41 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0005.hdf.
+2025-12-16 09:45:41 - INFO - Found blank for AirBlank_20keV440_0004.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:41 - INFO - Found blank for AirBlank_20keV440_0004.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:41 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_0004.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:41 - INFO - Read file :AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:41 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:42 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:42 - INFO - Wrote QRS group for file AirBlank_20keV440_0004.hdf. 
+2025-12-16 09:45:42 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0004.hdf. Overwriting.
+2025-12-16 09:45:42 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0004.hdf
+2025-12-16 09:45:42 - INFO - Found blank for GC_SRM3600_0003.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:42 - INFO - Found blank for GC_SRM3600_0003.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:45:42 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_0003.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:45:42 - INFO - Using existing processed data from file GC_SRM3600_0003.hdf.
+2025-12-16 09:45:42 - WARNING - No suitable blank found for sample AirBlank_0002.hdf (num: 2) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs'.
+2025-12-16 09:45:42 - INFO - Found blank for AirBlank_0002.hdf , blank name : None
+2025-12-16 09:45:42 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_0002.hdf, blank path None, blank filename None
+2025-12-16 09:45:42 - INFO - Using existing processed data from file AirBlank_0002.hdf.
+2025-12-16 09:45:42 - INFO - Sleeping for 15 seconds
+2025-12-16 09:45:57 - INFO - New round of processing started at : 2025-12-16 09:45:57.888567
+2025-12-16 09:45:57 - INFO - Processing the Flyscans
+2025-12-16 09:45:57 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:45:57 - INFO - No new Flyscan data found
+2025-12-16 09:45:57 - INFO - Processing the Step scans
+2025-12-16 09:45:58 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:45:58 - INFO - No new Step scans data found
+2025-12-16 09:45:58 - INFO - Processing the SAXS
+2025-12-16 09:45:58 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:58 - INFO - No new SAXS data found
+2025-12-16 09:45:58 - INFO - Processing the WAXS
+2025-12-16 09:45:58 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:58 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:58 - INFO - Got list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:58 - INFO - Got blank list : [['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:45:58 - INFO - Processing of SAXS/WAXS with blanks
+2025-12-16 09:45:58 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.hdf: AirBlank_20keV440_step_0010.hdf (num: 10) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:58 - INFO - Found blank for GC_SRM3600_20keV440_step_0011.hdf , blank name : AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:58 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_step_0011.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:58 - INFO - Read file :GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:58 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:58 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:58 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:59 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:59 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:59 - INFO - Wrote Desmeared NXcanSAS group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:59 - INFO - Wrote QRS group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:59 - INFO - Wrote Blank data group for file GC_SRM3600_20keV440_step_0011.hdf. 
+2025-12-16 09:45:59 - INFO - Wrote NXcanSAS data to file: GC_SRM3600_20keV440_step_0011.hdf
+2025-12-16 09:45:59 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:59 - INFO - Found blank for AirBlank_20keV440_step_0010.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:59 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_step_0010.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:59 - INFO - Read file :AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:59 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:45:59 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:59 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0010.hdf. 
+2025-12-16 09:45:59 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0010.hdf. Overwriting.
+2025-12-16 09:45:59 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0010.hdf
+2025-12-16 09:45:59 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf: AirBlank_20keV440_step_0008.hdf (num: 8) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:59 - INFO - Found blank for GC_SRM3600_20keV440_step_0009.hdf , blank name : AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:59 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_step_0009.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:59 - INFO - Using existing processed data from file GC_SRM3600_20keV440_step_0009.hdf.
+2025-12-16 09:45:59 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:45:59 - INFO - Found blank for AirBlank_20keV440_step_0008.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:59 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_step_0008.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:45:59 - INFO - Read file :AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:45:59 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:46:00 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:46:00 - INFO - Wrote QRS group for file AirBlank_20keV440_step_0008.hdf. 
+2025-12-16 09:46:00 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_step_0008.hdf. Overwriting.
+2025-12-16 09:46:00 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_step_0008.hdf
+2025-12-16 09:46:00 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf: AirBlank_20keV440_0006.hdf (num: 6) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:46:00 - INFO - Found blank for GC_SRM3600_20keV440_0007.hdf , blank name : AirBlank_20keV440_0006.hdf
+2025-12-16 09:46:00 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_0007.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0006.hdf
+2025-12-16 09:46:00 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0007.hdf.
+2025-12-16 09:46:00 - INFO - Found blank for AirBlank_20keV440_0006.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:46:00 - INFO - Found blank for AirBlank_20keV440_0006.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:00 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_0006.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:00 - INFO - Read file :AirBlank_20keV440_0006.hdf
+2025-12-16 09:46:00 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:46:00 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_0006.hdf
+2025-12-16 09:46:00 - INFO - Wrote QRS group for file AirBlank_20keV440_0006.hdf. 
+2025-12-16 09:46:00 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0006.hdf. Overwriting.
+2025-12-16 09:46:00 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0006.hdf
+2025-12-16 09:46:00 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf: AirBlank_20keV440_0004.hdf (num: 4) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:46:00 - INFO - Found blank for GC_SRM3600_20keV440_0005.hdf , blank name : AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:00 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_20keV440_0005.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:00 - INFO - Using existing processed data from file GC_SRM3600_20keV440_0005.hdf.
+2025-12-16 09:46:00 - INFO - Found blank for AirBlank_20keV440_0004.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:46:00 - INFO - Found blank for AirBlank_20keV440_0004.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:46:00 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_20keV440_0004.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:46:00 - INFO - Read file :AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:00 - INFO - AI.integrate1d_ng: Resetting Cython integrator because of first initialization
+2025-12-16 09:46:01 - INFO - Saving NXcanSAS data to /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs/AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:01 - INFO - Wrote QRS group for file AirBlank_20keV440_0004.hdf. 
+2025-12-16 09:46:01 - WARNING - NXcanSAS group entry/QRS_data already exists in file AirBlank_20keV440_0004.hdf. Overwriting.
+2025-12-16 09:46:01 - INFO - Wrote NXcanSAS data to file: AirBlank_20keV440_0004.hdf
+2025-12-16 09:46:01 - INFO - Found blank for GC_SRM3600_0003.hdf: AirBlank_0002.hdf (num: 2) in path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs
+2025-12-16 09:46:01 - INFO - Found blank for GC_SRM3600_0003.hdf , blank name : AirBlank_0002.hdf
+2025-12-16 09:46:01 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename GC_SRM3600_0003.hdf, blank path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, blank filename AirBlank_0002.hdf
+2025-12-16 09:46:01 - INFO - Using existing processed data from file GC_SRM3600_0003.hdf.
+2025-12-16 09:46:01 - WARNING - No suitable blank found for sample AirBlank_0002.hdf (num: 2) in path '/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs'.
+2025-12-16 09:46:01 - INFO - Found blank for AirBlank_0002.hdf , blank name : None
+2025-12-16 09:46:01 - INFO - 2D data processing: path /share1/USAXS_data/2025-12/12_15_setup/data/data_waxs, filename AirBlank_0002.hdf, blank path None, blank filename None
+2025-12-16 09:46:01 - INFO - Using existing processed data from file AirBlank_0002.hdf.
+2025-12-16 09:46:01 - INFO - Sleeping for 15 seconds
+2025-12-16 09:46:16 - INFO - New round of processing started at : 2025-12-16 09:46:16.668838
+2025-12-16 09:46:16 - INFO - Processing the Flyscans
+2025-12-16 09:46:16 - INFO - Plan name: Flyscan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0007.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0006.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_0005.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_0004.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_0003.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_0002.h5']]
+2025-12-16 09:46:16 - INFO - No new Flyscan data found
+2025-12-16 09:46:16 - INFO - Processing the Step scans
+2025-12-16 09:46:16 - INFO - Plan name: uascan, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0011.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0010.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'GC_SRM3600_20keV440_step_0009.h5'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_usaxs', 'AirBlank_20keV440_step_0008.h5']]
+2025-12-16 09:46:16 - INFO - No new Step scans data found
+2025-12-16 09:46:16 - INFO - Processing the SAXS
+2025-12-16 09:46:16 - INFO - Plan name: SAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_saxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:46:16 - INFO - No new SAXS data found
+2025-12-16 09:46:16 - INFO - Processing the WAXS
+2025-12-16 09:46:17 - INFO - Plan name: WAXS, list of scans:[['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0011.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0010.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_step_0009.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_step_0008.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0007.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0006.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_20keV440_0005.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_20keV440_0004.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'GC_SRM3600_0003.hdf'], ['/share1/USAXS_data/2025-12/12_15_setup/data/data_waxs', 'AirBlank_0002.hdf']]
+2025-12-16 09:46:17 - INFO - No new WAXS data found
+2025-12-16 09:46:17 - INFO - Sleeping for 15 seconds

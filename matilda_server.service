@@ -1,0 +1,57 @@
+# systemd --user unit for running a Matilda server (no sudo required)
+#
+# Save this file as:
+#   ~/.config/systemd/user/matilda_server.service
+#
+# How to use (no sudo required):
+#
+#  ========     =============================================
+#  action       command
+#  ========     =============================================
+#  reload       systemctl --user daemon-reload
+#  ---          ---
+#  disable      systemctl --user disable matilda_server
+#  enable       systemctl --user enable matilda_server
+#  logs         journalctl --user -q -f -u matilda_server
+#  restart      systemctl --user restart matilda_server
+#  start        systemctl --user start matilda_server
+#  status       systemctl --user status matilda_server
+#  stop         systemctl --user stop matilda_server
+#  ========     =============================================
+#
+# Important notes and caveats:
+# - This is a per-user service. You do NOT need sudo to install or run it.
+# - systemd user services run while your user session is active. By default they do
+#   NOT continue running after you log out. To allow the service to keep running
+#   after logout ("linger"), an administrator must run:
+#       sudo loginctl enable-linger <your-username>
+#   Check if lingering is enabled: loginctl show-user $USER --property=Linger
+# - Conda: systemd user environment is minimal.
+#     - Source conda's activation script and activate the env (more robust).
+
+[Unit]
+Description=Matilda server on workstation 'usaxscontrol'
+ConditionHost=usaxscontrol.xray.aps.anl.gov
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/beams/USAXS/Apps/Matilda/
+ExecStart=/home/beams/USAXS/Apps/Matilda/serv_matilda.sh
+
+Restart=on-failure
+RestartSec=120
+StartLimitBurst=5
+# StartLimitIntervalSec=600
+StartLimitInterval=600
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+

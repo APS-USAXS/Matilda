@@ -36,8 +36,8 @@ else:
     #server = "localhost"
     server = "usaxscontrol.xray.aps.anl.gov"
 
-port = 8020
-catalog = "usaxs"
+port = 8000
+catalog = "raw"
 TILED_TIMEOUT = 10  # seconds
 
 def tiled_get(

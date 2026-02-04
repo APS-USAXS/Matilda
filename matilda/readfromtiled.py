@@ -94,7 +94,7 @@ def successful_run(uid: Optional[str] = None) -> bool:
         params = {
             "page[offset]": 0,
             "page[limit]": 1,
-            "sort": "-time",
+            "sort": "-metadata.start.time",
         }
         run_info = tiled_get(**params)
         last_run_index = 0  # when sorted by reverse time (params["sort"] value)
@@ -167,10 +167,12 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
             "&filter[eq][condition][key]=title"                                 # filter by title
             f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-            f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            # f"&filter[time_range][condition][timezone]={tz}"                    # time range
+            f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
             f"&select_metadata={select_metadata}"                               # select metadata
@@ -185,7 +187,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
             "&filter[eq][condition][key]=title"                                 # filter by title
             f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
             f"&select_metadata={select_metadata}"                               # select metadata
@@ -237,10 +239,12 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                # f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
                 f"&select_metadata={select_metadata}"                               # select metadata
@@ -256,7 +260,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
                 f"&select_metadata={select_metadata}"                               # select metadata
@@ -278,10 +282,12 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
                 "&filter[regex][condition][key]=hdf5_path"                          # filter by path
                 f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                # f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
                 f"&select_metadata={select_metadata}"                               # select metadata
@@ -299,7 +305,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
                 "&filter[regex][condition][key]=hdf5_path"                          # filter by path
                 f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                "&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
                 f"&select_metadata={select_metadata}"                               # select metadata
@@ -351,10 +357,12 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             #&filter[comparison][condition][operator]=gt&filter[comparison][condition][key]=duration&filter[comparison][condition][value]=0.1
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds - offsetTime
-            f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            # f"&filter[time_range][condition][timezone]={tz}"                    # time range
+            f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
             f"&select_metadata={select_metadata}"                               # select metadata
@@ -369,7 +377,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             #"&filter[contains][condition][exit_status]"                         # filter by exist status key present
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&sort=-time"                                                       # sort by time, -time gives last scans first
+            "&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
             f"&select_metadata={select_metadata}"                               # select metadata

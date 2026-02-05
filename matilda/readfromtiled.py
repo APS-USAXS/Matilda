@@ -157,7 +157,11 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = time.time() - (lastNdays * 86400)
         end_time = time.time()      # current time in seconds
-        tz = "US/Central"
+        # tz = "US/Central"
+        # server works in UTC, no need to provide timezone, but we need to add offset if needed.
+        offset = 6*60*60  # US/Central is UTC-6
+        start_time += offset
+        end_time += offset
         uri = (
             f"http://{server}:{port}"
             "/api/v1/search"
@@ -229,7 +233,11 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
             # if LastNdays is set, then we will ask for data from the last N days
             start_time = time.time() - (lastNdays * 86400)
             end_time = time.time()    #current time in seconds
-            tz = "US/Central"
+            # tz = "US/Central"
+            # server works in UTC, no need to provide timezone, but we need to add offset if needed.
+            offset = 6*60*60  # US/Central is UTC-6
+            start_time += offset
+            end_time += offset
             uri = (
                 f"http://{server}:{port}"
                 "/api/v1/search"
@@ -270,7 +278,11 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
             # if LastNdays is set, then we will ask for data from the last N days
             start_time = time.time() - (lastNdays * 86400)
             end_time = time.time()    #current time in seconds
-            tz = "US/Central"
+            # tz = "US/Central"
+            # server works in UTC, no need to provide timezone, but we need to add offset if needed.
+            offset = 6*60*60  # US/Central is UTC-6
+            start_time += offset
+            end_time += offset            
             uri = (
                 f"http://{server}:{port}"
                 "/api/v1/search"
@@ -341,7 +353,10 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
      #   offsetTime = 95
     # this shifts the querried time by offsetTime seconds to past, providing file flush out the files. 
     end_time = time.time() #- offsetTime
-    tz = "US/Central"
+    # tz = "US/Central"
+    # server works in UTC, no need to provide timezone, but we need to add offset if needed.
+    offset = 6*60*60  # US/Central is UTC-6
+    end_time += offset    
     if LastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = end_time - (LastNdays * 86400)

@@ -31,13 +31,15 @@ def ts_to_iso(time):
 
 current_hostname = socket.gethostname()
 if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-    server = "usaxscontrol.xray.aps.anl.gov"
+    #server = "usaxscontrol.xray.aps.anl.gov"
+    server = "otz"
 else:
     #server = "localhost"
     server = "usaxscontrol.xray.aps.anl.gov"
 
-port = 8000
-catalog = "raw"
+port = 8020
+#catalog = "raw"
+catalog = "usaxs"
 TILED_TIMEOUT = 10  # seconds
 
 select_metadata = ",".join([
@@ -157,11 +159,11 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = time.time() - (lastNdays * 86400)
         end_time = time.time()      # current time in seconds
-        # tz = "US/Central"
+        tz = "US/Central"
         # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-        offset = 6*60*60  # US/Central is UTC-6
-        start_time += offset
-        end_time += offset
+        #offset = 6*60*60  # US/Central is UTC-6
+        #start_time += offset
+        #end_time += offset
         uri = (
             f"http://{server}:{port}"
             "/api/v1/search"
@@ -171,15 +173,16 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
             "&filter[eq][condition][key]=title"                                 # filter by title
             f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-            # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-            # f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            f"&filter[time_range][condition][timezone]={tz}"                    # time range
+            "&sort=-time"                                                        # sort by time, -time gives last scans first
+            #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+            #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            f"&select_metadata={select_metadata}"                               # select metadata
+            f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
     else:
         uri = (
@@ -194,7 +197,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
             "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            f"&select_metadata={select_metadata}"                               # select metadata
+            f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
       
     #logging.info(f"{uri=}")
@@ -211,7 +214,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #returns last scan which conatins case independent "water blank" in name
     #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
     #returns last scan which conatisn case independet "water blank" in name
-    #print(uri)
+    print(uri)
     try:
         r = requests.get(uri).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
@@ -221,7 +224,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
         return ScanList
     except: 
         # url communication failed, happens and should not crash anything.
-        logging.error('Could not get data from tiled server at usaxscontrol.xray.aps.anl.gov')
+        logging.error(f'Could not get data from tiled server at {server}')
         logging.error(f"Failed {uri=}")
         return []
     
@@ -233,11 +236,11 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
             # if LastNdays is set, then we will ask for data from the last N days
             start_time = time.time() - (lastNdays * 86400)
             end_time = time.time()    #current time in seconds
-            # tz = "US/Central"
+            tz = "US/Central"
             # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-            offset = 6*60*60  # US/Central is UTC-6
-            start_time += offset
-            end_time += offset
+            #offset = 6*60*60  # US/Central is UTC-6
+            #start_time += offset
+            #end_time += offset
             uri = (
                 f"http://{server}:{port}"
                 "/api/v1/search"
@@ -245,17 +248,19 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
                 "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                # f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+                #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+                #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                f"&select_metadata={select_metadata}"                               # select metadata
+                f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
         else:
             # if LastNdays is not set, then we will ask for all data
@@ -266,23 +271,24 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
                 "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
                 "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                f"&select_metadata={select_metadata}"                               # select metadata
+                f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
     else:
         if lastNdays > 0:
             # if LastNdays is set, then we will ask for data from the last N days
             start_time = time.time() - (lastNdays * 86400)
             end_time = time.time()    #current time in seconds
-            # tz = "US/Central"
+            tz = "US/Central"
             # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-            offset = 6*60*60  # US/Central is UTC-6
-            start_time += offset
-            end_time += offset            
+            #offset = 6*60*60  # US/Central is UTC-6
+            #start_time += offset
+            #end_time += offset            
             uri = (
                 f"http://{server}:{port}"
                 "/api/v1/search"
@@ -290,19 +296,21 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
                 "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
                 "&filter[regex][condition][key]=hdf5_path"                          # filter by path
                 f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                # f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+                f"&filter[time_range][condition][timezone]={tz}"                    # time range
+                #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+                #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+                #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                f"&select_metadata={select_metadata}"                               # select metadata
+                f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
         else:
             # if LastNdays is not set, then we will ask for all data
@@ -313,17 +321,20 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
                 "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
                 f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
                 "&filter[regex][condition][key]=hdf5_path"                          # filter by path
                 f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                "&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
+                "&sort=-time"                                                       # sort by time, -time gives last scans first
+                #"&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
                 "&omit_links=true"                                                  # no links
-                f"&select_metadata={select_metadata}"                               # select metadata
+                f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
                    
     #logging.info(f"{uri=}")
+    print(uri)
 
     try:
         r = requests.get(uri).json()
@@ -333,7 +344,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
         return ScanList
     except: 
         # url communication failed, happens and shoudl not crash anything.
-        logging.error('Could not get data from tiled server at  usaxscontrol.xray.aps.anl.gov')
+        logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
         return []
  
@@ -353,10 +364,10 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
      #   offsetTime = 95
     # this shifts the querried time by offsetTime seconds to past, providing file flush out the files. 
     end_time = time.time() #- offsetTime
-    # tz = "US/Central"
+    tz = "US/Central"
     # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-    offset = 6*60*60  # US/Central is UTC-6
-    end_time += offset    
+    #offset = 6*60*60  # US/Central is UTC-6
+    #end_time += offset    
     if LastNdays > 0:
         # if LastNdays is set, then we will ask for data from the last N days
         start_time = end_time - (LastNdays * 86400)
@@ -368,19 +379,21 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "/api/v1/search"
             f"/{catalog}"
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            #"&filter[contains][condition][exit_status]"                         # filter by exist status key present
+            "&filter[contains][condition][exit_status]"                         # filter by exist status key present
             #&filter[comparison][condition][operator]=gt&filter[comparison][condition][key]=duration&filter[comparison][condition][value]=0.1
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            # f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            # f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-            # f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+            #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
+            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
+            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
+            f"&filter[time_range][condition][timezone]={tz}"                    # time range
+            #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
+            #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
+            "&sort=-time"                                                      # sort by time, -time gives last scans first
+            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            f"&select_metadata={select_metadata}"                               # select metadata
+            f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
     else:
         # if LastNdays is not set, then we will ask for all data
@@ -389,17 +402,19 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             "/api/v1/search"
             f"/{catalog}"
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            #"&filter[contains][condition][exit_status]"                         # filter by exist status key present
+            "&filter[contains][condition][exit_status]"                         # filter by exist status key present
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
+            #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
+            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
+            "&sort=-time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
-            f"&select_metadata={select_metadata}"                               # select metadata
+            f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
           
     #logging.info(f"{uri=}")
-    #print(f"{uri=}")
+    print(f"{uri=}")
     try:
         r = requests.get(uri).json()
         # this is now a list of Flyscan data sets
@@ -408,7 +423,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
         return ScanList
     except: 
         # url communication failed, happens and shoudl not crash anything.
-        logging.error('Could not get data from tiled server at  usaxscontrol.xray.aps.anl.gov')
+        logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
         return []
 

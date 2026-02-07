@@ -97,6 +97,7 @@ def successful_run(uid: Optional[str] = None) -> bool:
             "page[offset]": 0,
             "page[limit]": 1,
             "sort": "-metadata.start.time",
+            #"sort": "-time",
         }
         run_info = tiled_get(**params)
         last_run_index = 0  # when sorted by reverse time (params["sort"] value)
@@ -126,7 +127,8 @@ def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
         uid = r["data"][v]["id"]
-        md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
+        #md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
+        md = r["data"][v]["attributes"]["metadata"]                #is OTZ without ["selected"]? 
         success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :

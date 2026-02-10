@@ -31,15 +31,15 @@ def ts_to_iso(time):
 
 current_hostname = socket.gethostname()
 if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-    #server = "usaxscontrol.xray.aps.anl.gov"
-    server = "otz"
+    server = "usaxscontrol.xray.aps.anl.gov"
+    #server = "otz"
 else:
     #server = "localhost"
     server = "usaxscontrol.xray.aps.anl.gov"
 
-port = 8020
+port = 8000
 #catalog = "raw"
-catalog = "usaxs"
+catalog = "usaxs_MongoDB"
 TILED_TIMEOUT = 10  # seconds
 
 select_metadata = ",".join([

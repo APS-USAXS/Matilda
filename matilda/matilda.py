@@ -59,6 +59,7 @@ import logging
 import datetime
 from logging.handlers import RotatingFileHandler
 import os
+import subprocess
 
 
 from readfromtiled import FindLastScanData, FindLastBlankScan
@@ -73,6 +74,15 @@ from plotData import plotUSAXSResults, plotSWAXSResults
 #imagePath = None  # Do not save images
 imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 #imagePath = '/home/parallels/Desktop/'  # Path to save images
+
+# Conda setup for pynika calibration.
+# Full path to the conda executable used at this beamline.
+CONDA_EXECUTABLE = '/APSshare/miniconda/x86_64/bin/conda'
+# Full path to pynika's conda environment (mirrors the pynika-gui launch script).
+PYNIKA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pynika'
+
+# Regex pattern to detect AgBehenateLaB6 calibrant files (any capitalisation)
+_CALIBRANT_PATTERN = re.compile(r'agbehenatelab6', re.IGNORECASE)
 
 NumberOfDaysToLookBack = 1  # Number of days to look back for scans
 NumberOfDaysToLookBackBlanks = 5  # Number of days to look back for blanks
@@ -105,7 +115,71 @@ logging.basicConfig(
 # logging.critical('This is a critical message')
 
 
-# user facing functions
+# --- pynika auto-calibration helpers ---
+
+def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
+    """
+    Run pynika on a single AgBehenateLaB6 calibrant file to recalibrate the
+    instrument geometry and push results to EPICS PVs.
+
+    Parameters
+    ----------
+    path : str
+        Directory containing the HDF5 file.
+    filename : str
+        HDF5 filename of the calibrant scan.
+    instrument_type : str
+        'SAXS' or 'WAXS' — passed to pynika --instrument flag.
+    calibrated_set : set
+        Mutable set of (path, filename) tuples already processed this session.
+        Updated in-place on success to prevent re-running the same file.
+    """
+    file_key = (path, filename)
+    if file_key in calibrated_set:
+        logging.info(f"Pynika calibration already run for {filename}, skipping.")
+        return
+
+    filepath = os.path.join(path, filename)
+    if not os.path.exists(filepath):
+        logging.error(f"Calibrant file not found: {filepath}")
+        return
+
+    logging.info(f"Running pynika calibration: {filepath} [{instrument_type}]")
+    cmd = [CONDA_EXECUTABLE, 'run', '--no-capture-output', '-p', PYNIKA_CONDA_ENV_PATH,
+           'pynika', '--file', filepath, '--instrument', instrument_type, '--auto-fit', '--save-to-pvs']
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode == 0:
+            logging.info(f"Pynika calibration succeeded for {filename}")
+            calibrated_set.add(file_key)
+        else:
+            logging.error(
+                f"Pynika calibration failed for {filename} "
+                f"(exit {result.returncode}): {result.stderr.strip()}"
+            )
+    except subprocess.TimeoutExpired:
+        logging.error(f"Pynika calibration timed out for {filename}")
+    except Exception as e:
+        logging.error(f"Pynika calibration error for {filename}: {e}", exc_info=True)
+
+
+def _checkAndRunPynikaCalibration(ListOfScans, instrument_type, calibrated_set):
+    """
+    Scan a list of (path, filename) tuples.  For any file whose name contains
+    'AgBehenateLaB6' (case-insensitive) that has not been calibrated yet this
+    session, run pynika calibration before data reduction proceeds.
+    """
+    for scan_path, scan_filename in ListOfScans:
+        if _CALIBRANT_PATTERN.search(scan_filename):
+            _runPynikaCalibration(scan_path, scan_filename, instrument_type, calibrated_set)
+
+
+# --- user facing functions ---
 
 def processUSAXSFolder(path):
     # Get the list of folders in the path folder
@@ -274,6 +348,11 @@ if __name__ == "__main__":
         listofStepScansOld=dict()
         listofSAXSOld=dict()
         listOfWAXSOld=dict()
+        # Track AgBehenateLaB6 calibrant files already processed by pynika this
+        # session.  Separate sets for SAXS and WAXS because files share the same
+        # name across detectors but live in different folders.
+        calibratedSAXSFiles = set()
+        calibratedWAXSFiles = set()
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
@@ -318,9 +397,10 @@ if __name__ == "__main__":
                 #listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
+                _checkAndRunPynikaCalibration(ListOfScans, "SAXS", calibratedSAXSFiles)
                 results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS = True) 
-                listofSAXSOld = ListOfScans 
+                plotSWAXSResults(results, imagePath, isSAXS = True)
+                listofSAXSOld = ListOfScans
 
             logging.info("Processing the WAXS")
             ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
@@ -332,9 +412,10 @@ if __name__ == "__main__":
                 #listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
-                results = processADscans(ListOfScans, listOfBlanks)      
-                plotSWAXSResults(results, imagePath, isSAXS = False)  
-                listOfWAXSOld = ListOfScans 
+                _checkAndRunPynikaCalibration(ListOfScans, "WAXS", calibratedWAXSFiles)
+                results = processADscans(ListOfScans, listOfBlanks)
+                plotSWAXSResults(results, imagePath, isSAXS = False)
+                listOfWAXSOld = ListOfScans
 
             logging.info('Sleeping for 15 seconds')
             time.sleep(15)

@@ -157,6 +157,9 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
         if result.returncode == 0:
             logging.info(f"Pynika calibration succeeded for {filename}")
             calibrated_set.add(file_key)
+            # Keep the set bounded to match the Tiled look-back window
+            while len(calibrated_set) > NumberOfImagesInGraphs:
+                calibrated_set.pop()
         else:
             logging.error(
                 f"Pynika calibration failed for {filename} "

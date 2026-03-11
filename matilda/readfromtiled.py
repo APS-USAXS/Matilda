@@ -218,8 +218,8 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
-        #ScanList = convert_results(r)
-        ScanList=[]
+        ScanList = convert_results(r)
+        #ScanList=[]
         logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
@@ -419,7 +419,8 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
-        ScanList = convert_results(r)
+        #ScanList = convert_results(r)
+        ScanList=[]
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 

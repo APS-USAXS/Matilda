@@ -125,8 +125,8 @@ def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
         uid = r["data"][v]["id"]
-        #md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
-        md = r["data"][v]["attributes"]["metadata"]                #is OTZ without ["selected"]? 
+        raw_md = r["data"][v]["attributes"]["metadata"]
+        md = raw_md.get("selected", raw_md)   # usaxscontrol/VM has ["selected"]; OTZ does not
         success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
@@ -419,8 +419,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
-        #ScanList = convert_results(r)
-        ScanList=[]
+        ScanList = convert_results(r)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 

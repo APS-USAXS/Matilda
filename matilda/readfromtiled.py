@@ -217,9 +217,9 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     print(uri)
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
-        #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
+        logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
         ScanList = convert_results(r)
-        #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
+        logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 

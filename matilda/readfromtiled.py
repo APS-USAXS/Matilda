@@ -30,11 +30,9 @@ def ts_to_iso(time):
     return datetime.datetime.fromtimestamp(time).isoformat()
 
 current_hostname = socket.gethostname()
-if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-    server = "usaxscontrol.xray.aps.anl.gov"
-    #server = "otz"
+if current_hostname in ('usaxscontrol', 'usaxscontrol.xray.aps.anl.gov'):
+    server = "localhost"   # avoid proxy/firewall issues when running on the same machine
 else:
-    #server = "localhost"
     server = "usaxscontrol.xray.aps.anl.gov"
 
 port = 8000
@@ -218,7 +216,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #returns last scan which conatisn case independet "water blank" in name
     print(uri)
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
@@ -339,7 +337,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
     print(uri)
 
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
@@ -418,7 +416,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #logging.info(f"{uri=}")
     print(f"{uri=}")
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")

@@ -278,75 +278,128 @@ def generate_plate_image(plate_name: str, generic_params: dict | None = None,
 # HDF5 persistence
 # ---------------------------------------------------------------------------
 
-def save_sets_to_hdf5(path: str, sets: dict[str, SampleSet]) -> None:
-    """Save all named SampleSets to an HDF5 file."""
+def _write_set_to_group(grp, ss: SampleSet) -> None:
+    """Write a SampleSet to an open HDF5 group."""
+    grp.attrs["name"] = ss.name
+    grp.attrs["usaxs_all"] = int(ss.usaxs_all)
+    grp.attrs["saxs_all"] = int(ss.saxs_all)
+    grp.attrs["waxs_all"] = int(ss.waxs_all)
+    names_arr = np.array([r.name.encode() for r in ss.rows])
+    sx_arr = np.array([r.sx for r in ss.rows])
+    sy_arr = np.array([r.sy for r in ss.rows])
+    th_arr = np.array([r.thickness for r in ss.rows])
+    u_arr = np.array([int(r.usaxs) for r in ss.rows])
+    s_arr = np.array([int(r.saxs) for r in ss.rows])
+    w_arr = np.array([int(r.waxs) for r in ss.rows])
+    md_arr = np.array([r.metadata.encode() for r in ss.rows])
+    grp.create_dataset("name", data=names_arr)
+    grp.create_dataset("sx", data=sx_arr)
+    grp.create_dataset("sy", data=sy_arr)
+    grp.create_dataset("thickness", data=th_arr)
+    grp.create_dataset("usaxs", data=u_arr)
+    grp.create_dataset("saxs", data=s_arr)
+    grp.create_dataset("waxs", data=w_arr)
+    grp.create_dataset("metadata", data=md_arr)
+
+
+def _read_set_from_group(grp) -> SampleSet:
+    """Read a SampleSet from an open HDF5 group."""
+    ss = SampleSet(name=grp.attrs.get("name", ""))
+    ss.usaxs_all = bool(grp.attrs.get("usaxs_all", 1))
+    ss.saxs_all = bool(grp.attrs.get("saxs_all", 1))
+    ss.waxs_all = bool(grp.attrs.get("waxs_all", 1))
+
+    def _ds(key):
+        item = grp.get(key)
+        return item[:] if isinstance(item, h5py.Dataset) else []
+
+    names_arr = _ds("name")
+    sx_arr = _ds("sx")
+    sy_arr = _ds("sy")
+    th_arr = _ds("thickness")
+    u_arr = _ds("usaxs")
+    s_arr = _ds("saxs")
+    w_arr = _ds("waxs")
+    md_arr = _ds("metadata")
+    rows = []
+    for i in range(len(names_arr)):
+        row = SampleRow(
+            name=names_arr[i].decode() if hasattr(names_arr[i], "decode") else str(names_arr[i]),
+            sx=float(sx_arr[i]) if i < len(sx_arr) else 0.0,
+            sy=float(sy_arr[i]) if i < len(sy_arr) else 0.0,
+            thickness=float(th_arr[i]) if i < len(th_arr) else DEFAULT_THICKNESS,
+            usaxs=bool(u_arr[i]) if i < len(u_arr) else True,
+            saxs=bool(s_arr[i]) if i < len(s_arr) else True,
+            waxs=bool(w_arr[i]) if i < len(w_arr) else True,
+            metadata=md_arr[i].decode() if i < len(md_arr) and hasattr(md_arr[i], "decode") else "",
+        )
+        rows.append(row)
+    ss.rows = rows
+    return ss
+
+
+def save_state_to_hdf5(path: str, sets: dict[str, SampleSet],
+                        current_set: "SampleSet | None" = None,
+                        export_order: str = "USAXS-SAXS-WAXS",
+                        cmd_filename: str = DEFAULT_CMD_FILENAME,
+                        export_list_mode: bool = False) -> None:
+    """Save full tool state to HDF5: saved sets, current set, and export controls."""
     with h5py.File(path, "w") as f:
         f.attrs["creator"] = "Matilda SamplePlateSetup"
-        f.attrs["version"] = "1.0"
+        f.attrs["version"] = "2.0"
         f.attrs["saved"] = datetime.datetime.now().isoformat()
+        f.attrs["export_order"] = export_order
+        f.attrs["cmd_filename"] = cmd_filename
+        f.attrs["export_list_mode"] = int(export_list_mode)
+        if current_set is not None:
+            grp_cur = f.require_group("current_set")
+            _write_set_to_group(grp_cur, current_set)
         grp = f.require_group("saved_sets")
         for name, ss in sets.items():
             sg = grp.require_group(name)
-            sg.attrs["name"] = ss.name
-            sg.attrs["usaxs_all"] = int(ss.usaxs_all)
-            sg.attrs["saxs_all"] = int(ss.saxs_all)
-            sg.attrs["waxs_all"] = int(ss.waxs_all)
-            n = len(ss.rows)
-            names_arr = np.array([r.name.encode() for r in ss.rows])
-            sx_arr = np.array([r.sx for r in ss.rows])
-            sy_arr = np.array([r.sy for r in ss.rows])
-            th_arr = np.array([r.thickness for r in ss.rows])
-            u_arr = np.array([int(r.usaxs) for r in ss.rows])
-            s_arr = np.array([int(r.saxs) for r in ss.rows])
-            w_arr = np.array([int(r.waxs) for r in ss.rows])
-            md_arr = np.array([r.metadata.encode() for r in ss.rows])
-            sg.create_dataset("name", data=names_arr)
-            sg.create_dataset("sx", data=sx_arr)
-            sg.create_dataset("sy", data=sy_arr)
-            sg.create_dataset("thickness", data=th_arr)
-            sg.create_dataset("usaxs", data=u_arr)
-            sg.create_dataset("saxs", data=s_arr)
-            sg.create_dataset("waxs", data=w_arr)
-            sg.create_dataset("metadata", data=md_arr)
+            _write_set_to_group(sg, ss)
+
+
+def load_state_from_hdf5(path: str) -> dict:
+    """Load full tool state from HDF5.
+
+    Returns a dict with keys:
+        'saved_sets'      : dict[str, SampleSet]
+        'current_set'     : SampleSet | None
+        'export_order'    : str
+        'cmd_filename'    : str
+        'export_list_mode': bool
+    """
+    result = {
+        "saved_sets": {},
+        "current_set": None,
+        "export_order": "USAXS-SAXS-WAXS",
+        "cmd_filename": DEFAULT_CMD_FILENAME,
+        "export_list_mode": False,
+    }
+    with h5py.File(path, "r") as f:
+        result["export_order"] = f.attrs.get("export_order", "USAXS-SAXS-WAXS")
+        result["cmd_filename"] = f.attrs.get("cmd_filename", DEFAULT_CMD_FILENAME)
+        result["export_list_mode"] = bool(f.attrs.get("export_list_mode", 0))
+        grp_cur = f.get("current_set")
+        if grp_cur is not None:
+            result["current_set"] = _read_set_from_group(grp_cur)
+        grp = f.get("saved_sets")
+        if grp is not None:
+            for name in grp:
+                result["saved_sets"][name] = _read_set_from_group(grp[name])
+    return result
+
+
+# Keep for backward compatibility
+def save_sets_to_hdf5(path: str, sets: dict[str, SampleSet]) -> None:
+    """Save named SampleSets to HDF5 (no current_set or export controls)."""
+    save_state_to_hdf5(path, sets)
 
 
 def load_sets_from_hdf5(path: str) -> dict[str, SampleSet]:
-    """Load all saved SampleSets from an HDF5 file."""
-    result = {}
-    with h5py.File(path, "r") as f:
-        grp = f.get("saved_sets")
-        if grp is None:
-            return result
-        for name in grp:
-            sg = grp[name]
-            ss = SampleSet(name=sg.attrs.get("name", name))
-            ss.usaxs_all = bool(sg.attrs.get("usaxs_all", 1))
-            ss.saxs_all = bool(sg.attrs.get("saxs_all", 1))
-            ss.waxs_all = bool(sg.attrs.get("waxs_all", 1))
-            names_arr = sg["name"][:] if "name" in sg else []
-            sx_arr = sg["sx"][:] if "sx" in sg else []
-            sy_arr = sg["sy"][:] if "sy" in sg else []
-            th_arr = sg["thickness"][:] if "thickness" in sg else []
-            u_arr = sg["usaxs"][:] if "usaxs" in sg else []
-            s_arr = sg["saxs"][:] if "saxs" in sg else []
-            w_arr = sg["waxs"][:] if "waxs" in sg else []
-            md_arr = sg["metadata"][:] if "metadata" in sg else []
-            rows = []
-            for i in range(len(names_arr)):
-                row = SampleRow(
-                    name=names_arr[i].decode() if hasattr(names_arr[i], "decode") else str(names_arr[i]),
-                    sx=float(sx_arr[i]) if i < len(sx_arr) else 0.0,
-                    sy=float(sy_arr[i]) if i < len(sy_arr) else 0.0,
-                    thickness=float(th_arr[i]) if i < len(th_arr) else DEFAULT_THICKNESS,
-                    usaxs=bool(u_arr[i]) if i < len(u_arr) else True,
-                    saxs=bool(s_arr[i]) if i < len(s_arr) else True,
-                    waxs=bool(w_arr[i]) if i < len(w_arr) else True,
-                    metadata=md_arr[i].decode() if i < len(md_arr) and hasattr(md_arr[i], "decode") else "",
-                )
-                rows.append(row)
-            ss.rows = rows
-            result[name] = ss
-    return result
+    """Load saved SampleSets from HDF5 (backward-compatible)."""
+    return load_state_from_hdf5(path)["saved_sets"]
 
 
 # ---------------------------------------------------------------------------
@@ -694,10 +747,13 @@ class SampleTable(QTableWidget):
         self.dataChanged.emit()
 
     def delete_row(self):
-        r = self._current_row()
-        if self.rowCount() > 1:
-            self.removeRow(r)
-            self.dataChanged.emit()
+        rows = sorted(set(item.row() for item in self.selectedItems()), reverse=True)
+        if not rows:
+            rows = [self._current_row()]
+        for r in rows:
+            if self.rowCount() > 1:
+                self.removeRow(r)
+        self.dataChanged.emit()
 
     def duplicate_row(self):
         r = self._current_row()
@@ -743,6 +799,14 @@ class SampleTable(QTableWidget):
         self._block_signals = False
         self.dataChanged.emit()
 
+    def set_column_checked(self, col: int, checked: bool):
+        """Set all checkboxes in the given column to checked/unchecked."""
+        for r in range(self.rowCount()):
+            chkw = self.cellWidget(r, col)
+            if chkw:
+                chkw.setChecked(checked)
+        self.dataChanged.emit()
+
     def increment_sx(self, delta=1.0):
         for r in set(item.row() for item in self.selectedItems()):
             item = self.item(r, COL_SX)
@@ -763,15 +827,41 @@ class SampleTable(QTableWidget):
             self.setItem(r, COL_SY, QTableWidgetItem(f"{val:.3f}"))
         self.dataChanged.emit()
 
-    def add_to_sx(self):
-        val, ok = _ask_float(self, "Add to SX", "Value to add to SX [mm]:", 1.0)
-        if ok:
-            self.increment_sx(val)
+    def increment_sx_stepped(self):
+        """Increment SX across selected rows: row[i].sx = row[0].sx + i * step (Igor-style)."""
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            QMessageBox.information(self, "No selection", "Select rows to increment.")
+            return
+        val, ok = _ask_float(self, "Increment SX", "Step between rows [mm]:", 5.0)
+        if not ok:
+            return
+        item0 = self.item(rows[0], COL_SX)
+        try:
+            base = float(item0.text())
+        except (ValueError, AttributeError):
+            base = 0.0
+        for i, r in enumerate(rows):
+            self.setItem(r, COL_SX, QTableWidgetItem(f"{base + i * val:.3f}"))
+        self.dataChanged.emit()
 
-    def add_to_sy(self):
-        val, ok = _ask_float(self, "Add to SY", "Value to add to SY [mm]:", 1.0)
-        if ok:
-            self.increment_sy(val)
+    def increment_sy_stepped(self):
+        """Increment SY across selected rows: row[i].sy = row[0].sy + i * step (Igor-style)."""
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            QMessageBox.information(self, "No selection", "Select rows to increment.")
+            return
+        val, ok = _ask_float(self, "Increment SY", "Step between rows [mm]:", 5.0)
+        if not ok:
+            return
+        item0 = self.item(rows[0], COL_SY)
+        try:
+            base = float(item0.text())
+        except (ValueError, AttributeError):
+            base = 0.0
+        for i, r in enumerate(rows):
+            self.setItem(r, COL_SY, QTableWidgetItem(f"{base + i * val:.3f}"))
+        self.dataChanged.emit()
 
     def set_as_blank(self):
         for r in set(item.row() for item in self.selectedItems()):
@@ -794,13 +884,16 @@ class SampleTable(QTableWidget):
         self.dataChanged.emit()
 
     def clear_row(self):
-        r = self._current_row()
-        for col in (COL_NAME, COL_SX, COL_SY, COL_THICK, COL_META):
-            self.setItem(r, col, QTableWidgetItem(""))
-        for col in (COL_USAXS, COL_SAXS, COL_WAXS):
-            chk = self.cellWidget(r, col)
-            if chk:
-                chk.setChecked(True)
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            rows = [self._current_row()]
+        for r in rows:
+            for col in (COL_NAME, COL_SX, COL_SY, COL_THICK, COL_META):
+                self.setItem(r, col, QTableWidgetItem(""))
+            for col in (COL_USAXS, COL_SAXS, COL_WAXS):
+                chk = self.cellWidget(r, col)
+                if chk:
+                    chk.setChecked(True)
         self.dataChanged.emit()
 
     def copy_selection(self):
@@ -855,10 +948,8 @@ class SampleTable(QTableWidget):
         menu.addAction("Copy", self.copy_selection)
         menu.addAction("Paste", self.paste_selection)
         menu.addSeparator()
-        menu.addAction("Increment SX (+1 mm)", lambda: self.increment_sx(1.0))
-        menu.addAction("Increment SY (+1 mm)", lambda: self.increment_sy(1.0))
-        menu.addAction("Add value to SX...", self.add_to_sx)
-        menu.addAction("Add value to SY...", self.add_to_sy)
+        menu.addAction("Increment SX (stepped)...", self.increment_sx_stepped)
+        menu.addAction("Increment SY (stepped)...", self.increment_sy_stepped)
         menu.addSeparator()
         menu.addAction("Set as Blank", self.set_as_blank)
         menu.addAction("Set as AgBehenateLaB6", self.set_as_agbehenaatelab6)
@@ -1580,6 +1671,9 @@ class SamplePlateSetupWindow(QMainWindow):
         self._current_set.usaxs_all = self._usaxs_all.isChecked()
         self._current_set.saxs_all = self._saxs_all.isChecked()
         self._current_set.waxs_all = self._waxs_all.isChecked()
+        self._table.set_column_checked(COL_USAXS, self._usaxs_all.isChecked())
+        self._table.set_column_checked(COL_SAXS, self._saxs_all.isChecked())
+        self._table.set_column_checked(COL_WAXS, self._waxs_all.isChecked())
         self._update_runtime()
 
     def _on_table_changed(self):
@@ -1615,7 +1709,7 @@ class SamplePlateSetupWindow(QMainWindow):
             n = dlg.total()
             rows = []
             for i, (cx, cy) in enumerate(centers):
-                rows.append(SampleRow(name=f"Sample{i+1:03d}", sx=cx, sy=cy))
+                rows.append(SampleRow(name="", sx=cx, sy=cy))
         elif plate_name == "AgBehenateLaB6":
             rows = [SampleRow(name="AgBehenateLaB6", sx=20.0, sy=20.0, usaxs=False)]
         elif defn is not None:
@@ -1623,7 +1717,7 @@ class SamplePlateSetupWindow(QMainWindow):
             rows = []
             for i in range(min(n, len(centers))):
                 cx, cy = centers[i]
-                rows.append(SampleRow(name=f"Sample{i+1:03d}", sx=cx, sy=cy))
+                rows.append(SampleRow(name="", sx=cx, sy=cy))
             while len(rows) < n:
                 rows.append(SampleRow())
         else:
@@ -1663,7 +1757,14 @@ class SamplePlateSetupWindow(QMainWindow):
         self._saved_sets[name] = self._current_set.copy()
         self._multi_export.set_saved_sets(list(self._saved_sets.keys()))
         if self._hdf5_path:
-            save_sets_to_hdf5(self._hdf5_path, self._saved_sets)
+            save_state_to_hdf5(
+                self._hdf5_path,
+                self._saved_sets,
+                current_set=self._current_set,
+                export_order=self._order_combo.currentText(),
+                cmd_filename=self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME,
+                export_list_mode=self._export_list.isChecked(),
+            )
         self._status_lbl.setText(f"Saved set '{name}'")
         self._unsaved = False
 
@@ -1818,20 +1919,38 @@ class SamplePlateSetupWindow(QMainWindow):
     def _on_open_hdf5(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Open HDF5 file", "", "HDF5 files (*.h5 *.hdf5);;All files (*)")
-        if path:
-            self._saved_sets = load_sets_from_hdf5(path)
-            self._hdf5_path = path
-            self._multi_export.set_saved_sets(list(self._saved_sets.keys()))
-            if self._saved_sets:
-                first = next(iter(self._saved_sets.values()))
-                self._current_set = first.copy()
-                self._set_name_edit.setText(self._current_set.name)
-                self._table.load_from_sample_set(self._current_set)
-                self._canvas.update_markers(self._current_set.rows)
-                self._update_runtime()
-            self._status_lbl.setText(
-                f"Loaded {len(self._saved_sets)} set(s) from {os.path.basename(path)}")
-            self._unsaved = False
+        if not path:
+            return
+        state = load_state_from_hdf5(path)
+        self._hdf5_path = path
+        self._saved_sets = state["saved_sets"]
+        self._multi_export.set_saved_sets(list(self._saved_sets.keys()))
+        # Restore export controls
+        order = state["export_order"]
+        idx = self._order_combo.findText(order)
+        if idx >= 0:
+            self._order_combo.setCurrentIndex(idx)
+        self._cmd_fname.setText(state["cmd_filename"])
+        if state["export_list_mode"]:
+            self._export_list.setChecked(True)
+        else:
+            self._export_current.setChecked(True)
+        # Restore current set (prefer saved current_set, fall back to first saved set)
+        cur = state["current_set"]
+        if cur is None and self._saved_sets:
+            cur = next(iter(self._saved_sets.values())).copy()
+        if cur is not None:
+            self._current_set = cur
+            self._set_name_edit.setText(self._current_set.name)
+            self._usaxs_all.setChecked(self._current_set.usaxs_all)
+            self._saxs_all.setChecked(self._current_set.saxs_all)
+            self._waxs_all.setChecked(self._current_set.waxs_all)
+            self._table.load_from_sample_set(self._current_set)
+            self._canvas.update_markers(self._current_set.rows)
+            self._update_runtime()
+        self._status_lbl.setText(
+            f"Loaded {len(self._saved_sets)} set(s) from {os.path.basename(path)}")
+        self._unsaved = False
 
     def _on_save_hdf5(self):
         if self._hdf5_path is None:
@@ -1839,8 +1958,18 @@ class SamplePlateSetupWindow(QMainWindow):
             return
         name = self._set_name_edit.text().strip() or "MySamples"
         self._current_set.rows = self._table.get_sample_set()
+        self._current_set.usaxs_all = self._usaxs_all.isChecked()
+        self._current_set.saxs_all = self._saxs_all.isChecked()
+        self._current_set.waxs_all = self._waxs_all.isChecked()
         self._saved_sets[name] = self._current_set.copy()
-        save_sets_to_hdf5(self._hdf5_path, self._saved_sets)
+        save_state_to_hdf5(
+            self._hdf5_path,
+            self._saved_sets,
+            current_set=self._current_set,
+            export_order=self._order_combo.currentText(),
+            cmd_filename=self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME,
+            export_list_mode=self._export_list.isChecked(),
+        )
         self._status_lbl.setText(f"Saved to {self._hdf5_path}")
         self._unsaved = False
 

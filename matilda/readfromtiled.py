@@ -30,11 +30,9 @@ def ts_to_iso(time):
     return datetime.datetime.fromtimestamp(time).isoformat()
 
 current_hostname = socket.gethostname()
-if current_hostname == 'usaxscontrol.xray.aps.anl.gov':
-    server = "usaxscontrol.xray.aps.anl.gov"
-    #server = "otz"
+if current_hostname in ('usaxscontrol', 'usaxscontrol.xray.aps.anl.gov'):
+    server = "localhost"   # avoid proxy/firewall issues when running on the same machine
 else:
-    #server = "localhost"
     server = "usaxscontrol.xray.aps.anl.gov"
 
 port = 8000
@@ -127,8 +125,8 @@ def convert_results(r):
     OutputList=[]
     for v in range(len(r["data"])):
         uid = r["data"][v]["id"]
-        #md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled. 
-        md = r["data"][v]["attributes"]["metadata"]                #is OTZ without ["selected"]? 
+        raw_md = r["data"][v]["attributes"]["metadata"]
+        md = raw_md.get("selected", raw_md)   # usaxscontrol/VM has ["selected"]; OTZ does not
         success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
@@ -218,10 +216,11 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #returns last scan which conatisn case independet "water blank" in name
     print(uri)
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
         ScanList = convert_results(r)
-        #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
+        #ScanList=[]
+        logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
     except: 
@@ -339,7 +338,7 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
     print(uri)
 
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
@@ -418,7 +417,7 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
     #logging.info(f"{uri=}")
     print(f"{uri=}")
     try:
-        r = requests.get(uri).json()
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")

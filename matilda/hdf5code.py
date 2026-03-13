@@ -1,6 +1,38 @@
 """
-    this contains needed hdf5 support for matilda
-    used by saving blank BL_QRS data.
+hdf5code.py
+===========
+HDF5 / NXcanSAS read-write helpers used throughout Matilda.
+
+Public functions
+----------------
+save_dict_to_hdf5(data_dict, location, hdf_file)
+    Recursively write a Python dict into an open HDF5 file at the given path.
+
+load_dict_from_hdf5(hdf_file, location)
+    Recursively read an HDF5 group back into a Python dict.
+
+saveNXcanSAS(Sample, path, filename)
+    Write processed I(Q) data as an NXcanSAS-compliant NXsubentry into the
+    original scan HDF5 file.
+
+readMyNXcanSAS(path, filename)
+    Read back the NXcanSAS entry written by saveNXcanSAS().
+
+readGenericNXcanSAS(path, filename)
+    Read any NXcanSAS entry from a Nexus file (not necessarily written by
+    Matilda).
+
+find_matching_groups(hdf_file, required_attributes, required_items)
+    Search an open HDF5 file for groups matching a set of attribute and
+    dataset criteria; returns a list of matching group paths.
+
+Notes
+-----
+* The 'six' library is imported (line 8) as a Python 2/3 compatibility shim.
+  It appears unused in Python 3 code — the import can likely be removed once
+  verified.  The original author flagged this with '#what is this for???'.
+* All functions expect the HDF5 file to follow the NeXus / NXcanSAS
+  conventions used by the APS USAXS Bluesky acquisition system.
 """
 import h5py
 import os

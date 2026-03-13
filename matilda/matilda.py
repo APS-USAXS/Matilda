@@ -185,6 +185,36 @@ def _checkAndRunPynikaCalibration(ListOfScans, instrument_type, calibrated_set):
 # --- user facing functions ---
 
 def processUSAXSFolder(path):
+    """
+    Batch-reprocess all USAXS/SAXS/WAXS scans found under a single date folder.
+
+    Intended for offline re-reduction (e.g. from Igor or a notebook) where you
+    want to force-recalculate every file regardless of cached results.  Expects
+    the standard APS folder layout produced by the Bluesky acquisition system:
+
+        <path>/
+            <name>_usaxs/   — USAXS flyscan files (.h5)
+            <name>_saxs/    — SAXS area-detector files (.hdf)
+            <name>_waxs/    — WAXS area-detector files (.hdf)
+
+    All three sub-folder types must be present.  Files are sorted by the
+    trailing scan number embedded in the filename (see extract_number_from_filename).
+
+    Parameters
+    ----------
+    path : str
+        Absolute path to the date/experiment folder that contains the three
+        instrument sub-folders.
+
+    Notes
+    -----
+    * recalculateAllData is forced True — existing cached results are deleted
+      and recomputed from raw HDF5 data.
+    * No plotting is performed; results are only written back to the HDF5 files.
+    * The function silently returns if path does not exist.
+
+    TODO: pynika auto-calibration is not called here (only in the live loop).
+    """
     # Get the list of folders in the path folder
     if not os.path.exists(path):
         logging.error(f"The path {path} does not exist.")
@@ -280,7 +310,33 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=False,forceFir
 
 
 # Process the step scan data files
-def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirstBlank=False):
+def processStepscans(ListOfScans, ListOfBlanks, recalculateAllData=False, forceFirstBlank=False):
+    """
+    Process a list of USAXS step-scan files, pairing each with an appropriate blank.
+
+    Mirrors processFlyscans() but calls processStepscan() (convertUSAXS module)
+    instead of processFlyscan().  The blank-selection logic is identical.
+
+    Parameters
+    ----------
+    ListOfScans : list of (str, str)
+        (path, filename) tuples for step-scan HDF5 files to process.
+    ListOfBlanks : list of (str, str)
+        (path, filename) tuples for available blank/background measurements.
+    recalculateAllData : bool, optional
+        When True, delete any cached reduced data and recompute from raw.
+        Default False (reuse cached results if present).
+    forceFirstBlank : bool, optional
+        When True, always pair each scan with ListOfBlanks[0] instead of
+        searching for the nearest-preceding blank by scan number.
+        Default False.
+
+    Returns
+    -------
+    list of dict
+        One result dictionary per successfully processed scan (same structure
+        as returned by processStepscan).  Failed scans are logged and skipped.
+    """
     results=[]
     logging.info("Processing of Step scans with blanks")    
     for scan_path, scan_filename in ListOfScans:

@@ -1,18 +1,40 @@
 name: matilda
+# Build / update this environment:
+#   conda env create -f environment.yml          # first time
+#   conda env update -f environment.yml --prune  # update existing
+#
+# On Windows (development / testing):
+#   conda env create -f environment.yml
+#   conda activate matilda
+#   pip install -e .          # install matilda package in editable mode
+#
+# On the beamline server (headless, no GUI):
+#   conda env create -f environment.yml
+#   conda activate matilda
+#   pip install -e .
+#
+# To include the GUI stack (PyQt6 + pyqtgraph) for local development:
+#   pip install -e .[gui]
+
 channels:
   - conda-forge
   - defaults
-  - https://repo.anaconda.com/pkgs/main
-  - https://repo.anaconda.com/pkgs/r
+
 dependencies:
-  - python=3.12.3
+  - python=3.12
   - numpy
-  - tifffile
   - scipy
-  - matplotlib
-  - pyfai
+  - matplotlib          # headless plot export; target for pyqtgraph in GUI
+  - tifffile
+  - pyFAI               # SAXS/WAXS 2D→1D integration
+  - h5py                # moved from pip: available on conda-forge
+  - requests            # Tiled server HTTP queries
+
+  # GUI stack — comment out for headless server installs
+  - pyqt6               # Qt6 bindings; alternative: pyside6
+  - pyqtgraph           # fast scientific plotting (replaces matplotlib in GUI)
+
   - pip
-  - requests
-  
   - pip:
-    - h5py
+    # Nothing currently needs pip-only install.
+    # Keep this section for packages not available on conda-forge.

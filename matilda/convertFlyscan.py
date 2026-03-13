@@ -1,4 +1,12 @@
-''' 
+"""
+convertFlyscan.py
+=================
+Reduce USAXS flyscan HDF5 files to calibrated 1-D I(Q) data.
+
+Main entry point
+----------------
+processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
+
 processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)
         For example of use see: test_matildaLocal() at the end of this file. 
         Does:
@@ -25,7 +33,26 @@ processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFile
                      "Error":DSM_Error,
                      "dQ":DSM_dQ,
                      "units":"[cm2/cm3]",
-'''
+
+Data flow
+---------
+importFlyscan()                 — read raw arrays from HDF5 NXsas file
+calculatePD_Fly()               — compute normalised detector signal
+beamCenterCorrection()          — apply beam-centre angle offset
+smooth_r_data()                 — optional smoothing
+getBlankFlyscan()               — load and process blank scan
+normalizeByTransmission()       — apply transmission correction
+calibrateAndSubtractFlyscan()   — subtract blank, apply K-factor / Omega
+desmearData()                   — Lake/Strobl desmearing (slit-smearing correction)
+saveNXcanSAS() / readMyNXcanSAS() — cache results in the original HDF5 file
+
+Notes
+-----
+* matplotlib is imported but currently only used for optional/debug plots
+  (all plt.show() calls are commented out).  Target for removal when GUI
+  work begins.
+* pprint is imported twice (as pprint and as pp); one import is redundant.
+"""
 import h5py
 import numpy as np
 import pprint
@@ -44,10 +71,41 @@ from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateA
 from desmearing import desmearData
 
 
-# Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
-# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
-# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+# This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in the Nexus file
+# If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+    """Reduce a single USAXS flyscan HDF5 file to calibrated 1-D I(Q).
+
+    Results are cached inside the original HDF5 file as NXcanSAS groups so
+    that subsequent calls with recalculateAllData=False are fast (data are
+    read from file rather than recomputed).
+
+    Parameters
+    ----------
+    path : str
+        Directory containing the sample HDF5 file.
+    filename : str
+        Filename of the sample HDF5 file (.h5).
+    blankPath : str or None, optional
+        Directory containing the blank HDF5 file.  If None, only raw QR
+        data are produced (no calibration or blank subtraction).
+    blankFilename : str or None, optional
+        Filename of the blank HDF5 file.  If None, only raw QR data.
+    recalculateAllData : bool, optional
+        When True, delete cached NXcanSAS groups and recompute everything.
+        Default False.
+
+    Returns
+    -------
+    dict
+        Sample dictionary with keys:
+        * RawData       — raw detector arrays and metadata
+        * reducedData   — Q, Intensity, Error, UPD_gains (normalised, slit-smeared)
+        * CalibratedData — Q, Intensity, Error, dQ, units (desmeared, blank-subtracted)
+                          Present only when a blank is provided.
+        * SMR data stored under CalibratedData['SMR_*'] keys.
+    """
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:

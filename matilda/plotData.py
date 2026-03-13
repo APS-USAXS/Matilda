@@ -1,8 +1,31 @@
-#matilda/plotData.py
-'''
-These are plots for Matylda data analysis.
+"""
+plotData.py
+===========
+Matplotlib-based plotting routines for Matilda data analysis.
 
-'''
+Generates JPEG summary plots and writes them to a web-visible directory
+(imagePath) for live monitoring.  Called after each processing cycle by
+the main loop in matilda.py.
+
+Current outputs
+---------------
+usaxs.jpg / stepusaxs.jpg         — raw USAXS/step-scan I vs Q
+usaxs_cal.jpg / stepusaxs_cal.jpg — calibrated USAXS/step-scan I vs Q
+saxs.jpg                          — raw SAXS I vs Q (log-log)
+saxs_cal.jpg                      — calibrated SAXS I vs Q (log-log)
+waxs.jpg                          — raw WAXS I vs Q (linear)
+waxs_cal.jpg                      — calibrated WAXS I vs Q (linear)
+
+GUI transition note
+-------------------
+This module uses matplotlib for headless (file-only) output.  Future GUI
+work should use pyqtgraph for interactive display.  matplotlib may be kept
+for file export or replaced entirely depending on requirements.
+
+TODO: plotUSAXSResults has an off-by-one indentation on the second plot
+      block (lines starting with '   # Get plot styling' after first plt.close()).
+      Functionally correct but visually misleading.
+"""
 import matplotlib.pyplot as plt
 import pprint as pp
 import logging
@@ -16,8 +39,30 @@ default_plt_font_size = 7
 
 
 
-def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):  
+def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
+    """Save USAXS / step-scan summary plots to JPEG files.
 
+    Produces two JPEG files per call:
+    * Raw normalised I vs Q  (usaxs.jpg or stepusaxs.jpg)
+    * Calibrated I vs Q      (usaxs_cal.jpg or stepusaxs_cal.jpg)
+
+    Data sets are coloured with the 'viridis' colormap from oldest (purple)
+    to newest (yellow).  Y-axis is clamped to at most 14 decades below the
+    maximum to avoid empty log plots from outlier points.
+
+    Parameters
+    ----------
+    ListOfresults : list of dict
+        Each dict is the result of processFlyscan() or processStepscan().
+        Required keys: RawData.filename, reducedData.Q, reducedData.Intensity,
+        CalibratedData.Q, CalibratedData.Intensity (None if no blank).
+    imagePath : str or None
+        Directory to write JPEG files into.  If None, plotting is skipped.
+    isFlyscan : bool, optional
+        True  → save as usaxs*.jpg (flyscan).
+        False → save as stepusaxs*.jpg (step scan).
+        Default True.
+    """
     if imagePath is None:
         logging.warning("Image path is None, skipping plotting.")
         return
@@ -119,8 +164,31 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
 
 
 
-def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):  
-    
+def plotSWAXSResults(ListOfresults, imagePath, isSAXS=True):
+    """Save SAXS or WAXS summary plots to JPEG files.
+
+    Produces two JPEG files per call:
+    * Raw I vs Q           (saxs.jpg or waxs.jpg)
+    * Calibrated I vs Q    (saxs_cal.jpg or waxs_cal.jpg)
+
+    SAXS plots use log-log axes and limit the display range to 4 decades
+    below the maximum.  WAXS plots use linear axes with no range clamping.
+    Calibrated plots that have no data (CalibratedData.Intensity is None)
+    are silently skipped per scan.
+
+    Parameters
+    ----------
+    ListOfresults : list of dict
+        Each dict is the result of process2Ddata().  Required keys:
+        RawData.filename, reducedData.Q, reducedData.Intensity,
+        CalibratedData.Q, CalibratedData.Intensity (None if no blank).
+    imagePath : str or None
+        Directory to write JPEG files into.  If None, plotting is skipped.
+    isSAXS : bool, optional
+        True  → SAXS (log-log, saves saxs*.jpg).
+        False → WAXS (linear, saves waxs*.jpg).
+        Default True.
+    """
     if imagePath is None:
         logging.warning("Image path is None, skipping plotting.")
         return

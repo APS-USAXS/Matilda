@@ -19,23 +19,43 @@ requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
-
+# Core runtime dependencies (verified used in source code).
+# GUI dependencies (PyQt6, pyqtgraph) are listed separately below so the
+# headless server install can omit them if needed.
+# NOTE: netcdf4, pandas, tqdm, xarray were listed previously but do not
+#       appear to be imported in any current source file — removed pending
+#       confirmation that they are not needed.
 dependencies = [
     "h5py",
-    "matplotlib",
-    "netcdf4",
+    "matplotlib",       # used in plotData.py; target for replacement with pyqtgraph
     "numpy",
-    "pandas",
-    "pip",
-    "pyfai",
+    "pyFAI",
     "requests",
     "scipy",
     "tifffile",
-    "tqdm",
-    "xarray",
 ]
 
+[project.optional-dependencies]
+# Install with: pip install matilda[gui]
+gui = [
+    "PyQt6",
+    "pyqtgraph",
+]
+# Install with: pip install matilda[dev]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[project.scripts]
+# Allows running 'matilda' on the command line after install.
+# TODO: matilda.py currently uses if __name__ == "__main__" — a thin
+#       entry-point wrapper function should be added before this works.
+# matilda = "matilda.matilda:main"
+
 [tool.hatch.build.targets.wheel]
-packages = [ "." ]
+# Only package the matilda/ sub-directory, not the repo root.
+packages = ["matilda"]

@@ -1,17 +1,38 @@
-''' 
+"""
+convertUSAXS.py
+===============
+Reduce USAXS step-scan HDF5 files to calibrated 1-D I(Q) data.
 
-    Import data from step scan hdf5 file
-    and convert to QRdata
-    TODO: fix calibration and saving. 
+Main entry point
+----------------
+processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
 
-    First check if group root:DisplayData exists, if not, load data, process and save for future use. 
-    If it exists, load data from it.
-    This is to save time for future use.
+Also exports
+------------
+rebinData(Q, Intensity, Error, numBins)   — used by convertFlyscan.py
 
-    Main routines: 
-    reduceStepScanToQR
-    reduceFlyscanToQR
-'''
+Data flow
+---------
+importFlyscan() from supportFunctions    — read raw arrays (step and fly share format)
+calculatePD_Fly() / beamCenterCorrection()
+calibrateAndSubtractFlyscan()
+desmearData()
+saveNXcanSAS() / readMyNXcanSAS()         — cache in HDF5
+
+Notes
+-----
+* Despite the module name, the reduction pipeline is nearly identical to
+  convertFlyscan.py because step-scan and fly-scan share the same NXsas
+  file format at USAXS.
+* matplotlib is imported; plt.show() calls are all commented out.
+  Target for removal when GUI work begins.
+* rebinData() is also called by convertFlyscan — it lives here due to
+  historical code organisation but logically belongs in supportFunctions.
+
+TODO: fix calibration and saving (original TODO from module creation).
+TODO: reduceStepScanToQR and reduceFlyscanToQR mentioned in original header
+      may be legacy names — verify against current function names.
+"""
 
 import os
 import h5py
@@ -32,9 +53,36 @@ from plotData import plotUSAXSResults
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
-# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in the Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+    """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
+
+    Structurally identical to processFlyscan() (convertFlyscan module) —
+    see that function's docstring for parameter and return-value details.
+    The distinction is that step scans use point-by-point detector readout
+    rather than continuous motion, which affects the raw-data structure read
+    by importFlyscan().
+
+    Parameters
+    ----------
+    path : str
+        Directory containing the sample HDF5 file.
+    filename : str
+        Filename of the sample HDF5 file (.h5).
+    blankPath : str or None, optional
+        Directory of blank HDF5 file.  None → only raw QR data, no calibration.
+    blankFilename : str or None, optional
+        Filename of blank HDF5 file.  None → only raw QR data.
+    recalculateAllData : bool, optional
+        True → delete cached NXcanSAS data and recompute.  Default False.
+
+    Returns
+    -------
+    dict
+        Same structure as processFlyscan(): RawData, reducedData,
+        CalibratedData (when blank provided).
+    """
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:

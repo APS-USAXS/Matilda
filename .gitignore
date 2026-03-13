@@ -19,3 +19,4 @@ matilda/matildaIgor.py
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
+.claude/settings.local.json

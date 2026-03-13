@@ -10,6 +10,13 @@ reduction_gui
     beam-centre, integration range, and blank selection.  Uses pyqtgraph
     for real-time display of the 2-D detector image and the 1-D result.
 
+sample_plate_setup
+    Replaces the Igor Pro "Setup Sample Plates" tool.
+    Define sample positions (name, SX, SY, thickness, USAXS/SAXS/WAXS flags),
+    load plate geometry templates, click on a plate image to assign positions,
+    save/load sets in HDF5, export Bluesky command files (.mac), and
+    optionally drive the sample stage via EPICS (Beamline Survey).
+
 survey_tool
     Sample survey / overview: browse all scans in a folder, display
     thumbnails, select scans for manual re-reduction.

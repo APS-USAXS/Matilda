@@ -68,6 +68,9 @@ all = [
 # which runs 'python matilda/matilda.py' directly.
 # matilda = "matilda.matilda:main"
 
+# GUI tool entry points (require pip install matilda[gui]):
+matilda-sample-plates = "matilda.gui.sample_plate_setup:run_sample_plate_setup"
+
 [tool.hatch.build.targets.wheel]
 # Package matilda/ and its subpackages (gui/, reduction/).
 # tests/ is intentionally excluded from the wheel.

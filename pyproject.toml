@@ -40,6 +40,8 @@ dependencies = [
 
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]
+# GUI tools use PyQt6 (or PySide6 as drop-in) + pyqtgraph for plotting.
+# matplotlib is intentionally NOT listed here: it is a core headless dep.
 gui = [
     "PyQt6",
     "pyqtgraph",
@@ -49,13 +51,28 @@ dev = [
     "pytest",
     "pytest-cov",
 ]
+# Install everything for a full local development setup:
+#   pip install -e .[gui,dev]
+all = [
+    "PyQt6",
+    "pyqtgraph",
+    "pytest",
+    "pytest-cov",
+]
 
 [project.scripts]
 # Allows running 'matilda' on the command line after install.
-# TODO: matilda.py currently uses if __name__ == "__main__" — a thin
-#       entry-point wrapper function should be added before this works.
+# NOTE (BUG-01): bare module imports in matilda.py (from convertFlyscan import …)
+# must be converted to relative/absolute package imports before this entry
+# point will work correctly.  The current production launch is via serv_matilda.sh
+# which runs 'python matilda/matilda.py' directly.
 # matilda = "matilda.matilda:main"
 
 [tool.hatch.build.targets.wheel]
-# Only package the matilda/ sub-directory, not the repo root.
+# Package matilda/ and its subpackages (gui/, reduction/).
+# tests/ is intentionally excluded from the wheel.
 packages = ["matilda"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

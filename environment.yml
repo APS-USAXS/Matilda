@@ -1,20 +1,48 @@
 name: matilda
-# Build / update this environment:
-#   conda env create -f environment.yml          # first time
-#   conda env update -f environment.yml --prune  # update existing
+# =============================================================================
+# Matilda conda environment
+# =============================================================================
 #
-# On Windows (development / testing):
+# FIRST-TIME BUILD (creates env from scratch):
+#   conda env create -f environment.yml
+#
+# UPDATE EXISTING ENV (adds/removes packages to match this file):
+#   conda env update -f environment.yml --prune
+#
+# INSTALL MATILDA IN EDITABLE MODE (run from repo root after env is active):
+#   pip install -e .          # core + headless server
+#   pip install -e .[gui]     # + PyQt6 and pyqtgraph for GUI development
+#   pip install -e .[dev]     # + pytest for running tests
+#   pip install -e .[all]     # everything
+#
+# Windows (local development / testing)
+# ──────────────────────────────────────
+# Conda base : C:\ProgramData\miniconda3
+# Envs dir   : C:\Users\ilavsky\.conda\envs\
+# Test env   : C:\Users\ilavsky\.conda\envs\matilda
+#
+#   # (Re)build from scratch:
+#   conda env remove -n matilda          # only if you want a clean slate
 #   conda env create -f environment.yml
 #   conda activate matilda
-#   pip install -e .          # install matilda package in editable mode
+#   pip install -e .[all]
 #
-# On the beamline server (headless, no GUI):
+#   # Update existing env without rebuilding:
+#   conda env update -f environment.yml --prune
+#   conda activate matilda
+#   pip install -e .[all]
+#
+# Beamline server (headless — GUI stack optional but included below)
+# ───────────────────────────────────────────────────────────────────
+# Conda      : /APSshare/miniconda/x86_64/bin/conda
+# Envs dir   : /home/beams/USAXS/.conda/envs/
+# Matilda env: /home/beams/USAXS/.conda/envs/matilda  (name: matilda)
+#
 #   conda env create -f environment.yml
 #   conda activate matilda
-#   pip install -e .
+#   pip install -e .           # headless only on server
 #
-# To include the GUI stack (PyQt6 + pyqtgraph) for local development:
-#   pip install -e .[gui]
+# =============================================================================
 
 channels:
   - conda-forge
@@ -24,17 +52,24 @@ dependencies:
   - python=3.12
   - numpy
   - scipy
-  - matplotlib          # headless plot export; target for pyqtgraph in GUI
+  - matplotlib          # headless JPEG export (plotData.py); NOT used in GUI
   - tifffile
-  - pyFAI               # SAXS/WAXS 2D→1D integration
-  - h5py                # moved from pip: available on conda-forge
-  - requests            # Tiled server HTTP queries
+  - pyfai               # SAXS/WAXS 2D→1D azimuthal integration (conda-forge: pyfai)
+  - h5py                # HDF5/NeXus file I/O
+  - requests            # Tiled server REST API queries
 
-  # GUI stack — comment out for headless server installs
-  - pyqt6               # Qt6 bindings; alternative: pyside6
-  - pyqtgraph           # fast scientific plotting (replaces matplotlib in GUI)
+  # GUI stack — safe to leave in for all installs; ignored at runtime if
+  # no GUI code is called.  Comment out for a minimal headless server env.
+  - pyqt6               # Qt6 Python bindings (alternative: pyside6)
+  - pyqtgraph           # fast scientific plotting for GUI tools
+
+  # Development / testing
+  - pytest
+  - pytest-cov
 
   - pip
   - pip:
-    # Nothing currently needs pip-only install.
-    # Keep this section for packages not available on conda-forge.
+    # Packages not available on conda-forge must go here.
+    # NOTE: 'six' (imported in hdf5code.py) is a transitive dependency of
+    # h5py and will be present automatically — do NOT add it explicitly.
+    # It should be removed from hdf5code.py (see BUG-02 in matilda/__init__.py).

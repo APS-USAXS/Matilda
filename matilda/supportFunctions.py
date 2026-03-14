@@ -78,6 +78,10 @@ def importFlyscan(path, filename):
         sample_group = file['/entry/sample']
         sample_dict = read_group_to_dict(sample_group)
 
+    # Handle known edge case where ARangles has one extra point vs mca arrays
+    if len(ARangles) == len(TimePerPoint) + 1:
+        logging.warning(f"ARangles has one extra point ({len(ARangles)}) vs mca arrays ({len(TimePerPoint)}), removing first point.")
+        ARangles = ARangles[1:]
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
     #Package these results into dictionary

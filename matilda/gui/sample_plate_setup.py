@@ -58,15 +58,15 @@ USAXS_SCAN_TIME_DEFAULT = 90   # seconds per USAXS flyscan
 SAXS_SCAN_TIME_DEFAULT = 1     # seconds per SAXS exposure
 WAXS_SCAN_TIME_DEFAULT = 3     # seconds per WAXS exposure
 
-USAXS_OVERHEAD = 25            # seconds overhead per USAXS scan
-SAXS_OVERHEAD = 10             # seconds overhead per SAXS scan
-WAXS_OVERHEAD = 3              # seconds overhead per WAXS scan
-SAMPLE_MOVE_SPEED = 8          # mm/second average sample stage speed
-GEOMETRY_SWITCH_TIME = 20      # seconds to switch between USAXS/SAXS/WAXS geometry
+USAXS_OVERHEAD = 15            # seconds overhead per USAXS scan (Igor: IN3BmSrvUSAXSOverhead)
+SAXS_OVERHEAD = 5              # seconds overhead per SAXS scan (Igor: IN3BmSrvSAXSOverhead)
+WAXS_OVERHEAD = 3              # seconds overhead per WAXS scan (Igor: IN3BmSrvWAXSOverhead)
+SAMPLE_MOVE_SPEED = 30         # mm/second average sample stage speed (Igor: IN3BmSrvSampleMoveSpeed, Aerotech)
+GEOMETRY_SWITCH_TIME = 15      # seconds to switch between USAXS/SAXS/WAXS geometry (Igor: IN3BmSrvMoveGeometryTime)
 USAXS_RETUNE_INTERVAL = 600    # seconds between SAXS/WAXS retunes
 USAXS_RETUNE_EVERY_N = 3       # retune every N USAXS flyscans
-USAXS_RETUNE_TIME = 40         # seconds per USAXS retune
-SWAXS_RETUNE_TIME = 14         # seconds per SAXS/WAXS retune
+USAXS_RETUNE_TIME = 20         # seconds per USAXS retune (Igor: IN3BmSrvTuneAveTime)
+SWAXS_RETUNE_TIME = 0          # SAXS/WAXS retune disabled on 12ID BS (Igor: IN3BmSrvSWTuneAveTime)
 
 DEFAULT_THICKNESS = 1.0        # mm
 DEFAULT_CMD_FILENAME = "usaxs.mac"
@@ -238,7 +238,7 @@ def generate_plate_image(plate_name: str, generic_params: dict | None = None,
 
     w = int(defn["plate_w"] * pix_per_mm)
     h = int(defn["plate_h"] * pix_per_mm)
-    img = np.full((w, h), 128, dtype=np.uint8)  # grey background
+    img = np.full((w, h), 200, dtype=np.uint8)  # grey background
 
     centers = defn["centers"]
     radius = defn["hole_radius"]
@@ -270,6 +270,12 @@ def generate_plate_image(plate_name: str, generic_params: dict | None = None,
             img[x0:x1, y0:y1] = 64   # darker fill
             img[x0, y0:y1] = 255     # left wall
             img[x1, y0:y1] = 255     # right wall
+
+    # Add 3-pixel black border
+    img[:3, :] = 0
+    img[-3:, :] = 0
+    img[:, :3] = 0
+    img[:, -3:] = 0
 
     return img
 
@@ -342,15 +348,34 @@ def save_state_to_hdf5(path: str, sets: dict[str, SampleSet],
                         current_set: "SampleSet | None" = None,
                         export_order: str = "USAXS-SAXS-WAXS",
                         cmd_filename: str = DEFAULT_CMD_FILENAME,
-                        export_list_mode: bool = False) -> None:
-    """Save full tool state to HDF5: saved sets, current set, and export controls."""
+                        export_list_mode: bool = False,
+                        timing: dict | None = None,
+                        hook: dict | None = None) -> None:
+    """Save full tool state to HDF5: saved sets, current set, export controls,
+    timing constants, and hook function settings."""
     with h5py.File(path, "w") as f:
         f.attrs["creator"] = "Matilda SamplePlateSetup"
-        f.attrs["version"] = "2.0"
+        f.attrs["version"] = "3.0"
         f.attrs["saved"] = datetime.datetime.now().isoformat()
         f.attrs["export_order"] = export_order
         f.attrs["cmd_filename"] = cmd_filename
         f.attrs["export_list_mode"] = int(export_list_mode)
+        # Timing constants
+        if timing:
+            tg = f.require_group("timing")
+            for k, v in timing.items():
+                tg.attrs[k] = v
+        # Hook function settings
+        if hook:
+            hg = f.require_group("hook")
+            hg.attrs["enabled"] = int(hook.get("enabled", False))
+            rows = hook.get("rows", [])
+            hg.attrs["n_rows"] = len(rows)
+            for i, (en, dsx, dsy, suffix) in enumerate(rows):
+                hg.attrs[f"row{i}_enabled"] = int(en)
+                hg.attrs[f"row{i}_dsx"] = float(dsx)
+                hg.attrs[f"row{i}_dsy"] = float(dsy)
+                hg.attrs[f"row{i}_suffix"] = suffix
         if current_set is not None:
             grp_cur = f.require_group("current_set")
             _write_set_to_group(grp_cur, current_set)
@@ -369,6 +394,8 @@ def load_state_from_hdf5(path: str) -> dict:
         'export_order'    : str
         'cmd_filename'    : str
         'export_list_mode': bool
+        'timing'          : dict | None
+        'hook'            : dict | None
     """
     result = {
         "saved_sets": {},
@@ -376,18 +403,37 @@ def load_state_from_hdf5(path: str) -> dict:
         "export_order": "USAXS-SAXS-WAXS",
         "cmd_filename": DEFAULT_CMD_FILENAME,
         "export_list_mode": False,
+        "timing": None,
+        "hook": None,
     }
     with h5py.File(path, "r") as f:
         result["export_order"] = f.attrs.get("export_order", "USAXS-SAXS-WAXS")
         result["cmd_filename"] = f.attrs.get("cmd_filename", DEFAULT_CMD_FILENAME)
         result["export_list_mode"] = bool(f.attrs.get("export_list_mode", 0))
+        tg = f.get("timing")
+        if isinstance(tg, h5py.Group):
+            result["timing"] = {k: tg.attrs[k] for k in tg.attrs}
+        hg = f.get("hook")
+        if isinstance(hg, h5py.Group):
+            n = int(hg.attrs.get("n_rows", 0))
+            rows = []
+            for i in range(n):
+                rows.append((
+                    bool(hg.attrs.get(f"row{i}_enabled", True)),
+                    float(hg.attrs.get(f"row{i}_dsx", 0.0)),
+                    float(hg.attrs.get(f"row{i}_dsy", 0.0)),
+                    str(hg.attrs.get(f"row{i}_suffix", "")),
+                ))
+            result["hook"] = {"enabled": bool(hg.attrs.get("enabled", False)), "rows": rows}
         grp_cur = f.get("current_set")
-        if grp_cur is not None:
+        if isinstance(grp_cur, h5py.Group):
             result["current_set"] = _read_set_from_group(grp_cur)
         grp = f.get("saved_sets")
-        if grp is not None:
+        if isinstance(grp, h5py.Group):
             for name in grp:
-                result["saved_sets"][name] = _read_set_from_group(grp[name])
+                sg = grp[name]
+                if isinstance(sg, h5py.Group):
+                    result["saved_sets"][name] = _read_set_from_group(sg)
     return result
 
 
@@ -438,7 +484,8 @@ def check_for_blanks(sample_set: SampleSet) -> str:
 
 def generate_command_file(sets_to_export: list[SampleSet],
                           export_order: str = "USAXS-SAXS-WAXS",
-                          include_header: bool = True) -> str:
+                          include_header: bool = True,
+                          hook_offsets: list | None = None) -> str:
     """Generate the ASCII command file content for one or more SampleSets."""
     lines = []
     if include_header:
@@ -466,10 +513,21 @@ def generate_command_file(sets_to_export: list[SampleSet],
         lines.append("")
         lines += _write_commands_for_set(ss, export_order)
 
+    if hook_offsets:
+        for (dsx, dsy, suffix, enabled) in hook_offsets:
+            if not enabled:
+                continue
+            lines.append("")
+            lines.append(f"        # Hook offset: SX+{dsx:.2f}, SY+{dsy:.2f}, suffix='{suffix}'")
+            for ss in sets_to_export:
+                lines += _write_commands_for_set(ss, export_order, sx_offset=dsx, sy_offset=dsy, name_suffix=suffix)
+
     return "\n".join(lines)
 
 
-def _write_commands_for_set(ss: SampleSet, export_order: str) -> list[str]:
+def _write_commands_for_set(ss: SampleSet, export_order: str,
+                            sx_offset: float = 0.0, sy_offset: float = 0.0,
+                            name_suffix: str = "") -> list[str]:
     lines = []
 
     def usaxs_rows():
@@ -489,15 +547,21 @@ def _write_commands_for_set(ss: SampleSet, export_order: str) -> list[str]:
 
     def fmt_usaxs(r: SampleRow):
         t = r.thickness if r.thickness > 0 else DEFAULT_THICKNESS
-        return f'      USAXSscan      {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"'
+        sx = r.sx + sx_offset
+        sy = r.sy + sy_offset
+        return f'      USAXSscan      {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"'
 
     def fmt_saxs(r: SampleRow):
         t = r.thickness if r.thickness > 0 else DEFAULT_THICKNESS
-        return f'      saxsExp        {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"'
+        sx = r.sx + sx_offset
+        sy = r.sy + sy_offset
+        return f'      saxsExp        {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"'
 
     def fmt_waxs(r: SampleRow):
         t = r.thickness if r.thickness > 0 else DEFAULT_THICKNESS
-        return f'      waxsExp        {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"'
+        sx = r.sx + sx_offset
+        sy = r.sy + sy_offset
+        return f'      waxsExp        {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"'
 
     if export_order == "USAXS-SAXS-WAXS":
         lines.append("        #USAXS measurements")
@@ -547,9 +611,11 @@ def _write_commands_for_set(ss: SampleSet, export_order: str) -> list[str]:
         lines.append("")
         for r in usaxs_rows():
             t = r.thickness if r.thickness > 0 else DEFAULT_THICKNESS
-            lines.append(f'      USAXSscan      {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"')
-            lines.append(f'      saxsExp        {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"')
-            lines.append(f'      waxsExp        {r.sx:.3f}      {r.sy:.3f}      {t:.3f}      "{r.name}"')
+            sx = r.sx + sx_offset
+            sy = r.sy + sy_offset
+            lines.append(f'      USAXSscan      {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"')
+            lines.append(f'      saxsExp        {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"')
+            lines.append(f'      waxsExp        {sx:.3f}      {sy:.3f}      {t:.3f}      "{r.name}{name_suffix}"')
             lines.append("")
         lines.append("        #END of batch of measurements")
 
@@ -561,7 +627,16 @@ def _write_commands_for_set(ss: SampleSet, export_order: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def estimate_run_time(ss: SampleSet, usaxs_time: float, saxs_time: float,
-                      waxs_time: float) -> tuple[int, int, int, int]:
+                      waxs_time: float,
+                      usaxs_overhead: float = USAXS_OVERHEAD,
+                      saxs_overhead: float = SAXS_OVERHEAD,
+                      waxs_overhead: float = WAXS_OVERHEAD,
+                      move_speed: float = SAMPLE_MOVE_SPEED,
+                      geom_switch: float = GEOMETRY_SWITCH_TIME,
+                      retune_interval: float = USAXS_RETUNE_INTERVAL,
+                      retune_every_n: int = USAXS_RETUNE_EVERY_N,
+                      usaxs_retune_time: float = USAXS_RETUNE_TIME,
+                      swaxs_retune_time: float = SWAXS_RETUNE_TIME) -> tuple[int, int, int, int]:
     """
     Returns (num_usaxs, num_saxs, num_waxs, total_minutes).
     """
@@ -585,29 +660,29 @@ def estimate_run_time(ss: SampleSet, usaxs_time: float, saxs_time: float,
     n_saxs = len(saxs_rows)
     n_waxs = len(waxs_rows)
 
-    total += n_usaxs * (usaxs_time + USAXS_OVERHEAD)
-    total += total_travel(usaxs_rows) / SAMPLE_MOVE_SPEED + n_usaxs
+    total += n_usaxs * (usaxs_time + usaxs_overhead)
+    total += total_travel(usaxs_rows) / move_speed + n_usaxs
 
     if n_usaxs > 0:
-        total += GEOMETRY_SWITCH_TIME
+        total += geom_switch
 
-    total += n_saxs * (saxs_time + SAXS_OVERHEAD)
-    total += total_travel(saxs_rows) / SAMPLE_MOVE_SPEED + n_saxs
-    sw_time = n_saxs * (saxs_time + SAXS_OVERHEAD) + total_travel(saxs_rows) / SAMPLE_MOVE_SPEED + n_saxs
+    total += n_saxs * (saxs_time + saxs_overhead)
+    total += total_travel(saxs_rows) / move_speed + n_saxs
+    sw_time = n_saxs * (saxs_time + saxs_overhead) + total_travel(saxs_rows) / move_speed + n_saxs
 
     if n_saxs > 0:
-        total += GEOMETRY_SWITCH_TIME
+        total += geom_switch
 
-    total += n_waxs * (waxs_time + WAXS_OVERHEAD)
-    total += total_travel(waxs_rows) / SAMPLE_MOVE_SPEED + n_waxs
-    sw_time += n_waxs * (waxs_time + WAXS_OVERHEAD) + total_travel(waxs_rows) / SAMPLE_MOVE_SPEED + n_waxs
+    total += n_waxs * (waxs_time + waxs_overhead)
+    total += total_travel(waxs_rows) / move_speed + n_waxs
+    sw_time += n_waxs * (waxs_time + waxs_overhead) + total_travel(waxs_rows) / move_speed + n_waxs
 
     if n_waxs > 0:
-        total += GEOMETRY_SWITCH_TIME
+        total += geom_switch
 
-    num_sw_tunes = sw_time / USAXS_RETUNE_INTERVAL
-    num_u_tunes = n_usaxs / USAXS_RETUNE_EVERY_N
-    total += num_sw_tunes * SWAXS_RETUNE_TIME + num_u_tunes * USAXS_RETUNE_TIME
+    num_sw_tunes = sw_time / retune_interval if retune_interval > 0 else 0
+    num_u_tunes = n_usaxs / retune_every_n if retune_every_n > 0 else 0
+    total += num_sw_tunes * swaxs_retune_time + num_u_tunes * usaxs_retune_time
 
     total_min = max(0, round(total / 60))
     return n_usaxs, n_saxs, n_waxs, total_min
@@ -896,6 +971,99 @@ class SampleTable(QTableWidget):
                     chk.setChecked(True)
         self.dataChanged.emit()
 
+    def add_to_sx_sy(self):
+        """Dialog: add constant dSX, dSY offsets to all selected rows."""
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            QMessageBox.information(self, "No selection", "Select rows first.")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Add to SX / SY")
+        lay = QFormLayout(dlg)
+        dsx_spin = QDoubleSpinBox(); dsx_spin.setRange(-9999, 9999); dsx_spin.setDecimals(3); dsx_spin.setValue(0.0)
+        dsy_spin = QDoubleSpinBox(); dsy_spin.setRange(-9999, 9999); dsy_spin.setDecimals(3); dsy_spin.setValue(0.0)
+        lay.addRow("\u0394SX [mm]:", dsx_spin)
+        lay.addRow("\u0394SY [mm]:", dsy_spin)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(dlg.accept); btns.rejected.connect(dlg.reject)
+        lay.addRow(btns)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        dsx, dsy = dsx_spin.value(), dsy_spin.value()
+        for r in rows:
+            for col, delta in ((COL_SX, dsx), (COL_SY, dsy)):
+                item = self.item(r, col)
+                try:
+                    val = float(item.text()) + delta
+                except (ValueError, AttributeError):
+                    val = delta
+                self.setItem(r, col, QTableWidgetItem(f"{val:.3f}"))
+        self.dataChanged.emit()
+
+    def write_same_positions(self):
+        """Dialog: write same SX/SY/thickness to selected rows with per-field opt-in."""
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            QMessageBox.information(self, "No selection", "Select rows first.")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Write Same SX / SY / Thickness")
+        lay = QGridLayout(dlg)
+        lay.addWidget(QLabel("Apply?"), 0, 0)
+        lay.addWidget(QLabel("Field"), 0, 1)
+        lay.addWidget(QLabel("Value"), 0, 2)
+        chk_sx = QCheckBox(); chk_sx.setChecked(False)
+        chk_sy = QCheckBox(); chk_sy.setChecked(False)
+        chk_th = QCheckBox(); chk_th.setChecked(False)
+        sx_spin = QDoubleSpinBox(); sx_spin.setRange(-9999, 9999); sx_spin.setDecimals(3)
+        sy_spin = QDoubleSpinBox(); sy_spin.setRange(-9999, 9999); sy_spin.setDecimals(3)
+        th_spin = QDoubleSpinBox(); th_spin.setRange(0, 100); th_spin.setDecimals(3); th_spin.setValue(DEFAULT_THICKNESS)
+        lay.addWidget(chk_sx, 1, 0); lay.addWidget(QLabel("SX [mm]:"), 1, 1); lay.addWidget(sx_spin, 1, 2)
+        lay.addWidget(chk_sy, 2, 0); lay.addWidget(QLabel("SY [mm]:"), 2, 1); lay.addWidget(sy_spin, 2, 2)
+        lay.addWidget(chk_th, 3, 0); lay.addWidget(QLabel("Thickness [mm]:"), 3, 1); lay.addWidget(th_spin, 3, 2)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(dlg.accept); btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns, 4, 0, 1, 3)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        for r in rows:
+            if chk_sx.isChecked():
+                self.setItem(r, COL_SX, QTableWidgetItem(f"{sx_spin.value():.3f}"))
+            if chk_sy.isChecked():
+                self.setItem(r, COL_SY, QTableWidgetItem(f"{sy_spin.value():.3f}"))
+            if chk_th.isChecked():
+                self.setItem(r, COL_THICK, QTableWidgetItem(f"{th_spin.value():.3f}"))
+        self.dataChanged.emit()
+
+    def write_same_name(self):
+        """Dialog: write same name (optionally with incrementing number) to selected rows."""
+        rows = sorted(set(item.row() for item in self.selectedItems()))
+        if not rows:
+            QMessageBox.information(self, "No selection", "Select rows first.")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Write Same Name")
+        lay = QFormLayout(dlg)
+        name_edit = QLineEdit("Sample")
+        chk_num = QCheckBox("Append incrementing number")
+        chk_num.setChecked(True)
+        start_spin = QSpinBox(); start_spin.setRange(0, 9999); start_spin.setValue(1)
+        lay.addRow("Name:", name_edit)
+        lay.addRow("", chk_num)
+        lay.addRow("Start number:", start_spin)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(dlg.accept); btns.rejected.connect(dlg.reject)
+        lay.addRow(btns)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        base = name_edit.text()
+        use_num = chk_num.isChecked()
+        start = start_spin.value()
+        for i, r in enumerate(rows):
+            name = f"{base}{start + i}" if use_num else base
+            self.setItem(r, COL_NAME, QTableWidgetItem(name))
+        self.dataChanged.emit()
+
     def copy_selection(self):
         rows = sorted(set(item.row() for item in self.selectedItems()))
         lines = []
@@ -951,6 +1119,10 @@ class SampleTable(QTableWidget):
         menu.addAction("Increment SX (stepped)...", self.increment_sx_stepped)
         menu.addAction("Increment SY (stepped)...", self.increment_sy_stepped)
         menu.addSeparator()
+        menu.addAction("Add to SX/SY values...", self.add_to_sx_sy)
+        menu.addAction("Write same SX/SY/thickness...", self.write_same_positions)
+        menu.addAction("Write same name...", self.write_same_name)
+        menu.addSeparator()
         menu.addAction("Set as Blank", self.set_as_blank)
         menu.addAction("Set as AgBehenateLaB6", self.set_as_agbehenaatelab6)
         menu.addAction("Clear Row", self.clear_row)
@@ -997,6 +1169,8 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setBackground('w')
+        self._frame_item = None
         self._plot = self.addPlot(row=0, col=0)
         self._plot.setAspectLocked(True)
         self._plot.invertY(True)
@@ -1024,8 +1198,15 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
         # ImageItem: pixel axis -> mm
         self._img_item.setImage(img, autoLevels=True)
         self._img_item.setRect(0, 0, self._plate_w, self._plate_h)
-        self._plot.setXRange(0, self._plate_w)
-        self._plot.setYRange(0, self._plate_h)
+        if self._frame_item is not None:
+            self._plot.removeItem(self._frame_item)
+        self._frame_item = pg.PlotDataItem(
+            [0, self._plate_w, self._plate_w, 0, 0],
+            [0, 0, self._plate_h, self._plate_h, 0],
+            pen=pg.mkPen('k', width=2))
+        self._plot.addItem(self._frame_item)
+        self._plot.setXRange(-10, self._plate_w + 10)
+        self._plot.setYRange(-10, self._plate_h + 10)
 
     def update_markers(self, rows: list[SampleRow], current_row: int = -1):
         for t in self._text_items:
@@ -1456,6 +1637,9 @@ class SamplePlateSetupWindow(QMainWindow):
         self._usaxs_time = USAXS_SCAN_TIME_DEFAULT
         self._saxs_time = SAXS_SCAN_TIME_DEFAULT
         self._waxs_time = WAXS_SCAN_TIME_DEFAULT
+        self._settings_hdf5_path: str | None = None
+        self._hdf5_dirty: bool = False
+        self._last_export_dir: str | None = None
 
         self._build_ui()
         self._load_template("9x9 Acrylic/magnetic plate")
@@ -1491,6 +1675,24 @@ class SamplePlateSetupWindow(QMainWindow):
         toolbar.addStretch()
         self._runtime_lbl = QLabel("Est. time: - min  |  Samples: 0")
         toolbar.addWidget(self._runtime_lbl)
+
+        self._hdf5_settings_lbl = QLabel("Settings: (not saved)")
+        self._hdf5_settings_lbl.setStyleSheet("color: grey; font-style: italic;")
+        toolbar.addWidget(self._hdf5_settings_lbl)
+
+        btn_reset = QPushButton("Reset Tool")
+        btn_reset.setStyleSheet("background-color: #ffcccc;")
+        btn_reset.clicked.connect(self._on_reset_tool)
+        toolbar.addWidget(btn_reset)
+
+        btn_save_settings = QPushButton("Save Settings...")
+        btn_save_settings.clicked.connect(self._on_save_settings)
+        toolbar.addWidget(btn_save_settings)
+
+        btn_load_settings = QPushButton("Load Settings...")
+        btn_load_settings.clicked.connect(self._on_load_settings)
+        toolbar.addWidget(btn_load_settings)
+
         main_layout.addLayout(toolbar)
 
         # Status message
@@ -1499,8 +1701,8 @@ class SamplePlateSetupWindow(QMainWindow):
         main_layout.addWidget(self._status_lbl)
 
         # Tab widget
-        tabs = QTabWidget()
-        main_layout.addWidget(tabs)
+        self._tabs = QTabWidget()
+        main_layout.addWidget(self._tabs)
 
         # -- Tab 1: Sample Table --
         tab1 = QWidget()
@@ -1563,35 +1765,150 @@ class SamplePlateSetupWindow(QMainWindow):
         right.addWidget(self._canvas, 1)
         tab1_lay.addLayout(right, 40)
 
-        tabs.addTab(tab1, "Sample Table")
+        self._tabs.addTab(tab1, "Sample Table")
 
         # -- Tab 2: Option Controls --
         tab2 = QWidget()
-        tab2_lay = QFormLayout(tab2)
+        tab2_outer = QVBoxLayout(tab2)
+        tab2_scroll = QScrollArea()
+        tab2_scroll.setWidgetResizable(True)
+        tab2_inner = QWidget()
+        tab2_lay = QVBoxLayout(tab2_inner)
+        tab2_scroll.setWidget(tab2_inner)
+        tab2_outer.addWidget(tab2_scroll)
+
+        # Scan Times group
+        scan_grp = QGroupBox("Scan Times")
+        scan_form = QFormLayout(scan_grp)
         self._usaxs_time_spin = QDoubleSpinBox()
         self._usaxs_time_spin.setRange(10, 600)
         self._usaxs_time_spin.setValue(USAXS_SCAN_TIME_DEFAULT)
         self._usaxs_time_spin.setSuffix(" s")
         self._usaxs_time_spin.valueChanged.connect(self._update_runtime)
-        tab2_lay.addRow("USAXS scan time:", self._usaxs_time_spin)
+        scan_form.addRow("USAXS scan time:", self._usaxs_time_spin)
         self._saxs_time_spin = QDoubleSpinBox()
         self._saxs_time_spin.setRange(0.1, 3600)
         self._saxs_time_spin.setValue(SAXS_SCAN_TIME_DEFAULT)
         self._saxs_time_spin.setSuffix(" s")
         self._saxs_time_spin.valueChanged.connect(self._update_runtime)
-        tab2_lay.addRow("SAXS scan time:", self._saxs_time_spin)
+        scan_form.addRow("SAXS scan time:", self._saxs_time_spin)
         self._waxs_time_spin = QDoubleSpinBox()
         self._waxs_time_spin.setRange(0.1, 3600)
         self._waxs_time_spin.setValue(WAXS_SCAN_TIME_DEFAULT)
         self._waxs_time_spin.setSuffix(" s")
         self._waxs_time_spin.valueChanged.connect(self._update_runtime)
-        tab2_lay.addRow("WAXS scan time:", self._waxs_time_spin)
+        scan_form.addRow("WAXS scan time:", self._waxs_time_spin)
         self._default_thick = QDoubleSpinBox()
         self._default_thick.setRange(0, 20)
         self._default_thick.setValue(DEFAULT_THICKNESS)
         self._default_thick.setSuffix(" mm")
-        tab2_lay.addRow("Default sample thickness:", self._default_thick)
-        tabs.addTab(tab2, "Option Controls")
+        scan_form.addRow("Default sample thickness:", self._default_thick)
+        tab2_lay.addWidget(scan_grp)
+
+        # Timing Constants group
+        timing_grp = QGroupBox("Timing Constants")
+        timing_lay = QFormLayout(timing_grp)
+
+        self._usaxs_overhead_spin = QDoubleSpinBox()
+        self._usaxs_overhead_spin.setRange(0, 300); self._usaxs_overhead_spin.setValue(USAXS_OVERHEAD); self._usaxs_overhead_spin.setSuffix(" s")
+        self._usaxs_overhead_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("USAXS overhead:", self._usaxs_overhead_spin)
+
+        self._saxs_overhead_spin = QDoubleSpinBox()
+        self._saxs_overhead_spin.setRange(0, 300); self._saxs_overhead_spin.setValue(SAXS_OVERHEAD); self._saxs_overhead_spin.setSuffix(" s")
+        self._saxs_overhead_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("SAXS overhead:", self._saxs_overhead_spin)
+
+        self._waxs_overhead_spin = QDoubleSpinBox()
+        self._waxs_overhead_spin.setRange(0, 300); self._waxs_overhead_spin.setValue(WAXS_OVERHEAD); self._waxs_overhead_spin.setSuffix(" s")
+        self._waxs_overhead_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("WAXS overhead:", self._waxs_overhead_spin)
+
+        self._move_speed_spin = QDoubleSpinBox()
+        self._move_speed_spin.setRange(0.1, 200); self._move_speed_spin.setValue(SAMPLE_MOVE_SPEED); self._move_speed_spin.setSuffix(" mm/s")
+        self._move_speed_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("Sample move speed:", self._move_speed_spin)
+
+        self._geom_switch_spin = QDoubleSpinBox()
+        self._geom_switch_spin.setRange(0, 300); self._geom_switch_spin.setValue(GEOMETRY_SWITCH_TIME); self._geom_switch_spin.setSuffix(" s")
+        self._geom_switch_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("Geometry switch time:", self._geom_switch_spin)
+
+        self._retune_interval_spin = QDoubleSpinBox()
+        self._retune_interval_spin.setRange(0, 3600); self._retune_interval_spin.setValue(USAXS_RETUNE_INTERVAL); self._retune_interval_spin.setSuffix(" s")
+        self._retune_interval_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("Retune interval:", self._retune_interval_spin)
+
+        self._retune_every_n_spin = QSpinBox()
+        self._retune_every_n_spin.setRange(1, 20); self._retune_every_n_spin.setValue(USAXS_RETUNE_EVERY_N)
+        self._retune_every_n_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("USAXS retune every N scans:", self._retune_every_n_spin)
+
+        self._usaxs_retune_spin = QDoubleSpinBox()
+        self._usaxs_retune_spin.setRange(0, 300); self._usaxs_retune_spin.setValue(USAXS_RETUNE_TIME); self._usaxs_retune_spin.setSuffix(" s")
+        self._usaxs_retune_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("USAXS retune time:", self._usaxs_retune_spin)
+
+        self._swaxs_retune_spin = QDoubleSpinBox()
+        self._swaxs_retune_spin.setRange(0, 300); self._swaxs_retune_spin.setValue(SWAXS_RETUNE_TIME); self._swaxs_retune_spin.setSuffix(" s")
+        self._swaxs_retune_spin.valueChanged.connect(self._update_runtime)
+        timing_lay.addRow("SAXS/WAXS retune time:", self._swaxs_retune_spin)
+
+        tab2_lay.addWidget(timing_grp)
+
+        # Export Hook Function group
+        hook_grp = QGroupBox("Export Hook Function")
+        hook_grp.setToolTip("After normal export, run additional passes at offset positions.\n"
+                             "Positive dSX shifts sample right (beam hits left -> 'L').\n"
+                             "Negative dSX shifts sample left (beam hits right -> 'R').\n"
+                             "Positive dSY shifts sample down (beam hits bottom -> 'B').\n"
+                             "Negative dSY shifts sample up (beam hits top -> 'T').")
+        hook_outer = QVBoxLayout(hook_grp)
+        self._hook_enabled = QCheckBox("Enable hook function in exports")
+        hook_outer.addWidget(self._hook_enabled)
+
+        hook_grid = QGridLayout()
+        hook_grid.addWidget(QLabel("Enable"), 0, 0)
+        hook_grid.addWidget(QLabel("Direction"), 0, 1)
+        hook_grid.addWidget(QLabel("dSX [mm]"), 0, 2)
+        hook_grid.addWidget(QLabel("dSY [mm]"), 0, 3)
+        hook_grid.addWidget(QLabel("Suffix"), 0, 4)
+
+        self._hook_rows = []  # list of (chk, dsx_spin, dsy_spin, suffix_edit)
+        hook_defaults = [
+            (True,  "Right (R)", -1.0, 0.0, "_R"),
+            (True,  "Top (T)",    0.0, -1.0, "_T"),
+            (True,  "Left (L)",   1.0, 0.0, "_L"),
+            (True,  "Bottom (B)", 0.0, 1.0, "_B"),
+        ]
+        for i, (en, label, dsx, dsy, suffix) in enumerate(hook_defaults):
+            chk = QCheckBox(); chk.setChecked(en)
+            dsx_s = QDoubleSpinBox(); dsx_s.setRange(-999, 999); dsx_s.setDecimals(2); dsx_s.setValue(dsx)
+            dsy_s = QDoubleSpinBox(); dsy_s.setRange(-999, 999); dsy_s.setDecimals(2); dsy_s.setValue(dsy)
+            suf_e = QLineEdit(suffix); suf_e.setMaximumWidth(60)
+            hook_grid.addWidget(chk, i + 1, 0)
+            hook_grid.addWidget(QLabel(label), i + 1, 1)
+            hook_grid.addWidget(dsx_s, i + 1, 2)
+            hook_grid.addWidget(dsy_s, i + 1, 3)
+            hook_grid.addWidget(suf_e, i + 1, 4)
+            self._hook_rows.append((chk, dsx_s, dsy_s, suf_e))
+
+        hook_outer.addLayout(hook_grid)
+        tab2_lay.addWidget(hook_grp)
+        tab2_lay.addStretch()
+
+        # Connect overhead spinboxes and hook enable to _mark_settings_dirty
+        for spin in (self._usaxs_overhead_spin, self._saxs_overhead_spin,
+                     self._waxs_overhead_spin, self._move_speed_spin,
+                     self._geom_switch_spin, self._retune_interval_spin,
+                     self._usaxs_retune_spin, self._swaxs_retune_spin):
+            spin.valueChanged.connect(self._mark_settings_dirty)
+        self._retune_every_n_spin.valueChanged.connect(self._mark_settings_dirty)
+        self._hook_enabled.stateChanged.connect(self._mark_settings_dirty)
+        for chk, dsx_s, dsy_s, suf_e in self._hook_rows:
+            chk.stateChanged.connect(self._mark_settings_dirty)
+
+        self._tabs.addTab(tab2, "Option Controls")
 
         # -- Tab 3: Export Controls --
         tab3 = QWidget()
@@ -1621,6 +1938,8 @@ class SamplePlateSetupWindow(QMainWindow):
             lambda s: self._export_list.setChecked(not bool(s)))
         self._export_list.stateChanged.connect(
             lambda s: self._export_current.setChecked(not bool(s)))
+        self._export_current.stateChanged.connect(self._update_export_tab_color)
+        self._export_list.stateChanged.connect(self._update_export_tab_color)
         mode_lay.addWidget(self._export_current)
         mode_lay.addWidget(self._export_list)
         tab3_lay.addWidget(mode_grp)
@@ -1642,7 +1961,7 @@ class SamplePlateSetupWindow(QMainWindow):
         exp_btns.addWidget(btn_exp_named)
         exp_btns.addWidget(btn_exp_append)
         tab3_lay.addLayout(exp_btns)
-        tabs.addTab(tab3, "Export Controls")
+        self._tabs.addTab(tab3, "Export Controls")
 
         # Menubar
         menubar = self.menuBar()
@@ -1659,6 +1978,11 @@ class SamplePlateSetupWindow(QMainWindow):
         help_menu = menubar.addMenu("Help")
         help_menu.addAction("About", self._on_about)
 
+        # Apply initial column visibility based on global checkboxes
+        self._table.setColumnHidden(COL_USAXS, self._usaxs_all.isChecked())
+        self._table.setColumnHidden(COL_SAXS, self._saxs_all.isChecked())
+        self._table.setColumnHidden(COL_WAXS, self._waxs_all.isChecked())
+
     # ------------------------------------------------------------------
     # Event handlers
     # ------------------------------------------------------------------
@@ -1674,6 +1998,9 @@ class SamplePlateSetupWindow(QMainWindow):
         self._table.set_column_checked(COL_USAXS, self._usaxs_all.isChecked())
         self._table.set_column_checked(COL_SAXS, self._saxs_all.isChecked())
         self._table.set_column_checked(COL_WAXS, self._waxs_all.isChecked())
+        self._table.setColumnHidden(COL_USAXS, self._usaxs_all.isChecked())
+        self._table.setColumnHidden(COL_SAXS, self._saxs_all.isChecked())
+        self._table.setColumnHidden(COL_WAXS, self._waxs_all.isChecked())
         self._update_runtime()
 
     def _on_table_changed(self):
@@ -1816,6 +2143,7 @@ class SamplePlateSetupWindow(QMainWindow):
             sets,
             export_order=self._order_combo.currentText(),
             include_header=True,
+            hook_offsets=self._get_hook_offsets(),
         )
         dlg = QDialog(self)
         dlg.setWindowTitle("Command File Preview")
@@ -1831,6 +2159,14 @@ class SamplePlateSetupWindow(QMainWindow):
         lay.addWidget(btn)
         dlg.exec()
 
+    def _get_hook_offsets(self):
+        if not self._hook_enabled.isChecked():
+            return None
+        result = []
+        for chk, dsx_s, dsy_s, suf_e in self._hook_rows:
+            result.append((dsx_s.value(), dsy_s.value(), suf_e.text(), chk.isChecked()))
+        return result
+
     def _on_export(self):
         sets = self._collect_sets_for_export()
         if not sets:
@@ -1842,12 +2178,17 @@ class SamplePlateSetupWindow(QMainWindow):
             sets,
             export_order=self._order_combo.currentText(),
             include_header=True,
+            hook_offsets=self._get_hook_offsets(),
         )
         fname = self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME
-        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-        path = os.path.join(desktop, fname)
+        if self._last_export_dir is not None:
+            out_dir = self._last_export_dir
+        else:
+            out_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        path = os.path.join(out_dir, fname)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
+        self._last_export_dir = os.path.dirname(path)
         self._status_lbl.setText(f"Exported command file: {path}")
 
     def _on_export_named(self):
@@ -1861,13 +2202,17 @@ class SamplePlateSetupWindow(QMainWindow):
             sets,
             export_order=self._order_combo.currentText(),
             include_header=True,
+            hook_offsets=self._get_hook_offsets(),
         )
         fname = self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME
+        init_dir = self._last_export_dir or ""
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save command file", fname, "Command files (*.mac);;All files (*)")
+            self, "Save command file", os.path.join(init_dir, fname),
+            "Command files (*.mac);;All files (*)")
         if path:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
+            self._last_export_dir = os.path.dirname(path)
             self._status_lbl.setText(f"Exported: {path}")
 
     def _on_export_append(self):
@@ -1878,10 +2223,12 @@ class SamplePlateSetupWindow(QMainWindow):
             sets,
             export_order=self._order_combo.currentText(),
             include_header=False,
+            hook_offsets=self._get_hook_offsets(),
         )
         fname = self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME
+        init_dir = self._last_export_dir or ""
         path, _ = QFileDialog.getSaveFileName(
-            self, "Append to command file", fname,
+            self, "Append to command file", os.path.join(init_dir, fname),
             "Command files (*.mac);;All files (*)")
         if path:
             existing = ""
@@ -1892,6 +2239,7 @@ class SamplePlateSetupWindow(QMainWindow):
                 f.write(existing)
                 f.write("\n\n###  Appended commands\n\n")
                 f.write(content_new)
+            self._last_export_dir = os.path.dirname(path)
             self._status_lbl.setText(f"Appended to: {path}")
 
     def _on_beamline_survey(self):
@@ -1951,6 +2299,9 @@ class SamplePlateSetupWindow(QMainWindow):
         self._status_lbl.setText(
             f"Loaded {len(self._saved_sets)} set(s) from {os.path.basename(path)}")
         self._unsaved = False
+        self._table.setColumnHidden(COL_USAXS, self._usaxs_all.isChecked())
+        self._table.setColumnHidden(COL_SAXS, self._saxs_all.isChecked())
+        self._table.setColumnHidden(COL_WAXS, self._waxs_all.isChecked())
 
     def _on_save_hdf5(self):
         if self._hdf5_path is None:
@@ -2026,6 +2377,168 @@ class SamplePlateSetupWindow(QMainWindow):
             "APS 12-ID-E, Argonne National Laboratory.",
         )
 
+    def _update_export_tab_color(self):
+        idx = 2  # Export Controls tab index
+        if self._export_list.isChecked():
+            self._tabs.tabBar().setTabTextColor(idx, QColor('darkgreen'))
+        else:
+            self._tabs.tabBar().setTabTextColor(idx, QColor())
+
+    def _update_settings_label(self):
+        if self._settings_hdf5_path is None:
+            self._hdf5_settings_lbl.setText("Settings: (not saved)")
+            self._hdf5_settings_lbl.setStyleSheet("color: grey; font-style: italic;")
+        else:
+            base = os.path.basename(self._settings_hdf5_path)
+            if self._hdf5_dirty:
+                self._hdf5_settings_lbl.setText(f"Settings: {base} *")
+                self._hdf5_settings_lbl.setStyleSheet("color: darkorange; font-style: italic;")
+            else:
+                self._hdf5_settings_lbl.setText(f"Settings: {base}")
+                self._hdf5_settings_lbl.setStyleSheet("color: darkgreen; font-style: italic;")
+
+    def _mark_settings_dirty(self):
+        self._hdf5_dirty = True
+        self._update_settings_label()
+
+    def _on_reset_tool(self):
+        reply = QMessageBox.question(self, "Reset Tool",
+            "Reset all saved sets and settings to defaults?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._current_set = SampleSet()
+        self._saved_sets = {}
+        self._hdf5_path = None
+        self._table.load_from_sample_set(self._current_set)
+        self._canvas.update_markers([])
+        self._multi_export.set_saved_sets([])
+        self._set_name_edit.setText("MySamples")
+        self._usaxs_all.setChecked(True)
+        self._saxs_all.setChecked(True)
+        self._waxs_all.setChecked(True)
+        self._order_combo.setCurrentIndex(0)
+        self._cmd_fname.setText(DEFAULT_CMD_FILENAME)
+        self._export_current.setChecked(True)
+        self._update_runtime()
+        self._unsaved = False
+        self._hdf5_dirty = False
+        self._update_settings_label()
+        self._status_lbl.setText("Tool reset to defaults.")
+
+    def _on_save_settings(self):
+        default_name = "SamplePlate_settings.hdf5"
+        init_dir = os.path.dirname(self._settings_hdf5_path) if self._settings_hdf5_path else ""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Settings", os.path.join(init_dir, default_name),
+            "HDF5 files (*.hdf5 *.h5);;All files (*)")
+        if not path:
+            return
+        self._current_set.rows = self._table.get_sample_set()
+        self._current_set.usaxs_all = self._usaxs_all.isChecked()
+        self._current_set.saxs_all = self._saxs_all.isChecked()
+        self._current_set.waxs_all = self._waxs_all.isChecked()
+        self._saved_sets[self._current_set.name] = self._current_set.copy()
+        timing = {
+            "usaxs_time": self._usaxs_time_spin.value(),
+            "saxs_time": self._saxs_time_spin.value(),
+            "waxs_time": self._waxs_time_spin.value(),
+            "usaxs_overhead": self._usaxs_overhead_spin.value(),
+            "saxs_overhead": self._saxs_overhead_spin.value(),
+            "waxs_overhead": self._waxs_overhead_spin.value(),
+            "move_speed": self._move_speed_spin.value(),
+            "geom_switch": self._geom_switch_spin.value(),
+            "retune_interval": self._retune_interval_spin.value(),
+            "retune_every_n": self._retune_every_n_spin.value(),
+            "usaxs_retune_time": self._usaxs_retune_spin.value(),
+            "swaxs_retune_time": self._swaxs_retune_spin.value(),
+            "default_thickness": self._default_thick.value(),
+        }
+        hook = {
+            "enabled": self._hook_enabled.isChecked(),
+            "rows": [
+                (chk.isChecked(), dsx_s.value(), dsy_s.value(), suf_e.text())
+                for chk, dsx_s, dsy_s, suf_e in self._hook_rows
+            ],
+        }
+        save_state_to_hdf5(
+            path,
+            self._saved_sets,
+            current_set=self._current_set,
+            export_order=self._order_combo.currentText(),
+            cmd_filename=self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME,
+            export_list_mode=self._export_list.isChecked(),
+            timing=timing,
+            hook=hook,
+        )
+        self._settings_hdf5_path = path
+        self._hdf5_dirty = False
+        self._update_settings_label()
+        self._status_lbl.setText(f"Settings saved to {os.path.basename(path)}")
+
+    def _on_load_settings(self):
+        init_dir = os.path.dirname(self._settings_hdf5_path) if self._settings_hdf5_path else ""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Settings", init_dir,
+            "HDF5 files (*.hdf5 *.h5);;All files (*)")
+        if not path:
+            return
+        state = load_state_from_hdf5(path)
+        self._saved_sets = state["saved_sets"]
+        self._multi_export.set_saved_sets(list(self._saved_sets.keys()))
+        order = state["export_order"]
+        idx = self._order_combo.findText(order)
+        if idx >= 0:
+            self._order_combo.setCurrentIndex(idx)
+        self._cmd_fname.setText(state["cmd_filename"])
+        if state["export_list_mode"]:
+            self._export_list.setChecked(True)
+        else:
+            self._export_current.setChecked(True)
+        cur = state["current_set"]
+        if cur is None and self._saved_sets:
+            cur = next(iter(self._saved_sets.values())).copy()
+        if cur is not None:
+            self._current_set = cur
+            self._set_name_edit.setText(self._current_set.name)
+            self._usaxs_all.setChecked(self._current_set.usaxs_all)
+            self._saxs_all.setChecked(self._current_set.saxs_all)
+            self._waxs_all.setChecked(self._current_set.waxs_all)
+            self._table.load_from_sample_set(self._current_set)
+            self._canvas.update_markers(self._current_set.rows)
+            self._update_runtime()
+        # Restore timing constants
+        t = state.get("timing")
+        if t:
+            if "usaxs_time" in t: self._usaxs_time_spin.setValue(float(t["usaxs_time"]))
+            if "saxs_time" in t: self._saxs_time_spin.setValue(float(t["saxs_time"]))
+            if "waxs_time" in t: self._waxs_time_spin.setValue(float(t["waxs_time"]))
+            if "usaxs_overhead" in t: self._usaxs_overhead_spin.setValue(float(t["usaxs_overhead"]))
+            if "saxs_overhead" in t: self._saxs_overhead_spin.setValue(float(t["saxs_overhead"]))
+            if "waxs_overhead" in t: self._waxs_overhead_spin.setValue(float(t["waxs_overhead"]))
+            if "move_speed" in t: self._move_speed_spin.setValue(float(t["move_speed"]))
+            if "geom_switch" in t: self._geom_switch_spin.setValue(float(t["geom_switch"]))
+            if "retune_interval" in t: self._retune_interval_spin.setValue(float(t["retune_interval"]))
+            if "retune_every_n" in t: self._retune_every_n_spin.setValue(int(t["retune_every_n"]))
+            if "usaxs_retune_time" in t: self._usaxs_retune_spin.setValue(float(t["usaxs_retune_time"]))
+            if "swaxs_retune_time" in t: self._swaxs_retune_spin.setValue(float(t["swaxs_retune_time"]))
+            if "default_thickness" in t: self._default_thick.setValue(float(t["default_thickness"]))
+        # Restore hook function settings
+        h = state.get("hook")
+        if h:
+            self._hook_enabled.setChecked(bool(h.get("enabled", False)))
+            for i, (chk, dsx_s, dsy_s, suf_e) in enumerate(self._hook_rows):
+                if i < len(h.get("rows", [])):
+                    en, dsx, dsy, suffix = h["rows"][i]
+                    chk.setChecked(bool(en))
+                    dsx_s.setValue(float(dsx))
+                    dsy_s.setValue(float(dsy))
+                    suf_e.setText(str(suffix))
+        self._settings_hdf5_path = path
+        self._hdf5_dirty = False
+        self._update_settings_label()
+        self._status_lbl.setText(f"Settings loaded from {os.path.basename(path)}")
+
     def _update_runtime(self):
         self._current_set.rows = self._table.get_sample_set()
         n_u, n_s, n_w, t_min = estimate_run_time(
@@ -2033,6 +2546,15 @@ class SamplePlateSetupWindow(QMainWindow):
             self._usaxs_time_spin.value(),
             self._saxs_time_spin.value(),
             self._waxs_time_spin.value(),
+            usaxs_overhead=self._usaxs_overhead_spin.value(),
+            saxs_overhead=self._saxs_overhead_spin.value(),
+            waxs_overhead=self._waxs_overhead_spin.value(),
+            move_speed=self._move_speed_spin.value(),
+            geom_switch=self._geom_switch_spin.value(),
+            retune_interval=self._retune_interval_spin.value(),
+            retune_every_n=int(self._retune_every_n_spin.value()),
+            usaxs_retune_time=self._usaxs_retune_spin.value(),
+            swaxs_retune_time=self._swaxs_retune_spin.value(),
         )
         total = max(n_u, n_s, n_w)
         self._runtime_lbl.setText(
@@ -2049,6 +2571,17 @@ class SamplePlateSetupWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
+        if self._hdf5_dirty:
+            reply = QMessageBox.question(
+                self, "Unsaved settings",
+                "Settings have changed since last save. Save settings before exiting?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            if reply == QMessageBox.StandardButton.Yes:
+                self._on_save_settings()
         event.accept()
 
 

@@ -41,10 +41,13 @@ dependencies = [
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]
 # GUI tools use PySide6 (preferred) or PyQt6 as fallback + pyqtgraph for plotting.
+# IMPORTANT: install only ONE of PySide6 or PyQt6 — having both on the same
+# environment causes Qt platform-plugin conflicts on macOS ("cocoa not found").
+# PySide6 is listed here as the default.  Users who prefer PyQt6 should install
+# it manually and NOT use this extras group.
 # matplotlib is intentionally NOT listed here: it is a core headless dep.
 gui = [
     "PySide6",
-    "PyQt6",
     "pyqtgraph",
 ]
 # Install with: pip install matilda[dev]
@@ -55,7 +58,7 @@ dev = [
 # Install everything for a full local development setup:
 #   pip install -e .[gui,dev]
 all = [
-    "PyQt6",
+    "PySide6",
     "pyqtgraph",
     "pytest",
     "pytest-cov",

@@ -40,9 +40,10 @@ dependencies = [
 
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]
-# GUI tools use PyQt6 (or PySide6 as drop-in) + pyqtgraph for plotting.
+# GUI tools use PySide6 (preferred) or PyQt6 as fallback + pyqtgraph for plotting.
 # matplotlib is intentionally NOT listed here: it is a core headless dep.
 gui = [
+    "PySide6",
     "PyQt6",
     "pyqtgraph",
 ]
@@ -69,6 +70,7 @@ matilda = "matilda.matilda:main"
 
 # GUI tool entry points (require pip install matilda[gui]):
 matilda-sample-plates = "matilda.gui.sample_plate_setup:run_sample_plate_setup"
+matilda-gui = "matilda.gui.data_reduction:main"
 
 [tool.hatch.build.targets.wheel]
 # Package matilda/ and its subpackages (gui/, reduction/).

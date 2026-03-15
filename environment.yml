@@ -11,7 +11,7 @@ name: matilda
 #
 # INSTALL MATILDA IN EDITABLE MODE (run from repo root after env is active):
 #   pip install -e .          # core + headless server
-#   pip install -e .[gui]     # + PyQt6 and pyqtgraph for GUI development
+#   pip install -e .[gui]     # + PySide6 and pyqtgraph for GUI development
 #   pip install -e .[dev]     # + pytest for running tests
 #   pip install -e .[all]     # everything
 #
@@ -60,7 +60,10 @@ dependencies:
 
   # GUI stack — safe to leave in for all installs; ignored at runtime if
   # no GUI code is called.  Comment out for a minimal headless server env.
-  - pyqt6               # Qt6 Python bindings (alternative: pyside6)
+  # IMPORTANT: use only ONE of pyside6 or pyqt6 — having both installed
+  # (e.g. one via conda, one via pip) causes Qt platform-plugin conflicts
+  # on macOS ("cocoa not found") and potentially on Linux as well.
+  - pyside6             # Qt6 Python bindings (preferred; PyQt6 fallback in code)
   - pyqtgraph           # fast scientific plotting for GUI tools
 
   # Development / testing

@@ -55,20 +55,18 @@ Notes
 """
 import h5py
 import numpy as np
-import pprint
 import os
-import matplotlib.pyplot as plt
 import pprint as pp
 import logging
 #from scipy.optimize import curve_fit
 
 
-from supportFunctions import subtract_data 
-from convertUSAXS import rebinData
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
-from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
-from desmearing import desmearData
+from .supportFunctions import subtract_data
+from .convertUSAXS import rebinData
+from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
+from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
+from .desmearing import desmearData
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
@@ -325,19 +323,20 @@ def test_matildaLocal():
     # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"] 
     # SMR_Int =Sample["CalibratedData"]["SMR_Int"] 
     # #SMR_Error =Sample["CalibratedData"]["SMR_Error"] 
-    DSM_Qvec =Sample["CalibratedData"]["Q"] 
-    DSM_Int =Sample["CalibratedData"]["Intensity"] 
-    #DSM_Error =Sample["CalibratedData"]["Error"] 
-    plt.figure(figsize=(6, 12))
-    #plt.plot(SMR_Qvec, SMR_Int, linestyle='-')  # You can customize the marker and linestyle
-    plt.plot(DSM_Qvec, DSM_Int, linestyle='-')  # You can customize the marker and linestyle
-    plt.title('Plot of Intensity vs. Q')
-    plt.xlabel('log(Q) [1/A]')
-    plt.ylabel('Intensity')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show() 
+    DSM_Qvec =Sample["CalibratedData"]["Q"]
+    DSM_Int =Sample["CalibratedData"]["Intensity"]
+    #DSM_Error =Sample["CalibratedData"]["Error"]
+    # Debug plot (requires matplotlib; commented out for production):
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(6, 12))
+    # plt.plot(DSM_Qvec, DSM_Int, linestyle='-')
+    # plt.title('Plot of Intensity vs. Q')
+    # plt.xlabel('log(Q) [1/A]')
+    # plt.ylabel('Intensity')
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.grid(True)
+    # plt.show()
 
 
 

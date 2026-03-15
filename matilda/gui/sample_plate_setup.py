@@ -116,6 +116,33 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# Sample name validation helpers
+# ---------------------------------------------------------------------------
+
+def sanitize_sample_name(name: str) -> str:
+    """Return a valid sample name derived from *name*.
+
+    Rules (matching Bluesky / spec command-file conventions):
+    - Empty string is returned unchanged (empty = skip row in export).
+    - All characters that are not [A-Za-z0-9_] are replaced with '_'.
+    - If the first character is a digit, 'X' is prepended.
+    """
+    if not name:
+        return name
+    cleaned = re.sub(r'[^A-Za-z0-9_]', '_', name)
+    if cleaned[0].isdigit():
+        cleaned = 'X' + cleaned
+    return cleaned
+
+
+def validate_sample_name(name: str) -> bool:
+    """Return True if *name* is already a valid sample name (or empty)."""
+    if not name:
+        return True
+    return bool(re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name))
+
+
+# ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
 
@@ -729,6 +756,15 @@ class SampleTable(QTableWidget):
 
     def _on_cell_changed(self, row, col):
         if not self._block_signals:
+            if col == COL_NAME:
+                item = self.item(row, col)
+                if item:
+                    raw = item.text()
+                    clean = sanitize_sample_name(raw)
+                    if clean != raw:
+                        self._block_signals = True
+                        item.setText(clean)
+                        self._block_signals = False
             self.dataChanged.emit()
 
     def load_from_sample_set(self, ss: SampleSet):
@@ -1174,6 +1210,7 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
         self._plot = self.addPlot(row=0, col=0)
         self._plot.setAspectLocked(True)
         self._plot.invertY(True)
+        self._plot.invertX(True)   # SX=0 on right; positive SX towards left
         self._img_item = pg.ImageItem()
         self._plot.addItem(self._img_item)
         self._scatter = pg.ScatterPlotItem(
@@ -1183,8 +1220,10 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
         self._plate_w = 200.0
         self._plate_h = 200.0
         self._pix_per_mm = 2.0
+        self._label_font_size = 9   # base font size (points) at full-plate zoom
 
         self._plot.scene().sigMouseClicked.connect(self._on_click)
+        self._plot.vb.sigRangeChanged.connect(self._on_range_changed)
 
     def set_plate(self, plate_name: str):
         img = generate_plate_image(plate_name, pix_per_mm=self._pix_per_mm)
@@ -1208,11 +1247,30 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
         self._plot.setXRange(-10, self._plate_w + 10)
         self._plot.setYRange(-10, self._plate_h + 10)
 
+    def _current_font_size(self) -> int:
+        """Return label font size scaled to current zoom level."""
+        try:
+            x_range = abs(self._plot.vb.viewRange()[0][1] - self._plot.vb.viewRange()[0][0])
+            ratio = (self._plate_w + 20) / max(x_range, 1.0)
+            return max(7, min(24, round(self._label_font_size * ratio)))
+        except Exception:
+            return self._label_font_size
+
+    def _on_range_changed(self, _, ranges):
+        """Scale label font size when the user zooms in/out."""
+        x_range = abs(ranges[0][1] - ranges[0][0])
+        ratio = (self._plate_w + 20) / max(x_range, 1.0)
+        font_size = max(7, min(24, round(self._label_font_size * ratio)))
+        font = QFont("Arial", font_size)
+        for txt in self._text_items:
+            txt.setFont(font)
+
     def update_markers(self, rows: list[SampleRow], current_row: int = -1):
         for t in self._text_items:
             self._plot.removeItem(t)
         self._text_items.clear()
 
+        font = QFont("Arial", self._current_font_size())
         spots = []
         for i, r in enumerate(rows):
             if r.name and r.sx is not None and r.sy is not None:
@@ -1223,6 +1281,7 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
                     "size": 10 if i == current_row else 7,
                 })
                 txt = pg.TextItem(r.name, anchor=(0, 1), color=color)
+                txt.setFont(font)
                 txt.setPos(r.sx, r.sy)
                 self._plot.addItem(txt)
                 self._text_items.append(txt)
@@ -1235,6 +1294,7 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
         view_pos = self._plot.vb.mapSceneToView(pos)
         sx = view_pos.x()
         sy = view_pos.y()
+        # invertX means sx can be anywhere within [0, plate_w] regardless of display order
         if 0 <= sx <= self._plate_w and 0 <= sy <= self._plate_h:
             self.positionClicked.emit(sx, sy)
 
@@ -2132,9 +2192,47 @@ class SamplePlateSetupWindow(QMainWindow):
             self._current_set.rows = self._table.get_sample_set()
             return [self._current_set]
 
+    def _validate_and_sanitize_for_export(self, sets: list[SampleSet]) -> bool:
+        """Check all non-empty names; auto-sanitize and warn if any were changed.
+
+        Returns False if the user cancels, True to proceed.
+        """
+        bad_names = []
+        for ss in sets:
+            for r in ss.rows:
+                if r.name and not validate_sample_name(r.name):
+                    bad_names.append(r.name)
+
+        if not bad_names:
+            return True
+
+        preview = "\n".join(f"  '{n}'  →  '{sanitize_sample_name(n)}'" for n in bad_names[:8])
+        if len(bad_names) > 8:
+            preview += f"\n  … and {len(bad_names) - 8} more"
+        reply = QMessageBox.warning(
+            self, "Invalid Sample Names",
+            f"{len(bad_names)} name(s) contain invalid characters and will be "
+            f"sanitized before export:\n\n{preview}\n\n"
+            "Proceed with sanitized names?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return False
+
+        # Apply sanitization in-place
+        for ss in sets:
+            for r in ss.rows:
+                r.name = sanitize_sample_name(r.name)
+        # Refresh table if the current set was affected
+        if any(s is self._current_set for s in sets):
+            self._table.load_from_sample_set(self._current_set)
+        return True
+
     def _on_preview(self):
         sets = self._collect_sets_for_export()
         if not sets:
+            return
+        if not self._validate_and_sanitize_for_export(sets):
             return
         warn = check_for_blanks(sets[0])
         if warn:
@@ -2171,6 +2269,8 @@ class SamplePlateSetupWindow(QMainWindow):
         sets = self._collect_sets_for_export()
         if not sets:
             return
+        if not self._validate_and_sanitize_for_export(sets):
+            return
         warn = check_for_blanks(sets[0])
         if warn:
             self._status_lbl.setText(warn)
@@ -2195,6 +2295,8 @@ class SamplePlateSetupWindow(QMainWindow):
         sets = self._collect_sets_for_export()
         if not sets:
             return
+        if not self._validate_and_sanitize_for_export(sets):
+            return
         warn = check_for_blanks(sets[0])
         if warn:
             self._status_lbl.setText(warn)
@@ -2218,6 +2320,8 @@ class SamplePlateSetupWindow(QMainWindow):
     def _on_export_append(self):
         sets = self._collect_sets_for_export()
         if not sets:
+            return
+        if not self._validate_and_sanitize_for_export(sets):
             return
         content_new = generate_command_file(
             sets,

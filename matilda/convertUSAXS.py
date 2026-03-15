@@ -39,17 +39,16 @@ import h5py
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
 import pprint as pp
 import logging
-from supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
-from supportFunctions import beamCenterCorrection, rebinData
-from supportFunctions import  calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
-from supportFunctions import subtract_data #read_group_to_dict, filter_nested_dict, check_arrays_same_length
-from hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
-from desmearing import desmearData
-from plotData import plotUSAXSResults
+from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
+from .supportFunctions import beamCenterCorrection, rebinData
+from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
+from .supportFunctions import subtract_data
+from .hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
+from .desmearing import desmearData
+from .plotData import plotUSAXSResults
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing

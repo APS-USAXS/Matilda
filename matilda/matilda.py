@@ -62,12 +62,12 @@ import os
 import subprocess
 
 
-from readfromtiled import FindLastScanData, FindLastBlankScan
-from convertFlyscan import processFlyscan
-from convertUSAXS import processStepscan
-from convertSWAXS import process2Ddata
-from supportFunctions import findProperBlankScan
-from plotData import plotUSAXSResults, plotSWAXSResults
+from .readfromtiled import FindLastScanData, FindLastBlankScan
+from .convertFlyscan import processFlyscan
+from .convertUSAXS import processStepscan
+from .convertSWAXS import process2Ddata
+from .supportFunctions import findProperBlankScan
+from .plotData import plotUSAXSResults, plotSWAXSResults
 
 
 #set ImagePath to None to prevent saving images
@@ -91,28 +91,22 @@ NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 #recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
 # Configure logging
-# Get the directory of the current script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-# Define the log directory path
-log_dir = os.path.join(script_dir, 'log')
-# Create the log directory if it doesn't exist
+# Log directory: use MATILDA_LOG_DIR env variable if set, otherwise default to
+# ~/.local/share/matilda/log (standard XDG user data location).
+# On the beamline service, serv_matilda.sh sets MATILDA_LOG_DIR=/share1/log/matilda.
+_default_log_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "matilda", "log")
+log_dir = os.environ.get("MATILDA_LOG_DIR", _default_log_dir)
 os.makedirs(log_dir, exist_ok=True)
-# Define the log file path
 log_file = os.path.join(log_dir, 'matilda.log')
-handler = RotatingFileHandler(log_file, maxBytes=200000, backupCount=1)
+# Rotating log: 1 MB per file, 3 backups → max 4 MB total on disk.
+handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
 logging.basicConfig(
     handlers=[handler],
-    level=logging.INFO,        # Set the logging level
-    #level=logging.DEBUG,       # Set the logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Format of the log messages
-    datefmt='%Y-%m-%d %H:%M:%S'  # Date format
+    level=logging.INFO,
+    #level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
-# # Log messages
-# logging.debug('This is a debug message')
-# logging.info('This is an info message')
-# logging.warning('This is a warning message')
-# logging.error('This is an error message')
-# logging.critical('This is a critical message')
 
 
 # --- pynika auto-calibration helpers ---
@@ -401,7 +395,12 @@ def extract_number_from_filename(filename):
 
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the Matilda service (15-second polling loop).
+
+    Invoked by the ``matilda`` console script installed by pyproject.toml,
+    or directly via ``python -m matilda.matilda``.
+    """
     try:
         listofFlyscansOld=dict()
         listofStepScansOld=dict()
@@ -479,4 +478,8 @@ if __name__ == "__main__":
             logging.info('Sleeping for 15 seconds')
             time.sleep(15)
     except KeyboardInterrupt:
-            logging.info('Keyboard interrupt') 
+            logging.info('Keyboard interrupt')
+
+
+if __name__ == "__main__":
+    main()

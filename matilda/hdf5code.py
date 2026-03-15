@@ -37,9 +37,9 @@ Notes
 import h5py
 import os
 import numpy as np
-import six  #what is this for???
 import datetime
 import logging
+from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
 
 
 def readGenericNXcanSAS(path, filename):
@@ -198,10 +198,14 @@ def saveNXcanSAS(Sample,path, filename):
         f.attrs['file_time']        = timeStamp 
         f.attrs['instrument']       = '12IDE USAXS'
         f.attrs['creator']          = 'Matilda NeXus writer'
-        f.attrs['Matilda_version']  = '1.0.0' # version 2025-07-06
+        try:
+            _matilda_ver = _pkg_version('Matilda')
+        except _PkgNotFoundError:
+            _matilda_ver = 'unknown'
+        f.attrs['Matilda_version']  = _matilda_ver
         f.attrs['NeXus_version']    = '4.3.0' #2025-5-9 4.3.0 is rc, it is current. 
-        f.attrs['HDF5_version']     = six.u(h5py.version.hdf5_version)
-        f.attrs['h5py_version']     = six.u(h5py.version.version)
+        f.attrs['HDF5_version']     = h5py.version.hdf5_version
+        f.attrs['h5py_version']     = h5py.version.version
 
         # now create the NXentry group called entry if does not exist
         if 'entry' not in f:

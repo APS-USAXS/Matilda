@@ -27,7 +27,6 @@ TODO: plotUSAXSResults has an off-by-one indentation on the second plot
       Functionally correct but visually misleading.
 """
 import matplotlib.pyplot as plt
-import pprint as pp
 import logging
 import numpy as np
 import os
@@ -119,12 +118,12 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     #plt.show()
     plt.close()
 
-   # Get plot styling
+    # Get plot styling
     style = get_usaxs_cal_plot_style()
     # Set the font size to specific size
     plt.rcParams['font.size'] = style["font_size"]
 
-   # Plot ydata against xdata
+    # Plot ydata against xdata
     plt.figure(figsize=style["figsize"])
     for i, color in zip(range(len(ListOfresults)),colors):
         data_dict = ListOfresults[i]

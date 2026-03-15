@@ -22,8 +22,6 @@
 
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 from pyFAI.integrator.azimuthal import AzimuthalIntegrator
 import h5py
 import pprint as pp
@@ -32,10 +30,10 @@ import os
 import tifffile as tiff
 import logging
 
-from supportFunctions import read_group_to_dict, filter_nested_dict, subtract_data
-from supportNikaFunctions import convert_Nika_to_Fit2D
-from readfromtiled import FindLastBlankScan
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .supportFunctions import read_group_to_dict, filter_nested_dict, subtract_data
+from .supportNikaFunctions import convert_Nika_to_Fit2D
+from .readfromtiled import FindLastBlankScan
+from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
 # TODO: split into multiple steps as needed
 # Import images for sample and blank as separate calls and get sample and blank objects
@@ -541,17 +539,19 @@ def PlotResults(data_dict):
     Q_red = data_dict["reducedData"]["Q"]
     Int_red = data_dict["reducedData"]["Intensity"]
     Q = data_dict["CalibratedData"]["Q"]
-    Intensity = data_dict["CalibratedData"]["Intensity"]    # Plot ydata against xdata
-    plt.figure(figsize=(6, 12))
-    plt.plot(Q_red, Int_red, linestyle='-')  # You can customize the marker and linestyle
-    plt.plot(Q, Intensity, linestyle='-')  # You can customize the marker and linestyle
-    plt.title('Plot of Intensity vs. Q')
-    plt.xlabel('log(Q) [1/A]')
-    plt.ylabel('Intensity')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show()
+    Intensity = data_dict["CalibratedData"]["Intensity"]
+    # Debug plot (requires matplotlib; commented out for production):
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(6, 12))
+    # plt.plot(Q_red, Int_red, linestyle='-')
+    # plt.plot(Q, Intensity, linestyle='-')
+    # plt.title('Plot of Intensity vs. Q')
+    # plt.xlabel('log(Q) [1/A]')
+    # plt.ylabel('Intensity')
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.grid(True)
+    # plt.show()
 
     # # Plot ydata against xdata
     # plt.figure(figsize=(6, 12))

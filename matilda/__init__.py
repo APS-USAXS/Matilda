@@ -162,56 +162,55 @@ All processXxx() functions return a list of result dicts with this structure::
 
 Known bugs / technical debt (do not fix without review)
 ---------------------------------------------------------
-BUG-01  Bare module imports throughout all reduction/support modules.
-        e.g. ``from convertFlyscan import processFlyscan`` in matilda.py.
-        Works when running as a script (matilda/ on sys.path) but fails
-        when importing the package normally.  Fix: convert to relative or
-        absolute package imports before adding any code that uses
-        ``import matilda.xxx`` style.
+BUG-01  FIXED (feature/30-documentation).
+        Bare module imports converted to relative imports (``from .xxx import``).
+        main() function added to matilda.py; entry point enabled in pyproject.toml.
+        Service launch: update serv_matilda.sh to use ``python -m matilda.matilda``
+        (or the installed ``matilda`` console script).
 
-BUG-02  ``import six`` in hdf5code.py (line ~40).
-        six is a Python 2/3 compatibility library; unused in Python 3.
-        Not listed in pyproject.toml dependencies. Should be removed.
+BUG-02  FIXED (feature/30-documentation).
+        ``import six`` removed from hdf5code.py; ``six.u()`` replaced with
+        direct string references.
 
-BUG-03  ``print(uri)`` calls in readfromtiled.py (FindLastScanData,
-        FindLastBlankScan, FindScanDataByName).
-        These write to stdout, polluting journal logs when running as a
-        service.  Should be ``logging.debug(f"{uri=}")``.
+BUG-03  FIXED (feature/30-documentation).
+        ``print(uri)`` replaced with ``logging.debug(f"{uri=}")`` in all three
+        functions in readfromtiled.py.
 
-BUG-04  Bare ``except:`` clauses in readfromtiled.py (~lines 306, 452, 560).
-        Silently swallows KeyboardInterrupt and SystemExit.
-        Should be ``except Exception:`` or a specific exception type.
+BUG-04  FIXED (feature/30-documentation).
+        Bare ``except:`` replaced with ``except Exception:`` in readfromtiled.py
+        and ``except KeyError:`` in supportFunctions.py (key-lookup fallback).
 
-BUG-05  Off-by-one indentation in plotData.py plotUSAXSResults().
-        The second plot block (calibrated data) is indented under the first
-        plt.close() making it appear inside the first block visually.
-        Functionally correct but misleading to readers.
+BUG-05  FIXED (feature/30-documentation).
+        3-space comment indentation corrected to 4 spaces in plotData.py.
+        Unused ``import pprint as pp`` also removed from plotData.py.
 
-BUG-06  Duplicate ``pprint`` import in convertFlyscan.py:
-        ``import pprint`` and ``import pprint as pp``.  One is redundant.
+BUG-06  FIXED (feature/30-documentation).
+        Duplicate ``import pprint`` removed from convertFlyscan.py;
+        only ``import pprint as pp`` remains.
 
-BUG-07  matplotlib imported in convertFlyscan.py and convertUSAXS.py but
-        only used in commented-out debug ``plt.show()`` calls.
-        Import can be removed once those debug plots are confirmed unnecessary.
+BUG-07  FIXED (feature/30-documentation).
+        matplotlib imports removed from convertFlyscan.py, convertUSAXS.py,
+        convertSWAXS.py, and supportFunctions.py.  Active debug plt calls
+        commented out (re-enable by uncommenting and adding the local import).
+        supportFunctions.py: ``import matplotlib.pyplot as plt`` moved inside
+        the ``if debugme:`` block so it is only loaded when debugging.
 
-BUG-08  ``matilda/runTests.py`` lives inside the package directory and
-        imports ``from matilda import …`` — would cause a circular import
-        if ever treated as part of the package.  Moved to tests/manual_test.py;
-        the original can be removed once that is confirmed working.
+BUG-08  FIXED (feature/30-documentation).
+        ``matilda/runTests.py`` deleted; tests/manual_test.py is the replacement.
 
-BUG-09  ``matilda/log/`` directory is hardcoded relative to the script file
-        location (matilda.py line ~97).  This is non-standard for an installed
-        package and will put log files inside the site-packages directory on a
-        regular ``pip install``.  Should use a user-configurable path or
-        platformdirs/appdirs for the log location.
+BUG-09  FIXED (feature/30-documentation).
+        Log directory now read from ``MATILDA_LOG_DIR`` env variable; default is
+        ``~/.local/share/matilda/log/matilda.log`` (dev machines).
+        serv_matilda.sh sets ``MATILDA_LOG_DIR=/share1/log/matilda`` for the service.
+        Rotating log: 1 MB × 4 files = 4 MB max on disk.
 
-BUG-10  In hdf5code.py saveNXcanSAS(), the 'Matilda_version' attribute is
-        hardcoded to '1.0.0'.  Should use importlib.metadata.version('matilda')
-        to pick up the real version from the installed package.
+BUG-10  FIXED (feature/30-documentation).
+        hdf5code.py now reads version via importlib.metadata.version('Matilda');
+        falls back to 'unknown' when the package is not installed.
 
 Public processing API (importable after ``pip install -e .``)
 -------------------------------------------------------------
-After the bare-import issue (BUG-01) is resolved::
+BUG-01 is now fixed, so all imports below work directly::
 
     from matilda.matilda import processFlyscans, processStepscans, processADscans
     from matilda.matilda import processUSAXSFolder

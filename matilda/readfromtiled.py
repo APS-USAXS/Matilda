@@ -294,7 +294,7 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
     #returns last scan which conatins case independent "water blank" in name
     #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
     #returns last scan which conatisn case independet "water blank" in name
-    print(uri)
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
@@ -303,7 +303,7 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
         logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and should not crash anything.
         logging.error(f'Could not get data from tiled server at {server}')
         logging.error(f"Failed {uri=}")
@@ -440,16 +440,14 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
                 f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
                    
-    #logging.info(f"{uri=}")
-    print(uri)
-
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and shoudl not crash anything.
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
@@ -549,15 +547,14 @@ def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
             f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
           
-    #logging.info(f"{uri=}")
-    print(f"{uri=}")
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and shoudl not crash anything.
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")

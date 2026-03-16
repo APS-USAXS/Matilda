@@ -35,18 +35,32 @@ from typing import Optional
 import numpy as np
 import h5py
 
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QTabWidget,
-    QTableWidget, QTableWidgetItem, QHeaderView,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-    QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
-    QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
-    QDialogButtonBox, QGroupBox, QSplitter, QStatusBar,
-    QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
-    QTextEdit, QSizePolicy, QScrollArea,
-)
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
-from PyQt6.QtGui import QAction, QFont, QColor, QIcon
+try:
+    from PySide6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QTabWidget,
+        QTableWidget, QTableWidgetItem, QHeaderView,
+        QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
+        QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
+        QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
+        QDialogButtonBox, QGroupBox, QSplitter, QStatusBar,
+        QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
+        QTextEdit, QSizePolicy, QScrollArea,
+    )
+    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QThread, QObject
+    from PySide6.QtGui import QAction, QFont, QColor, QIcon
+except ImportError:
+    from PyQt6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QTabWidget,
+        QTableWidget, QTableWidgetItem, QHeaderView,
+        QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
+        QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
+        QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
+        QDialogButtonBox, QGroupBox, QSplitter, QStatusBar,
+        QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
+        QTextEdit, QSizePolicy, QScrollArea,
+    )
+    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+    from PyQt6.QtGui import QAction, QFont, QColor, QIcon
 
 import pyqtgraph as pg
 
@@ -2161,7 +2175,10 @@ class SamplePlateSetupWindow(QMainWindow):
             QMessageBox.information(self, "No saved sets",
                                     "No sets saved yet. Save a set first.")
             return
-        from PyQt6.QtWidgets import QInputDialog
+        try:
+            from PySide6.QtWidgets import QInputDialog
+        except ImportError:
+            from PyQt6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getItem(self, "Load set", "Select set:", names, 0, False)
         if ok and name in self._saved_sets:
             if self._unsaved:

@@ -10,6 +10,7 @@ Layout (horizontal QSplitter):
 
 Bottom bar:
   [▶▶ Process All]  status label  progress bar  [✕ Cancel]
+  Error log (QPlainTextEdit — accumulates per-file errors; always visible)
 """
 
 import json
@@ -19,16 +20,18 @@ try:
     from PySide6.QtWidgets import (
         QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
         QToolBar, QPushButton, QLabel, QProgressBar,
-        QFileDialog, QMessageBox,
+        QFileDialog, QMessageBox, QPlainTextEdit,
     )
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor
 except ImportError:
     from PyQt6.QtWidgets import (
         QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
         QToolBar, QPushButton, QLabel, QProgressBar,
-        QFileDialog, QMessageBox,
+        QFileDialog, QMessageBox, QPlainTextEdit,
     )
     from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QColor
 
 from .file_tree import FileTreeWidget
 from .parameter_tabs import ParameterTabWidget
@@ -46,7 +49,7 @@ class MatildaReductionWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(_WINDOW_TITLE)
-        self.resize(1400, 820)
+        self.resize(1400, 860)
         self._worker: ReductionWorker | None = None
         self._last_folder: str = os.path.expanduser("~")
         self._build_ui()
@@ -127,8 +130,23 @@ class MatildaReductionWindow(QMainWindow):
 
         outer.addWidget(bottom)
 
+        # ── Error log ─────────────────────────────────────────────────────────
+        # Always visible; accumulates per-file errors so they are not lost
+        # when the status bar text is overwritten by the next file.
+        self._error_log = QPlainTextEdit()
+        self._error_log.setReadOnly(True)
+        self._error_log.setMaximumBlockCount(200)
+        self._error_log.setFixedHeight(70)
+        self._error_log.setPlaceholderText("Errors will appear here…")
+        self._error_log.setStyleSheet(
+            "QPlainTextEdit { font-family: monospace; font-size: 11px;"
+            " background: #fff8f8; color: #800; border: 1px solid #dbb; }"
+        )
+        outer.addWidget(self._error_log)
+
         # ── Signal wiring ─────────────────────────────────────────────────────
         self._file_tree.selection_changed.connect(self._on_selection_changed)
+        self._file_tree.file_double_clicked.connect(self._start_reduction)
         self._file_tree.blank_assigned.connect(self._on_blank_assigned)
         self._file_tree.blank_cleared.connect(self._on_blank_cleared)
         self._param_tabs.process_selected_clicked.connect(self._on_process_selected)
@@ -216,6 +234,7 @@ class MatildaReductionWindow(QMainWindow):
             )
             return
 
+        self._error_log.clear()
         blanks = self._file_tree.get_blanks()
         params = self._param_tabs.get_all_params()
 
@@ -240,20 +259,26 @@ class MatildaReductionWindow(QMainWindow):
 
     def _on_file_done(self, filepath: str, result: dict, technique: str):
         fname = os.path.basename(filepath)
-        self._status_label.setText(f"Done: {fname}")
+        self._status_label.setText(f"Done: {fname}  [{technique}]")
         self._graph.update_curves(result, technique)
 
     def _on_file_error(self, filepath: str, error: str):
         fname = os.path.basename(filepath)
-        # Truncate long error messages in the status bar
-        short_err = error[:100] + ("…" if len(error) > 100 else "")
-        self._status_label.setText(f"Error — {fname}: {short_err}")
+        self._status_label.setText(f"Error processing: {fname}")
+        # Append to persistent error log so errors are not lost
+        self._error_log.appendPlainText(f"[{fname}]  {error}")
 
     def _on_all_done(self):
         self._progress.setVisible(False)
         self._btn_cancel.setEnabled(False)
         self._btn_process_all.setEnabled(True)
-        self._status_label.setText("Done — all files processed.")
+        n_errors = self._error_log.document().blockCount() - 1
+        if n_errors > 0:
+            self._status_label.setText(
+                f"Done — {n_errors} error(s), see log below."
+            )
+        else:
+            self._status_label.setText("Done — all files processed successfully.")
         self._save_session()
 
     def _on_cancel(self):
@@ -273,7 +298,7 @@ class MatildaReductionWindow(QMainWindow):
             with open(_SESSION_FILE, "w", encoding="utf-8") as f:
                 json.dump(state, f, indent=2)
         except Exception:
-            pass  # Non-fatal; just skip session save
+            pass  # Non-fatal
 
     def _restore_session(self):
         try:

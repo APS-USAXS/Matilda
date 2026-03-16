@@ -24,6 +24,10 @@ except ImportError:
     )
     from PyQt6.QtCore import Qt
 
+# White background, black foreground — must be set before any pg widget is created.
+pg.setConfigOption("background", "w")
+pg.setConfigOption("foreground", "k")
+
 
 # Colorblind-friendly palette (blue, orange, green, purple, sky-blue, dark-red, yellow)
 _PALETTE = [
@@ -157,11 +161,18 @@ class GraphPanel(QWidget):
             if key not in curve_data:
                 continue
             q, inten, _err = curve_data[key]
-            if q is None or len(q) == 0:
+            if q is None or inten is None or len(q) == 0:
+                continue
+            # Strip non-positive values so log scale renders correctly.
+            # pyqtgraph silently drops them, but the auto-range then fails.
+            mask = (q > 0) & (inten > 0) & np.isfinite(q) & np.isfinite(inten)
+            q_plot = q[mask]
+            i_plot = inten[mask]
+            if len(q_plot) < 2:
                 continue
             color = _PALETTE[i % len(_PALETTE)]
             pen = pg.mkPen(color=color, width=1.5)
-            item = self._plot.plot(q, inten, pen=pen, name=label)
+            item = self._plot.plot(q_plot, i_plot, pen=pen, name=label)
             self._curves.append(item)
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -211,12 +222,15 @@ class GraphPanel(QWidget):
 # ── Result-dict → curve extraction ───────────────────────────────────────────
 
 def _safe(d: dict, key: str):
-    """Return float array from *d[key]*, or None if absent / empty."""
+    """Return float array from *d[key]*, or None if absent / unusable."""
     v = d.get(key)
     if v is None:
         return None
-    arr = np.asarray(v, dtype=float)
-    return arr if arr.size > 0 else None
+    try:
+        arr = np.asarray(v, dtype=float).ravel()
+    except (TypeError, ValueError):
+        return None
+    return arr if arr.size > 1 else None
 
 
 def _extract_curves(result: dict, technique: str) -> dict[str, tuple]:

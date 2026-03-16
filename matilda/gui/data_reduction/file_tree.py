@@ -51,6 +51,8 @@ class FileTreeWidget(QWidget):
 
     # Emits list of (path, filename) tuples for currently selected files
     selection_changed = Signal(list)
+    # Emits [(path, filename)] when a file is double-clicked (triggers processing)
+    file_double_clicked = Signal(list)
     # Emits (technique, path, filename) when a blank is assigned
     blank_assigned = Signal(str, str, str)
     # Emits technique name when a blank is cleared
@@ -142,6 +144,7 @@ class FileTreeWidget(QWidget):
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._on_context_menu)
         self._tree.itemSelectionChanged.connect(self._on_selection_changed)
+        self._tree.itemDoubleClicked.connect(self._on_double_click)
         self._tree.itemExpanded.connect(self._on_item_expanded)
         layout.addWidget(self._tree, 1)
 
@@ -305,6 +308,13 @@ class FileTreeWidget(QWidget):
 
     def _on_selection_changed(self):
         self.selection_changed.emit(self.get_selected_files())
+
+    def _on_double_click(self, item: QTreeWidgetItem, _column: int):
+        if not item.data(0, _ROLE_IS_FILE):
+            return  # double-clicking a folder just expands it — ignore
+        path  = item.data(0, _ROLE_PATH)
+        fname = item.data(0, _ROLE_FILENAME)
+        self.file_double_clicked.emit([(path, fname)])
 
     # ── Context menu ──────────────────────────────────────────────────────────
 

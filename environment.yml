@@ -58,13 +58,11 @@ dependencies:
   - h5py                # HDF5/NeXus file I/O
   - requests            # Tiled server REST API queries
 
-  # GUI stack — safe to leave in for all installs; ignored at runtime if
-  # no GUI code is called.  Comment out for a minimal headless server env.
-  # IMPORTANT: use only ONE of pyside6 or pyqt6 — having both installed
-  # (e.g. one via conda, one via pip) causes Qt platform-plugin conflicts
-  # on macOS ("cocoa not found") and potentially on Linux as well.
-  - pyside6             # Qt6 Python bindings (preferred; PyQt6 fallback in code)
-  - pyqtgraph           # fast scientific plotting for GUI tools
+  # GUI stack — pyside6 and pyqtgraph are installed via pip (see below)
+  # rather than conda to prevent the conda solver from pulling in pyqt6
+  # as a transitive dependency (e.g. through matplotlib's backend detection),
+  # which would create conflicting Qt shared-library sets on macOS.
+  # Do NOT add pyside6, pyqt6, or pyqtgraph here as conda packages.
 
   # Development / testing
   - pytest
@@ -72,6 +70,10 @@ dependencies:
 
   - pip
   - pip:
+    # GUI stack via pip: keeps PySide6 isolated from conda's Qt packages,
+    # preventing platform-plugin conflicts on macOS.
+    - PySide6
+    - pyqtgraph
     # Packages not available on conda-forge must go here.
     # NOTE: 'six' (imported in hdf5code.py) is a transitive dependency of
     # h5py and will be present automatically — do NOT add it explicitly.

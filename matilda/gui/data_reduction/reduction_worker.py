@@ -146,33 +146,10 @@ class ReductionWorker(QThread):
                 f"{os.path.join(path, filename)}"
             )
 
-        # Attempt to overlay the blank's raw 1D curve in the graph by
-        # re-running the converter on the blank file with recalculateAllData=False
-        # (uses HDF5 cache — fast).  Silently skipped on any failure.
-        blank_rd = self._get_blank_reduced_data(technique, blank)
-        if blank_rd is not None:
-            result["blankReducedData"] = blank_rd
+        # NOTE: blank curve overlay via _get_blank_reduced_data is disabled.
+        # Calling the converter on the blank file immediately after writing
+        # to the sample HDF5 causes HDF5 file-locking contention on some
+        # platforms, hanging the worker thread indefinitely.  Blank overlay
+        # will be re-enabled once a direct h5py read approach is implemented.
 
         return result
-
-    def _get_blank_reduced_data(
-        self,
-        technique: str,
-        blank: tuple[str | None, str | None],
-    ) -> dict | None:
-        """Return the blank file's reducedData dict, or None on any failure."""
-        bpath, bfile = blank
-        if not bpath or not bfile:
-            return None
-        try:
-            if technique == "Flyscan":
-                r = processFlyscan(bpath, bfile, recalculateAllData=False)
-            elif technique == "StepScan":
-                r = processStepscan(bpath, bfile, recalculateAllData=False)
-            elif technique in ("SAXS", "WAXS"):
-                r = process2Ddata(bpath, bfile, recalculateAllData=False)
-            else:
-                return None
-            return r.get("reducedData") or None
-        except Exception:
-            return None

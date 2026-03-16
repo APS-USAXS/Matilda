@@ -175,25 +175,23 @@ class GraphPanel(QWidget):
     # ── Public API ────────────────────────────────────────────────────────────
 
     def clear(self):
-        """Remove all curves and reset legend."""
+        """Remove all curves and clear the legend."""
+        # Remove each left-axis item from both the plot and the legend.
+        # Note: legend.removeItem(item) searches for the item by identity;
+        # it is a no-op if the item was never added to the legend (e.g. error
+        # bar segments added without a name).  Do NOT use legend.setParentItem
+        # (None) — pyqtgraph overrides setParentItem and calls self.anchor()
+        # which requires a parent, raising "Cannot anchor; parent is not set."
         for item in self._left_items:
+            self._legend.removeItem(item)
             self._plot.removeItem(item)
         self._left_items.clear()
         self._error_bar_items.clear()
 
         for item in self._right_items:
+            self._legend.removeItem(item)
             self._right_vb.removeItem(item)
         self._right_items.clear()
-
-        # Properly destroy the old legend.
-        # plot.removeItem() only works for ViewBox children; LegendItem is a
-        # child of the ViewBox scene overlay, so we must detach it via
-        # setParentItem(None) and clear the PlotItem's reference so that
-        # addLegend() creates a fresh one rather than returning the stale one.
-        if self._legend is not None:
-            self._legend.setParentItem(None)
-            self._plot.legend = None
-        self._legend = self._plot.addLegend(offset=(10, 10))
 
         # Reset view limits so stale limits from the previous file don't
         # constrain the new dataset.

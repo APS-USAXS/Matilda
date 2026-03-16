@@ -193,10 +193,11 @@ class GraphPanel(QWidget):
             self._right_vb.removeItem(item)
         self._right_items.clear()
 
-        # Reset view limits so stale limits from the previous file don't
-        # constrain the new dataset.
-        self._right_vb.setLimits(xMin=None, xMax=None, yMin=None, yMax=None)
-        self._plot.getViewBox().setLimits(xMin=None, xMax=None, yMin=None, yMax=None)
+        # Do NOT call setLimits(xMin=None, ...) here — passing None to
+        # setLimits triggers _effectiveLimits() which does max(None, float)
+        # and raises TypeError in Python 3 (pyqtgraph bug, some versions).
+        # Limits are always overwritten by update_curves() when new data
+        # arrives, so no explicit reset is needed.
 
         self._last_result    = None
         self._last_technique = None

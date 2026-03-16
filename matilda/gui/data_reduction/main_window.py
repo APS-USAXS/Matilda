@@ -142,7 +142,7 @@ class MatildaReductionWindow(QMainWindow):
         self._error_log.setFixedHeight(70)
         self._error_log.setPlaceholderText("Errors will appear here…")
         self._error_log.setStyleSheet(
-            "QPlainTextEdit { font-family: monospace; font-size: 11px;"
+            "QPlainTextEdit { font-family: 'Courier New', Courier; font-size: 11px;"
             " background: #fff8f8; color: #800; border: 1px solid #dbb; }"
         )
         outer.addWidget(self._error_log)

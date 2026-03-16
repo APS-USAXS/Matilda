@@ -49,14 +49,17 @@ pg.setConfigOption("foreground", "k")
 
 # Left-axis (calibrated) curve colors — colorblind-friendly
 _CAL_COLORS = [
-    (0,   114, 189),   # blue  — SMR / subtracted
+    (0,   114, 189),   # blue   — SMR / subtracted
     (217,  83,  25),   # orange — DSM / calibrated
     ( 32, 178,  34),   # green  — future
 ]
 
-# Right-axis (raw) curve: dashed grey line
-_RAW_COLOR    = (140, 140, 140)
-_RAW_PEN_DASH = Qt.PenStyle.DashLine
+# Right-axis raw curves: (color, Qt.PenStyle, width)
+# Index 0 = sample raw, Index 1 = blank raw
+_RAW_STYLES = [
+    ((100, 100, 100), Qt.PenStyle.DashLine, 1.5),    # grey dashed  — sample
+    ((160, 160, 210), Qt.PenStyle.DotLine,  1.5),    # blue-grey dotted — blank
+]
 
 
 # ── Main widget ───────────────────────────────────────────────────────────────
@@ -182,9 +185,20 @@ class GraphPanel(QWidget):
             self._right_vb.removeItem(item)
         self._right_items.clear()
 
-        # Rebuild legend (removeItem leaves stale entries)
-        self._plot.removeItem(self._legend)
+        # Properly destroy the old legend.
+        # plot.removeItem() only works for ViewBox children; LegendItem is a
+        # child of the ViewBox scene overlay, so we must detach it via
+        # setParentItem(None) and clear the PlotItem's reference so that
+        # addLegend() creates a fresh one rather than returning the stale one.
+        if self._legend is not None:
+            self._legend.setParentItem(None)
+            self._plot.legend = None
         self._legend = self._plot.addLegend(offset=(10, 10))
+
+        # Reset view limits so stale limits from the previous file don't
+        # constrain the new dataset.
+        self._right_vb.setLimits(xMin=None, xMax=None, yMin=None, yMax=None)
+        self._plot.getViewBox().setLimits(xMin=None, xMax=None, yMin=None, yMax=None)
 
         self._last_result    = None
         self._last_technique = None
@@ -216,29 +230,46 @@ class GraphPanel(QWidget):
 
         self._btn_2d.setVisible(technique in ("SAXS", "WAXS"))
 
-        raw, calibrated = _extract_curves(result, technique)
+        raw_curves, calibrated = _extract_curves(result, technique)
 
-        # ── Right axis: raw / arb. units (dashed grey) ───────────────────
-        if raw is not None:
-            q, I, _dI, label = raw
+        # Accumulate all Q arrays so we can set a shared X limit at the end.
+        all_q: list[np.ndarray] = []
+
+        # ── Right axis: raw curves (arb. units, dashed) ───────────────────
+        # Includes sample raw and (if available) blank raw overlay.
+        all_right_I: list[np.ndarray] = []
+        for i, (q, I, _dI, label) in enumerate(raw_curves):
             mask = (q > 0) & (I > 0) & np.isfinite(q) & np.isfinite(I)
             q_, I_ = q[mask], I[mask]
-            if len(q_) >= 2:
-                # Pre-log10 transform: right ViewBox has no setLogMode
-                q_log = np.log10(q_)
-                I_log = np.log10(I_)
-                pen = pg.mkPen(color=_RAW_COLOR, width=1.5, style=_RAW_PEN_DASH)
-                item = pg.PlotDataItem(q_log, I_log, pen=pen, name=label)
-                self._right_vb.addItem(item)
-                self._right_items.append(item)
-                self._legend.addItem(item, label)
-                # Robust Y range for right axis
-                if len(I_) >= 3:
-                    log_I = np.log10(I_[I_ > 0])
-                    lo = float(np.percentile(log_I, 2))  - 0.5
-                    hi = float(np.percentile(log_I, 99)) + 0.5
-                    self._right_vb.setYRange(lo, hi, padding=0)
-                    self._right_vb.setLimits(yMin=lo - 3, yMax=hi + 3)
+            if len(q_) < 2:
+                continue
+            all_q.append(q_)
+            all_right_I.append(I_)
+            # Pre-log10 transform: right ViewBox has no setLogMode
+            q_log = np.log10(q_)
+            I_log = np.log10(I_)
+            color, style, width = _RAW_STYLES[i % len(_RAW_STYLES)]
+            pen  = pg.mkPen(color=color, width=width, style=style)
+            item = pg.PlotDataItem(q_log, I_log, pen=pen, name=label)
+            self._right_vb.addItem(item)
+            self._right_items.append(item)
+            self._legend.addItem(item, label)
+
+        # Set right Y range: percentile-based view, 1-decade hard limits.
+        if all_right_I:
+            combined_r = np.concatenate(all_right_I)
+            valid_r = combined_r[combined_r > 0]
+            if len(valid_r) >= 3:
+                log_r = np.log10(valid_r)
+                lo_r  = float(np.percentile(log_r, 2))  - 0.5
+                hi_r  = float(np.percentile(log_r, 99)) + 0.5
+                self._right_vb.enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
+                self._right_vb.setYRange(lo_r, hi_r, padding=0)
+                # Hard zoom limit: 1 decade outside actual data min/max
+                self._right_vb.setLimits(
+                    yMin=float(np.min(log_r)) - 1,
+                    yMax=float(np.max(log_r)) + 1,
+                )
 
         # ── Left axis: calibrated / cm⁻¹ (solid colored lines) ───────────
         all_cal_I: list[np.ndarray] = []
@@ -247,12 +278,13 @@ class GraphPanel(QWidget):
             q_, I_ = q[mask], I[mask]
             if len(q_) < 2:
                 continue
+            all_q.append(q_)
+            all_cal_I.append(I_)
 
             color = _CAL_COLORS[i % len(_CAL_COLORS)]
             pen   = pg.mkPen(color=color, width=1.5)
             scatter = self._plot.plot(q_, I_, pen=pen, name=label)
             self._left_items.append(scatter)
-            all_cal_I.append(I_)
 
             if dI is not None:
                 dI_ = np.asarray(dI, dtype=float)
@@ -277,9 +309,34 @@ class GraphPanel(QWidget):
                         self._error_bar_items.append(eb)
                         eb.setVisible(self._btn_errbar.isChecked())
 
-        # Robust Y range for left axis (uses all calibrated data together)
+        # Set left Y range: percentile-based view, 1-decade hard limits.
         if all_cal_I:
-            set_robust_y_range(self._plot, np.concatenate(all_cal_I))
+            combined_c = np.concatenate(all_cal_I)
+            set_robust_y_range(self._plot, combined_c)
+            # Override limits to 1 decade outside actual data min/max
+            valid_c = combined_c[combined_c > 0]
+            if len(valid_c) >= 2:
+                self._plot.getViewBox().setLimits(
+                    yMin=np.log10(float(valid_c.min())) - 1,
+                    yMax=np.log10(float(valid_c.max())) + 1,
+                )
+
+        # ── Shared X axis: set initial view + 1-decade hard limit ─────────
+        if all_q:
+            q_all   = np.concatenate(all_q)
+            q_valid = q_all[q_all > 0]
+            if len(q_valid) >= 2:
+                xlo_lim = np.log10(float(q_valid.min())) - 1
+                xhi_lim = np.log10(float(q_valid.max())) + 1
+                self._plot.getViewBox().setLimits(xMin=xlo_lim, xMax=xhi_lim)
+                # Also limit the right ViewBox x range
+                self._right_vb.setLimits(xMin=xlo_lim, xMax=xhi_lim)
+                # Set initial X view range
+                self._plot.setXRange(
+                    np.log10(float(q_valid.min())),
+                    np.log10(float(q_valid.max())),
+                    padding=0.05,
+                )
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
@@ -318,11 +375,10 @@ class GraphPanel(QWidget):
         if not path:
             return
         technique = self._last_technique or "Unknown"
-        raw, calibrated = _extract_curves(self._last_result, technique)
+        raw_curves, calibrated = _extract_curves(self._last_result, technique)
         with open(path, "w", newline="") as f:
             writer = csv.writer(f)
-            if raw is not None:
-                q, I, dI, label = raw
+            for q, I, dI, label in raw_curves:
                 writer.writerow([f"# {label}"])
                 writer.writerow(["Q (1/A)", "Intensity (arb.)", "Error"])
                 err = dI if dI is not None else [0.0] * len(q)
@@ -355,17 +411,18 @@ def _safe(d: dict, key: str) -> np.ndarray | None:
 def _extract_curves(
     result: dict,
     technique: str,
-) -> tuple[tuple | None, list[tuple]]:
-    """Parse a result dict into (raw_curve, calibrated_curves).
+) -> tuple[list[tuple], list[tuple]]:
+    """Parse a result dict into (raw_curves, calibrated_curves).
 
     Returns
     -------
-    raw : (Q, I, dI, label) | None
-        Single curve for the right (arb. units) axis.
+    raw_curves : list of (Q, I, dI, label)
+        Curves for the right (arb. units) axis.
+        Index 0 = sample raw; index 1 = blank raw (if available).
     calibrated : list of (Q, I, dI, label)
         One or more curves for the left (cm⁻¹) axis.
     """
-    raw       = None
+    raw_curves: list[tuple] = []
     calibrated: list[tuple] = []
 
     if technique in ("Flyscan", "StepScan"):
@@ -374,7 +431,15 @@ def _extract_curves(
         I  = _safe(rd, "Intensity")
         dI = _safe(rd, "Error")
         if q is not None and I is not None:
-            raw = (q, I, dI, "Raw (R_data)")
+            raw_curves.append((q, I, dI, "Raw (R_data)"))
+
+        # Blank raw curve (if the worker fetched it)
+        brd = result.get("blankReducedData")
+        if brd:
+            bq = _safe(brd, "Q")
+            bI = _safe(brd, "Intensity")
+            if bq is not None and bI is not None:
+                raw_curves.append((bq, bI, None, "Blank (R_data)"))
 
         cd = result.get("CalibratedData", {})
 
@@ -396,7 +461,15 @@ def _extract_curves(
         I  = _safe(rd, "Intensity")
         dI = _safe(rd, "Error")
         if q is not None and I is not None:
-            raw = (q, I, dI, "Normalized (raw 1D)")
+            raw_curves.append((q, I, dI, "Normalized (raw 1D)"))
+
+        # Blank raw curve (if the worker fetched it)
+        brd = result.get("blankReducedData")
+        if brd:
+            bq = _safe(brd, "Q")
+            bI = _safe(brd, "Intensity")
+            if bq is not None and bI is not None:
+                raw_curves.append((bq, bI, None, "Blank (normalized)"))
 
         cd = result.get("CalibratedData", {})
         cq = _safe(cd, "Q")
@@ -405,4 +478,4 @@ def _extract_curves(
         if cq is not None and ci is not None:
             calibrated.append((cq, ci, ce, "Calibrated"))
 
-    return raw, calibrated
+    return raw_curves, calibrated

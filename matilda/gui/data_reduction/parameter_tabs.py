@@ -226,14 +226,19 @@ class _USAXSTab(_TechniqueTab):
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
 
-        # ── Output points ─────────────────────────────────────────────────────
+        # ── Output points (informational — not yet wired to converter) ───────
         self._npts = QSpinBox()
         self._npts.setRange(0, 5000)
         self._npts.setValue(500)
+        self._npts.setEnabled(False)
         self._npts.setToolTip(
-            "Number of Q points after rebinning.\n0 = no rebinning (keep all raw points)."
+            "Not yet passed to the converter.\n"
+            "The converter rebins to a hardcoded 500 points."
         )
         form.addRow("Output points:", self._npts)
+        _npts_note = QLabel("(not passed to converter — no effect)")
+        _npts_note.setStyleSheet("color: grey; font-size: 10px; font-style: italic;")
+        form.addRow("", _npts_note)
 
         form.addRow(_separator())
         form.addRow(QLabel("<b>Desmearing</b>"))
@@ -320,12 +325,19 @@ class _SAXSTab(_TechniqueTab):
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
 
-        # ── Output Q points ───────────────────────────────────────────────────
+        # ── Output Q points (informational — not yet wired to converter) ─────
         self._npts = QSpinBox()
         self._npts.setRange(10, 5000)
         self._npts.setValue(200)
-        self._npts.setToolTip("Number of Q points in azimuthal integration (pyFAI npt)")
+        self._npts.setEnabled(False)
+        self._npts.setToolTip(
+            "Not yet passed to the converter.\n"
+            "The converter uses a hardcoded 200 Q points for SAXS."
+        )
         form.addRow("Output Q points:", self._npts)
+        _npts_note = QLabel("(not passed to converter — no effect)")
+        _npts_note.setStyleSheet("color: grey; font-size: 10px; font-style: italic;")
+        form.addRow("", _npts_note)
 
         form.addRow(_separator())
         form.addRow(QLabel("<b>Azimuthal Integration</b>"))

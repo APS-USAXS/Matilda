@@ -16,6 +16,9 @@ Bottom bar:
 import json
 import os
 
+import h5py
+import numpy as np
+
 try:
     from PySide6.QtWidgets import (
         QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -151,6 +154,7 @@ class MatildaReductionWindow(QMainWindow):
         self._file_tree.blank_cleared.connect(self._on_blank_cleared)
         self._param_tabs.process_selected_clicked.connect(self._on_process_selected)
         self._param_tabs.blank_browse_clicked.connect(self._on_blank_browse)
+        self._graph.view_2d_requested.connect(self._open_2d_viewer)
 
     # ── Folder selection ──────────────────────────────────────────────────────
 
@@ -175,6 +179,8 @@ class MatildaReductionWindow(QMainWindow):
         technique = detect_technique(path, fname)
         if technique != "Unknown":
             self._param_tabs.activate_technique(technique)
+            thickness = self._read_hdf5_thickness(path, fname, technique)
+            self._param_tabs.update_hdf5_thickness(technique, thickness)
         n = len(selected)
         suffix = (f"  —  detected: {technique}") if n == 1 else ""
         self._status_label.setText(f"{n} file(s) selected{suffix}")
@@ -259,8 +265,9 @@ class MatildaReductionWindow(QMainWindow):
 
     def _on_file_done(self, filepath: str, result: dict, technique: str):
         fname = os.path.basename(filepath)
+        path  = os.path.dirname(filepath)
         self._status_label.setText(f"Done: {fname}  [{technique}]")
-        self._graph.update_curves(result, technique)
+        self._graph.update_curves(result, technique, path=path, filename=fname)
 
     def _on_file_error(self, filepath: str, error: str):
         fname = os.path.basename(filepath)
@@ -286,6 +293,30 @@ class MatildaReductionWindow(QMainWindow):
             self._worker.cancel()
         self._btn_cancel.setEnabled(False)
         self._status_label.setText("Cancelling after current file…")
+
+    # ── HDF5 helpers ──────────────────────────────────────────────────────────
+
+    def _read_hdf5_thickness(
+        self, path: str, filename: str, technique: str
+    ) -> float | None:
+        """Read sample thickness from the HDF5 file. Returns mm or None."""
+        if technique == "StepScan":
+            hdf5_key = "/entry/instrument/bluesky/metadata/sample_thickness_mm"
+        else:
+            hdf5_key = "/entry/sample/thickness"
+        full_path = os.path.join(path, filename)
+        try:
+            with h5py.File(full_path, "r") as f:
+                val = f[hdf5_key][()]
+            return float(np.asarray(val).ravel()[0])
+        except Exception:
+            return None
+
+    def _open_2d_viewer(self, path: str, filename: str, technique: str):
+        """Open a non-modal 2D detector image dialog."""
+        from .viewer_2d import Viewer2D
+        dlg = Viewer2D(path, filename, technique, parent=self)
+        dlg.show()
 
     # ── Session persistence ───────────────────────────────────────────────────
 

@@ -6,24 +6,32 @@ Center panel: QTabWidget with 4 technique-specific parameter tabs.
 Each tab exposes reduction parameters and a "Process Selected" button.
 Tabs are always visible; technique detection auto-activates the matching tab.
 
-Adding new parameters later:
-  1. Add widget to the relevant tab's __init__.
-  2. Include the value in get_params().
-  3. Pass the value through ReductionWorker to the converter function.
+Thickness handling
+------------------
+Each tab shows the HDF5 thickness by default (read by main_window.py on
+file selection and pushed via ``update_hdf5_thickness``).  When the
+"Override" checkbox is checked the spinbox becomes enabled and the manually
+entered value is used instead.
+
+Adding new parameters later
+---------------------------
+1. Add widget to the relevant tab's ``__init__``.
+2. Include the value in ``get_params()``.
+3. Pass the value through ReductionWorker to the converter function.
 """
 
 try:
     from PySide6.QtWidgets import (
         QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
         QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame,
+        QFrame, QCheckBox,
     )
     from PySide6.QtCore import Signal
 except ImportError:
     from PyQt6.QtWidgets import (
         QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
         QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame,
+        QFrame, QCheckBox,
     )
     from PyQt6.QtCore import pyqtSignal as Signal
 
@@ -88,6 +96,12 @@ class ParameterTabWidget(QTabWidget):
         if tab is not None:
             tab.set_blank_label(label)
 
+    def update_hdf5_thickness(self, technique: str, value: float | None):
+        """Push the HDF5 thickness value to the matching tab."""
+        tab = self._tabs.get(technique)
+        if tab is not None:
+            tab.update_hdf5_thickness(value)
+
     def get_params(self, technique: str) -> dict:
         """Return reduction parameters for *technique* as a plain dict."""
         tab = self._tabs.get(technique)
@@ -104,11 +118,65 @@ class _TechniqueTab(QWidget):
     process_selected_clicked = Signal()
     blank_browse_clicked = Signal()
 
+    # Shared state for HDF5 thickness
+    _hdf5_thickness: float | None = None
+
     def get_params(self) -> dict:           # pragma: no cover
         raise NotImplementedError
 
     def set_blank_label(self, label: str):  # pragma: no cover
         raise NotImplementedError
+
+    def update_hdf5_thickness(self, value: float | None):
+        """Update the HDF5 default thickness display."""
+        self._hdf5_thickness = value
+        if value is not None:
+            self._thickness_hdf5_lbl.setText(f"HDF5: {value:.4f} mm")
+        else:
+            self._thickness_hdf5_lbl.setText("HDF5: (not found)")
+
+    def _get_thickness(self) -> float:
+        """Return the effective thickness value."""
+        if self._thickness_override.isChecked():
+            return self._thickness_spin.value()
+        if self._hdf5_thickness is not None:
+            return self._hdf5_thickness
+        return 1.0   # safe fallback
+
+    def _setup_thickness_section(self, form: QFormLayout):
+        """Add the thickness row (HDF5 label + override checkbox + spinbox)."""
+        self._hdf5_thickness = None
+
+        thickness_outer = QWidget()
+        t_layout = QVBoxLayout(thickness_outer)
+        t_layout.setContentsMargins(0, 0, 0, 0)
+        t_layout.setSpacing(2)
+
+        # Row 1: HDF5 value label + override toggle
+        hdf5_row = QHBoxLayout()
+        self._thickness_hdf5_lbl = QLabel("HDF5: (not loaded)")
+        self._thickness_hdf5_lbl.setStyleSheet("color: grey; font-size: 11px;")
+        hdf5_row.addWidget(self._thickness_hdf5_lbl, 1)
+
+        self._thickness_override = QCheckBox("Override")
+        self._thickness_override.setToolTip(
+            "Check to enter a custom thickness instead of the HDF5 value"
+        )
+        hdf5_row.addWidget(self._thickness_override)
+        t_layout.addLayout(hdf5_row)
+
+        # Row 2: spinbox (disabled until Override is checked)
+        self._thickness_spin = QDoubleSpinBox()
+        self._thickness_spin.setRange(0.001, 100.0)
+        self._thickness_spin.setValue(1.0)
+        self._thickness_spin.setDecimals(3)
+        self._thickness_spin.setSuffix("  mm")
+        self._thickness_spin.setEnabled(False)
+        self._thickness_spin.setToolTip("Custom sample thickness in mm")
+        self._thickness_override.toggled.connect(self._thickness_spin.setEnabled)
+        t_layout.addWidget(self._thickness_spin)
+
+        form.addRow("Thickness:", thickness_outer)
 
 
 def _make_tab(technique: str, parent=None) -> _TechniqueTab:
@@ -155,14 +223,8 @@ class _USAXSTab(_TechniqueTab):
 
         form.addRow(_separator())
 
-        # ── Sample thickness ──────────────────────────────────────────────────
-        self._thickness = QDoubleSpinBox()
-        self._thickness.setRange(0.001, 100.0)
-        self._thickness.setValue(1.0)
-        self._thickness.setDecimals(3)
-        self._thickness.setSuffix("  mm")
-        self._thickness.setToolTip("Sample thickness in mm (overrides value in HDF5 if non-zero)")
-        form.addRow("Thickness:", self._thickness)
+        # ── Sample thickness (HDF5 default + override) ────────────────────────
+        self._setup_thickness_section(form)
 
         # ── Output points ─────────────────────────────────────────────────────
         self._npts = QSpinBox()
@@ -218,7 +280,7 @@ class _USAXSTab(_TechniqueTab):
     def get_params(self) -> dict:
         return {
             "blank_mode":         self._blank_mode.currentText(),
-            "thickness":          self._thickness.value(),
+            "thickness":          self._get_thickness(),
             "npts":               self._npts.value(),
             "desmear_iter":       self._desmear_iter.value(),
             "extrap_method":      self._extrap_method.currentText(),
@@ -255,13 +317,8 @@ class _SAXSTab(_TechniqueTab):
 
         form.addRow(_separator())
 
-        # ── Thickness ─────────────────────────────────────────────────────────
-        self._thickness = QDoubleSpinBox()
-        self._thickness.setRange(0.001, 100.0)
-        self._thickness.setValue(1.0)
-        self._thickness.setDecimals(3)
-        self._thickness.setSuffix("  mm")
-        form.addRow("Thickness:", self._thickness)
+        # ── Sample thickness (HDF5 default + override) ────────────────────────
+        self._setup_thickness_section(form)
 
         # ── Output Q points ───────────────────────────────────────────────────
         self._npts = QSpinBox()
@@ -307,7 +364,7 @@ class _SAXSTab(_TechniqueTab):
     def get_params(self) -> dict:
         return {
             "blank_mode":         self._blank_mode.currentText(),
-            "thickness":          self._thickness.value(),
+            "thickness":          self._get_thickness(),
             "npts":               self._npts.value(),
             "az_min":             self._az_min.value(),
             "az_max":             self._az_max.value(),
@@ -343,13 +400,8 @@ class _WAXSTab(_TechniqueTab):
 
         form.addRow(_separator())
 
-        # ── Thickness ─────────────────────────────────────────────────────────
-        self._thickness = QDoubleSpinBox()
-        self._thickness.setRange(0.001, 100.0)
-        self._thickness.setValue(1.0)
-        self._thickness.setDecimals(3)
-        self._thickness.setSuffix("  mm")
-        form.addRow("Thickness:", self._thickness)
+        # ── Sample thickness (HDF5 default + override) ────────────────────────
+        self._setup_thickness_section(form)
 
         # Placeholder for future parameters
         form.addRow(_separator())
@@ -379,6 +431,6 @@ class _WAXSTab(_TechniqueTab):
     def get_params(self) -> dict:
         return {
             "blank_mode":         self._blank_mode.currentText(),
-            "thickness":          self._thickness.value(),
+            "thickness":          self._get_thickness(),
             "recalculateAllData": True,
         }

@@ -58,6 +58,13 @@ dependencies:
   - h5py                # HDF5/NeXus file I/O
   - requests            # Tiled server REST API queries
 
+  # Pin freetype + harfbuzz via conda so their shared-library ABIs are
+  # consistent.  Without this, conda-forge may install a harfbuzz that was
+  # compiled against a newer FreeType than the env actually provides, causing
+  # "undefined symbol: FT_Get_Colorline_Stops" when PySide6 loads on Linux.
+  - freetype
+  - harfbuzz
+
   # GUI stack — pyside6 and pyqtgraph are installed via pip (see below)
   # rather than conda to prevent the conda solver from pulling in pyqt6
   # as a transitive dependency (e.g. through matplotlib's backend detection),

@@ -125,7 +125,6 @@ PV_C1M7 = "usxLAX:m58:c1:m7.VAL"
 try:
     import epics
     EPICS_AVAILABLE = True
-    print(f"[matilda] pyepics {epics.__version__} imported OK")
 except ImportError as _epics_err:
     EPICS_AVAILABLE = False
     print(f"[matilda] pyepics not available: {_epics_err}")
@@ -1472,11 +1471,6 @@ class BeamlineSurveyDialog(QDialog):
         self._epics_timer.timeout.connect(self._poll_epics)
 
         self._build_ui()
-
-        # Print fast diagnostics (env vars only) to the terminal on open so
-        # the user can see the EPICS environment without clicking anything.
-        diag = _get_epics_diagnostics(test_pvs=None)
-        print("[matilda EPICS diagnostics on Survey open]\n" + diag)
 
         if EPICS_AVAILABLE:
             self._epics_timer.start()

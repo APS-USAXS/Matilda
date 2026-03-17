@@ -125,8 +125,55 @@ PV_C1M7 = "usxLAX:m58:c1:m7.VAL"
 try:
     import epics
     EPICS_AVAILABLE = True
-except ImportError:
+    print(f"[matilda] pyepics {epics.__version__} imported OK")
+except ImportError as _epics_err:
     EPICS_AVAILABLE = False
+    print(f"[matilda] pyepics not available: {_epics_err}")
+
+
+def _get_epics_diagnostics(test_pvs=None):
+    """Return a multi-line diagnostic string for EPICS connectivity.
+
+    Parameters
+    ----------
+    test_pvs : list[str] | None
+        If given, attempt a ``caget`` on each PV (timeout=0.5 s) and report
+        the result.  Pass ``None`` to skip the PV tests (faster).
+    """
+    import os
+    import socket
+    lines = []
+    lines.append(f"Host : {socket.gethostname()}")
+    lines.append(f"pyepics available : {EPICS_AVAILABLE}")
+    if EPICS_AVAILABLE:
+        lines.append(f"pyepics version   : {epics.__version__}")
+
+    epics_vars = [
+        "EPICS_CA_ADDR_LIST",
+        "EPICS_CA_AUTO_ADDR_LIST",
+        "EPICS_CA_SERVER_PORT",
+        "EPICS_CA_MAX_ARRAY_BYTES",
+        "EPICS_HOST_ARCH",
+    ]
+    lines.append("")
+    lines.append("EPICS environment variables:")
+    for var in epics_vars:
+        lines.append(f"  {var} = {os.environ.get(var, '(not set)')}")
+
+    if EPICS_AVAILABLE and test_pvs:
+        lines.append("")
+        lines.append("PV connectivity test (timeout=0.5 s each):")
+        for pv in test_pvs:
+            try:
+                val = epics.caget(pv, timeout=0.5)
+                if val is None:
+                    lines.append(f"  {pv}  →  TIMEOUT / no connection")
+                else:
+                    lines.append(f"  {pv}  →  {val}")
+            except Exception as exc:
+                lines.append(f"  {pv}  →  ERROR: {exc}")
+
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -1426,6 +1473,11 @@ class BeamlineSurveyDialog(QDialog):
 
         self._build_ui()
 
+        # Print fast diagnostics (env vars only) to the terminal on open so
+        # the user can see the EPICS environment without clicking anything.
+        diag = _get_epics_diagnostics(test_pvs=None)
+        print("[matilda EPICS diagnostics on Survey open]\n" + diag)
+
         if EPICS_AVAILABLE:
             self._epics_timer.start()
         else:
@@ -1541,9 +1593,17 @@ class BeamlineSurveyDialog(QDialog):
         slit_lay.addWidget(btn_slits_sw)
         layout.addLayout(slit_lay)
 
-        # Status
+        # Status + diagnostics button on same row
+        status_row = QHBoxLayout()
         self._status_lbl = QLabel("Ready")
-        layout.addWidget(self._status_lbl)
+        status_row.addWidget(self._status_lbl, 1)
+        btn_diag = QPushButton("EPICS Diagnostics…")
+        btn_diag.setToolTip(
+            "Test PV connectivity and show EPICS environment variables"
+        )
+        btn_diag.clicked.connect(self._show_epics_diagnostics)
+        status_row.addWidget(btn_diag)
+        layout.addLayout(status_row)
 
         self._motor_buttons = [btn_sx_dn, btn_sx_up, btn_sy_dn, btn_sy_up,
                                 btn_drive, btn_save, btn_go00, btn_stop,
@@ -1596,6 +1656,27 @@ class BeamlineSurveyDialog(QDialog):
             self._sy_rbv.setText(f"{sy:.2f}" if sy is not None else "---")
         except Exception:
             pass
+
+    def _show_epics_diagnostics(self):
+        """Run a PV connectivity test and show results in a message box.
+
+        Pauses the polling timer while the (blocking) caget calls run so that
+        they do not race with the timer.
+        """
+        self._epics_timer.stop()
+        self._status_lbl.setText("Running EPICS diagnostics…")
+
+        test_pvs = [PV_SX_RBV, PV_SY_RBV, PV_DATA_COLLECTING, PV_ALL_STOP]
+        diag = _get_epics_diagnostics(test_pvs=test_pvs)
+
+        # Also echo to terminal
+        print("[matilda EPICS diagnostics (button)]\n" + diag)
+
+        QMessageBox.information(self, "EPICS Diagnostics", diag)
+
+        self._status_lbl.setText("Ready")
+        if EPICS_AVAILABLE:
+            self._epics_timer.start()
 
     def _check_instrument_busy(self):
         if not EPICS_AVAILABLE:

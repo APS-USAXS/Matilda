@@ -49,6 +49,7 @@ dependencies = [
 gui = [
     "PySide6",
     "pyqtgraph",
+    "pyepics",
 ]
 # Install with: pip install matilda[dev]
 dev = [
@@ -60,6 +61,7 @@ dev = [
 all = [
     "PySide6",
     "pyqtgraph",
+    "pyepics",
     "pytest",
     "pytest-cov",
 ]

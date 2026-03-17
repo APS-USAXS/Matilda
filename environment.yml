@@ -74,6 +74,7 @@ dependencies:
     # preventing platform-plugin conflicts on macOS.
     - PySide6
     - pyqtgraph
+    - pyepics           # EPICS Channel Access for Beamline Survey motor control
     # Packages not available on conda-forge must go here.
     # NOTE: 'six' (imported in hdf5code.py) is a transitive dependency of
     # h5py and will be present automatically — do NOT add it explicitly.

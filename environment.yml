@@ -65,11 +65,22 @@ dependencies:
   - freetype
   - harfbuzz
 
-  # GUI stack — pyside6 and pyqtgraph are installed via pip (see below)
-  # rather than conda to prevent the conda solver from pulling in pyqt6
-  # as a transitive dependency (e.g. through matplotlib's backend detection),
-  # which would create conflicting Qt shared-library sets on macOS.
-  # Do NOT add pyside6, pyqt6, or pyqtgraph here as conda packages.
+  # GUI stack via conda-forge.
+  # Previously installed via pip to avoid macOS Qt plugin conflicts, but
+  # pip's --upgrade flag requires uninstalling the old version first, which
+  # fails when a prior shiboken6 was installed without a pip RECORD file
+  # (a known issue on shared network-mounted home directories at APS).
+  # conda manages its own package database and never hits the RECORD problem.
+  #
+  # macOS note: if conda-forge pulls in pyqt6 as a matplotlib transitive dep
+  # and you see "cocoa platform plugin not found", reinstall pyside6 and
+  # pyqtgraph via pip inside the activated env:
+  #   pip install --ignore-installed "PySide6>=6.4,<6.8" pyqtgraph
+  #
+  # PySide6 6.8+ requires GLIBC 2.32; pin to <6.8 for RHEL 8 compatibility
+  # (RHEL 8 ships GLIBC 2.28; RHEL 9 has 2.34 and could use a newer version).
+  - pyside6>=6.4,<6.8
+  - pyqtgraph
 
   # Development / testing
   - pytest
@@ -77,14 +88,8 @@ dependencies:
 
   - pip
   - pip:
-    # GUI stack via pip: keeps PySide6 isolated from conda's Qt packages,
-    # preventing platform-plugin conflicts on macOS.
-    # PySide6 6.8+ requires GLIBC 2.32; pin to <6.8 for RHEL 8 compatibility
-    # (RHEL 8 ships GLIBC 2.28, which PySide6 6.7.x supports).
-    - PySide6>=6.4,<6.8
-    - pyqtgraph
+    # pyepics is not on conda-forge, must come from pip.
     - pyepics           # EPICS Channel Access for Beamline Survey motor control
-    # Packages not available on conda-forge must go here.
     # NOTE: 'six' (imported in hdf5code.py) is a transitive dependency of
     # h5py and will be present automatically — do NOT add it explicitly.
     # It should be removed from hdf5code.py (see BUG-02 in matilda/__init__.py).

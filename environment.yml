@@ -79,7 +79,9 @@ dependencies:
   - pip:
     # GUI stack via pip: keeps PySide6 isolated from conda's Qt packages,
     # preventing platform-plugin conflicts on macOS.
-    - PySide6
+    # PySide6 6.8+ requires GLIBC 2.32; pin to <6.8 for RHEL 8 compatibility
+    # (RHEL 8 ships GLIBC 2.28, which PySide6 6.7.x supports).
+    - PySide6>=6.4,<6.8
     - pyqtgraph
     - pyepics           # EPICS Channel Access for Beamline Survey motor control
     # Packages not available on conda-forge must go here.

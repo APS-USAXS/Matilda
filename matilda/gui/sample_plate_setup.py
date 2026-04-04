@@ -46,7 +46,7 @@ try:
         QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
         QTextEdit, QSizePolicy, QScrollArea,
     )
-    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QThread, QObject
+    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QThread, QObject, QSettings
     from PySide6.QtGui import QAction, QFont, QColor, QIcon
 except ImportError:
     from PyQt6.QtWidgets import (
@@ -59,7 +59,7 @@ except ImportError:
         QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
         QTextEdit, QSizePolicy, QScrollArea,
     )
-    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
+    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QSettings
     from PyQt6.QtGui import QAction, QFont, QColor, QIcon
 
 import pyqtgraph as pg
@@ -1788,7 +1788,8 @@ class SamplePlateSetupWindow(QMainWindow):
         self._waxs_time = WAXS_SCAN_TIME_DEFAULT
         self._settings_hdf5_path: str | None = None
         self._hdf5_dirty: bool = False
-        self._last_export_dir: str | None = None
+        self._settings = QSettings("USAXS", "MatildaSamplePlates")
+        self._last_export_dir: str = self._settings.value("last_export_dir", "") or ""
 
         self._build_ui()
         self._load_template("9x9 Acrylic/magnetic plate")
@@ -2372,15 +2373,16 @@ class SamplePlateSetupWindow(QMainWindow):
             include_header=True,
             hook_offsets=self._get_hook_offsets(),
         )
-        fname = self._cmd_fname.text().strip() or DEFAULT_CMD_FILENAME
-        if self._last_export_dir is not None:
-            out_dir = self._last_export_dir
-        else:
-            out_dir = os.path.join(os.path.expanduser("~"), "Desktop")
-        path = os.path.join(out_dir, fname)
+        init_path = os.path.join(self._last_export_dir, DEFAULT_CMD_FILENAME)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export command file", init_path,
+            "Command files (*.mac);;All files (*)")
+        if not path:
+            return
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         self._last_export_dir = os.path.dirname(path)
+        self._settings.setValue("last_export_dir", self._last_export_dir)
         self._status_lbl.setText(f"Exported command file: {path}")
 
     def _on_export_named(self):
@@ -2407,6 +2409,7 @@ class SamplePlateSetupWindow(QMainWindow):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             self._last_export_dir = os.path.dirname(path)
+            self._settings.setValue("last_export_dir", self._last_export_dir)
             self._status_lbl.setText(f"Exported: {path}")
 
     def _on_export_append(self):
@@ -2436,6 +2439,7 @@ class SamplePlateSetupWindow(QMainWindow):
                 f.write("\n\n###  Appended commands\n\n")
                 f.write(content_new)
             self._last_export_dir = os.path.dirname(path)
+            self._settings.setValue("last_export_dir", self._last_export_dir)
             self._status_lbl.setText(f"Appended to: {path}")
 
     def _on_beamline_survey(self):

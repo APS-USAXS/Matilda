@@ -123,8 +123,9 @@ Edit them and restart the service for changes to take effect.
 | `NumberOfDaysToLookBack` | `1` | How far back (days) to search for new scans. |
 | `NumberOfDaysToLookBackBlanks` | `5` | How far back (days) to search for blank scans. |
 | `NumberOfImagesInGraphs` | `10` | Maximum number of data sets shown in each summary plot. |
-| `CONDA_EXECUTABLE` | `/APSshare/miniconda/x86_64/bin/conda` | Full path to conda — used when invoking pynika calibration. |
+| `CONDA_EXECUTABLE` | `/APSshare/miniconda/x86_64/bin/conda` | Full path to conda — used when invoking pynika and pyirena. |
 | `PYNIKA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pynika` | pynika conda environment used for auto-calibration. |
+| `PYIRENA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pyirena` | pyirena conda environment used for auto-analysis and merging. |
 
 ---
 
@@ -142,6 +143,148 @@ Trigger: filename contains "AgBehenateLaB6"
 Command: conda run --no-capture-output -p <PYNIKA_CONDA_ENV_PATH>
          pynika --file <path> --instrument SAXS|WAXS --auto-fit --save-to-pvs
 Timeout: 300 seconds
+```
+
+---
+
+## pyirena auto-analysis
+
+After each data-reduction step (Flyscan, Step scan, SAXS, WAXS), Matilda checks
+whether a `pyirena_config.json` file exists in the same folder as the reduced
+data.  If it does, `pyirena.batch.fit_pyirena()` is called on every non-blank
+file that has not already been analyzed this session.
+
+This allows automatic model fitting (e.g., size distributions, form factors)
+immediately after reduction, with no user intervention.
+
+### Enabling auto-analysis
+
+Place a `pyirena_config.json` file in each technique folder that should be
+analyzed:
+
+```
+.../05_02_UserName/data/
+    data_usaxs/
+        pyirena_config.json    ← enables analysis for USAXS files
+    data_saxs/
+        pyirena_config.json    ← enables analysis for SAXS files
+    data_waxs/
+        pyirena_config.json    ← enables analysis for WAXS files
+```
+
+The config file format is defined by pyirena.  See the
+[pyirena documentation](https://github.com/jilavsky/pyirena) for details.
+
+### Subprocess call
+
+```
+Command: conda run --no-capture-output -p <PYIRENA_CONDA_ENV_PATH>
+         python -c "from pyirena.batch import fit_pyirena;
+                     fit_pyirena('<data_file>', '<config_file>',
+                                 save_to_nexus=True, with_uncertainty=False, n_mc_runs=10)"
+Timeout: 300 seconds
+```
+
+Blank files (filename containing "blank") are always skipped.  Each file is
+analyzed at most once per service session, tracked by bounded in-memory sets
+(max 100 entries per technique).
+
+---
+
+## Automatic USAXS+SAXS merging
+
+When both a USAXS and a matching SAXS dataset exist for the same sample,
+Matilda can automatically merge them into a single combined I(Q) curve using
+`pyirena.batch.merge_data()`.
+
+### Prerequisites
+
+1. Both the USAXS and SAXS files must be reduced (present in their respective
+   folders).
+2. A `merge_config.json` file must exist in the **parent data folder** (one
+   level above `data_usaxs` and `data_saxs`).
+
+```
+.../05_02_UserName/data/
+    merge_config.json          ← required to enable merging
+    data_usaxs/                ← reduced USAXS files (*.h5)
+    data_saxs/                 ← reduced SAXS files (*.hdf)
+    data_usaxs_merged/         ← output (created automatically)
+```
+
+### File matching logic
+
+Two files are considered to represent the same sample when:
+
+- The **prefix** before the first `_` is identical.
+- The **scan number** between the last `_` and the file extension is identical.
+
+The middle portion (timestamps, temperatures, etc.) is ignored because it may
+differ between USAXS and SAXS measurements of the same sample.
+
+| USAXS file | SAXS file | Match? |
+|---|---|---|
+| `Sample1_55C_10min_1234.h5` | `Sample1_58C_11min_1234.hdf` | Yes (`Sample1` + `1234`) |
+| `Sample1_55C_10min_1234.h5` | `Sample2_55C_10min_1234.hdf` | No (prefix differs) |
+| `Sample1_55C_10min_1234.h5` | `Sample1_55C_10min_1235.hdf` | No (scan number differs) |
+
+### When merging is triggered
+
+Merging is attempted after pyirena analysis in every processing cycle for
+Flyscans, Step scans, and SAXS data.  It fires regardless of which technique
+arrives first — if USAXS data arrive before SAXS, the merge is attempted when
+SAXS data appear (and vice versa).
+
+### Merge order
+
+USAXS data are always **file 1** (lower Q, absolute intensity scale) and SAXS
+data are always **file 2** (higher Q).  This is required by `merge_data()`.
+
+### Output
+
+Merged files are written to the `data_usaxs_merged` subfolder inside the parent
+data directory.  The output filename matches the USAXS input filename.
+
+### Post-merge pyirena analysis
+
+After a successful merge, Matilda checks whether a `pyirena_config.json` file
+exists in the `data_usaxs_merged` folder.  If it does, `fit_pyirena()` is called
+on the merged file, enabling automatic model fitting on the combined dataset.
+
+### Subprocess call
+
+```
+Command: conda run --no-capture-output -p <PYIRENA_CONDA_ENV_PATH>
+         python -c "from pyirena.batch import merge_data;
+                     merge_data('<usaxs_file>', '<saxs_file>',
+                                config_file='<merge_config.json>',
+                                output_folder='<data_usaxs_merged/>',
+                                save_to_nexus=True, verbose=True)"
+Timeout: 300 seconds
+```
+
+### Tracking and memory
+
+Each USAXS+SAXS pair is merged at most once per service session, tracked by a
+bounded in-memory set (max 100 entries).  Failed merges are also recorded — they
+are not retried.  When the set exceeds 100 entries, the oldest entry is evicted;
+re-merging an evicted pair is harmless (the output file is overwritten).
+
+### merge_config.json format
+
+The config file controls the overlap region and optimization parameters.
+See the [pyirena merge documentation](https://github.com/jilavsky/pyirena/blob/main/docs/data_merge_gui.md)
+for the full specification.  A minimal example:
+
+```json
+{
+  "version": "1.0",
+  "q_overlap_min": 0.08,
+  "q_overlap_max": 0.25,
+  "fit_scale": true,
+  "scale_dataset": 2,
+  "fit_qshift": false
+}
 ```
 
 ---

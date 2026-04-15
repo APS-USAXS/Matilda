@@ -17,6 +17,10 @@ matilda.py  ─── 15-second polling loop
         ├── pynika (subprocess, conda run)
         │       triggered by AgBehenateLaB6 filenames
         │
+        ├── pyirena (subprocess, conda run)
+        │       fit_pyirena  — auto-analysis per technique folder
+        │       merge_data   — USAXS+SAXS auto-merge
+        │
         ├── plotData.py         (JPEG summary plots → web directory)
         └── hdf5code.py         (NXcanSAS read/write)
 ```
@@ -42,8 +46,12 @@ Key module-level constants (configure near top of file):
 | `NumberOfDaysToLookBack` | Tiled query window for scans |
 | `NumberOfDaysToLookBackBlanks` | Tiled query window for blanks |
 | `NumberOfImagesInGraphs` | Max datasets per plot |
-| `CONDA_EXECUTABLE` | Path to conda for pynika subprocess |
+| `CONDA_EXECUTABLE` | Path to conda for pynika/pyirena subprocesses |
 | `PYNIKA_CONDA_ENV_PATH` | pynika environment path |
+| `PYIRENA_CONDA_ENV_PATH` | pyirena environment path |
+| `_PYIRENA_CONFIG_FILENAME` | Per-folder config that triggers pyirena analysis (`pyirena_config.json`) |
+| `_MERGE_CONFIG_FILENAME` | Per-experiment config that triggers USAXS+SAXS merging (`merge_config.json`) |
+| `_MERGED_FOLDER_NAME` | Output subfolder for merged data (`data_usaxs_merged`) |
 
 ---
 

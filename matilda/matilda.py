@@ -50,6 +50,7 @@ TODO: add to each processXYZ option to force Blank if Blanks is only one and avo
 
 '''
 
+import glob as _glob
 import pprint as pp
 import numpy as np
 import socket
@@ -85,6 +86,10 @@ PYIRENA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pyirena'
 
 # Name of the per-folder JSON config that triggers pyirena analysis.
 _PYIRENA_CONFIG_FILENAME = 'pyirena_config.json'
+# Name of the per-experiment JSON config that triggers USAXS+SAXS merging.
+_MERGE_CONFIG_FILENAME = 'merge_config.json'
+# Subfolder name for merged USAXS+SAXS output files.
+_MERGED_FOLDER_NAME = 'data_usaxs_merged'
 # Maximum number of (path, filename) entries kept in each per-technique
 # analyzed-files set.  Large enough to cover user transitions without growing
 # without bound.
@@ -254,6 +259,217 @@ def _checkAndRunPyirenaAnalysis(ListOfScans, analyzed_set):
     """
     for scan_path, scan_filename in ListOfScans:
         _runPyirenaAnalysis(scan_path, scan_filename, analyzed_set)
+
+
+# --- USAXS+SAXS auto-merge helpers ---
+
+def _extract_sample_key(filename):
+    """
+    Extract a (prefix, scan_number) key from a data filename.
+
+    The prefix is everything before the first '_' and the scan number is
+    the token between the last '_' and the file extension.  Two files
+    represent the same sample when both parts match.
+
+    Example: 'Sample1_55C_10min_1234.h5' → ('Sample1', '1234')
+
+    Returns None if the filename does not contain at least one '_'.
+    """
+    stem = os.path.splitext(filename)[0]  # strip extension
+    parts = stem.split('_')
+    if len(parts) < 2:
+        return None
+    return (parts[0], parts[-1])
+
+
+def _find_matching_partner(path, filename, partner_suffix):
+    """
+    Given a reduced data file, find the matching file in the partner
+    technique folder.
+
+    Parameters
+    ----------
+    path : str
+        Directory of the current file (e.g. '.../data_usaxs').
+    filename : str
+        Filename of the current reduced scan.
+    partner_suffix : str
+        Folder suffix of the partner technique ('_usaxs' or '_saxs').
+
+    Returns
+    -------
+    (partner_path, partner_filename) or None
+    """
+    key = _extract_sample_key(filename)
+    if key is None:
+        return None
+    prefix, scan_number = key
+
+    parent_dir = os.path.dirname(path)
+    # Build partner folder: replace the last _xxx suffix with partner_suffix.
+    current_folder_name = os.path.basename(path)
+    # Strip the technique suffix (e.g. '_usaxs', '_saxs') from the folder name.
+    # The folder name is like 'data_usaxs' or '05_02_UserName_saxs' — the
+    # technique suffix is always at the end.
+    for suffix in ('_usaxs', '_saxs'):
+        if current_folder_name.endswith(suffix):
+            base_name = current_folder_name[:-len(suffix)]
+            break
+    else:
+        return None  # folder doesn't follow expected naming
+
+    partner_folder = os.path.join(parent_dir, base_name + partner_suffix)
+    if not os.path.isdir(partner_folder):
+        return None
+
+    # Glob for files matching the same prefix and scan number.
+    pattern = os.path.join(partner_folder, f"{prefix}_*_{scan_number}.*")
+    matches = _glob.glob(pattern)
+    if not matches:
+        return None
+
+    partner_file = os.path.basename(matches[0])
+    return (partner_folder, partner_file)
+
+
+def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
+                  config_file, merged_set):
+    """
+    Merge a USAXS+SAXS file pair using pyirena merge_data().
+
+    USAXS is always file1 (lower Q, absolute scale), SAXS is file2
+    (higher Q).  On both success and failure the merge key is added to
+    *merged_set* so the pair is not retried this session.
+
+    Parameters
+    ----------
+    usaxs_path, usaxs_filename : str
+        Path and filename of the reduced USAXS file.
+    saxs_path, saxs_filename : str
+        Path and filename of the reduced SAXS file.
+    config_file : str
+        Full path to the merge_config.json file.
+    merged_set : set
+        Mutable set of merge keys already processed this session.
+
+    Returns
+    -------
+    bool
+        True if the merge succeeded, False otherwise.
+    """
+    usaxs_file = os.path.join(usaxs_path, usaxs_filename)
+    saxs_file = os.path.join(saxs_path, saxs_filename)
+    merge_key = (usaxs_file, saxs_file)
+
+    parent_dir = os.path.dirname(usaxs_path)
+    output_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+    os.makedirs(output_folder, exist_ok=True)
+
+    logging.info(f"Merging USAXS+SAXS: {usaxs_filename} + {saxs_filename}")
+    python_snippet = (
+        "from pyirena.batch import merge_data; "
+        f"merge_data({usaxs_file!r}, {saxs_file!r}, "
+        f"config_file={config_file!r}, "
+        f"output_folder={output_folder!r}, "
+        "save_to_nexus=True, verbose=True)"
+    )
+    cmd = [CONDA_EXECUTABLE, 'run', '--no-capture-output', '-p',
+           PYIRENA_CONDA_ENV_PATH, 'python', '-c', python_snippet]
+    success = False
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            logging.info(f"Merge succeeded: {usaxs_filename} + {saxs_filename}")
+            success = True
+        else:
+            logging.error(
+                f"Merge failed for {usaxs_filename} + {saxs_filename} "
+                f"(exit {result.returncode}): {result.stderr.strip()}"
+            )
+    except subprocess.TimeoutExpired:
+        logging.error(
+            f"Merge timed out for {usaxs_filename} + {saxs_filename}"
+        )
+    except Exception as e:
+        logging.error(
+            f"Merge error for {usaxs_filename} + {saxs_filename}: {e}",
+            exc_info=True,
+        )
+
+    # Always record the pair so it is not retried this session.
+    merged_set.add(merge_key)
+    while len(merged_set) > _MAX_PYIRENA_ANALYZED:
+        merged_set.pop()
+
+    return success
+
+
+def _checkAndRunMerge(ListOfScans, technique, merged_set, analyzed_merged_set):
+    """
+    For each scan in *ListOfScans*, check whether the matching partner
+    file (USAXS↔SAXS) exists and a merge_config.json is present.  If
+    so, merge the pair and optionally run pyirena analysis on the output.
+
+    Parameters
+    ----------
+    ListOfScans : list of (path, filename)
+        Scans just processed in the current cycle.
+    technique : str
+        'USAXS' or 'SAXS' — indicates which technique *ListOfScans*
+        belongs to.
+    merged_set : set
+        Tracks (usaxs_file, saxs_file) pairs already merged this session.
+    analyzed_merged_set : set
+        Tracks merged output files already sent to pyirena this session.
+    """
+    if technique == "USAXS":
+        partner_suffix = '_saxs'
+    elif technique == "SAXS":
+        partner_suffix = '_usaxs'
+    else:
+        return
+
+    for scan_path, scan_filename in ListOfScans:
+        if 'blank' in scan_filename.lower():
+            continue
+
+        partner = _find_matching_partner(scan_path, scan_filename,
+                                         partner_suffix)
+        if partner is None:
+            continue
+        partner_path, partner_filename = partner
+
+        # Determine which is USAXS and which is SAXS.
+        if technique == "USAXS":
+            usaxs_path, usaxs_filename = scan_path, scan_filename
+            saxs_path, saxs_filename = partner_path, partner_filename
+        else:
+            saxs_path, saxs_filename = scan_path, scan_filename
+            usaxs_path, usaxs_filename = partner_path, partner_filename
+
+        usaxs_file = os.path.join(usaxs_path, usaxs_filename)
+        saxs_file = os.path.join(saxs_path, saxs_filename)
+        merge_key = (usaxs_file, saxs_file)
+        if merge_key in merged_set:
+            continue
+
+        # Check for merge_config.json in the parent data folder.
+        parent_dir = os.path.dirname(usaxs_path)
+        config_file = os.path.join(parent_dir, _MERGE_CONFIG_FILENAME)
+        if not os.path.isfile(config_file):
+            continue
+
+        success = _runMergeData(usaxs_path, usaxs_filename,
+                                saxs_path, saxs_filename,
+                                config_file, merged_set)
+
+        if success:
+            # Run pyirena analysis on the merged output if config exists.
+            merged_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+            # The merged file is named after the USAXS (file1) input.
+            merged_filename = usaxs_filename
+            _runPyirenaAnalysis(merged_folder, merged_filename,
+                                analyzed_merged_set)
 
 
 # --- user facing functions ---
@@ -497,6 +713,10 @@ def main():
         analyzedStepFiles = set()
         analyzedSAXSFiles = set()
         analyzedWAXSFiles = set()
+        # Track USAXS+SAXS pairs already merged and merged files already
+        # analyzed this session.  Bounded like the sets above.
+        mergedUSAXSSAXSFiles = set()
+        analyzedMergedFiles = set()
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
@@ -514,6 +734,7 @@ def main():
                 results = processFlyscans(ListOfScans, listOfBlanks)
                 plotUSAXSResults(results, imagePath, isFlyscan=True)
                 _checkAndRunPyirenaAnalysis(ListOfScans, analyzedFlyscanFiles)
+                _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
                 listofFlyscansOld = ListOfScans
             
 
@@ -531,6 +752,7 @@ def main():
                 results = processStepscans(ListOfScans, listOfBlanks)
                 plotUSAXSResults(results, imagePath, isFlyscan=False)
                 _checkAndRunPyirenaAnalysis(ListOfScans, analyzedStepFiles)
+                _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
                 listofStepScansOld = ListOfScans
     
             #process SAXS and WAXS data
@@ -547,6 +769,7 @@ def main():
                 results = processADscans(ListOfScans, listOfBlanks)
                 plotSWAXSResults(results, imagePath, isSAXS=True)
                 _checkAndRunPyirenaAnalysis(ListOfScans, analyzedSAXSFiles)
+                _checkAndRunMerge(ListOfScans, "SAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
                 listofSAXSOld = ListOfScans
 
             logging.info("Processing the WAXS")

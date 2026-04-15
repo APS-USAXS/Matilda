@@ -1,18 +1,95 @@
 name: matilda
+# =============================================================================
+# Matilda conda environment
+# =============================================================================
+#
+# FIRST-TIME BUILD (creates env from scratch):
+#   conda env create -f environment.yml
+#
+# UPDATE EXISTING ENV (adds/removes packages to match this file):
+#   conda env update -f environment.yml --prune
+#
+# INSTALL MATILDA IN EDITABLE MODE (run from repo root after env is active):
+#   pip install -e .          # core + headless server
+#   pip install -e .[gui]     # + PySide6 and pyqtgraph for GUI development
+#   pip install -e .[dev]     # + pytest for running tests
+#   pip install -e .[all]     # everything
+#
+# Windows (local development / testing)
+# ──────────────────────────────────────
+# Conda base : C:\ProgramData\miniconda3
+# Envs dir   : C:\Users\ilavsky\.conda\envs\
+# Test env   : C:\Users\ilavsky\.conda\envs\matilda
+#
+#   # (Re)build from scratch:
+#   conda env remove -n matilda          # only if you want a clean slate
+#   conda env create -f environment.yml
+#   conda activate matilda
+#   pip install -e .[all]
+#
+#   # Update existing env without rebuilding:
+#   conda env update -f environment.yml --prune
+#   conda activate matilda
+#   pip install -e .[all]
+#
+# Beamline server (headless — GUI stack optional but included below)
+# ───────────────────────────────────────────────────────────────────
+# Conda      : /APSshare/miniconda/x86_64/bin/conda
+# Envs dir   : /home/beams/USAXS/.conda/envs/
+# Matilda env: /home/beams/USAXS/.conda/envs/matilda  (name: matilda)
+#
+#   conda env create -f environment.yml
+#   conda activate matilda
+#   pip install -e .           # headless only on server
+#
+# =============================================================================
+
 channels:
   - conda-forge
   - defaults
-  - https://repo.anaconda.com/pkgs/main
-  - https://repo.anaconda.com/pkgs/r
+
 dependencies:
-  - python=3.12.3
+  - python=3.12
   - numpy
-  - tifffile
   - scipy
-  - matplotlib
-  - pyfai
+  - matplotlib          # headless JPEG export (plotData.py); NOT used in GUI
+  - tifffile
+  - pyfai               # SAXS/WAXS 2D→1D azimuthal integration (conda-forge: pyfai)
+  - h5py                # HDF5/NeXus file I/O
+  - requests            # Tiled server REST API queries
+
+  # Pin freetype + harfbuzz via conda so their shared-library ABIs are
+  # consistent.  Without this, conda-forge may install a harfbuzz that was
+  # compiled against a newer FreeType than the env actually provides, causing
+  # "undefined symbol: FT_Get_Colorline_Stops" when PySide6 loads on Linux.
+  - freetype
+  - harfbuzz
+
+  # GUI stack via conda-forge.
+  # Previously installed via pip to avoid macOS Qt plugin conflicts, but
+  # pip's --upgrade flag requires uninstalling the old version first, which
+  # fails when a prior shiboken6 was installed without a pip RECORD file
+  # (a known issue on shared network-mounted home directories at APS).
+  # conda manages its own package database and never hits the RECORD problem.
+  #
+  # macOS note: if conda-forge pulls in pyqt6 as a matplotlib transitive dep
+  # and you see "cocoa platform plugin not found", reinstall pyside6 and
+  # pyqtgraph via pip inside the activated env:
+  #   pip install --ignore-installed "PySide6>=6.4,<6.8" pyqtgraph
+  #
+  # PySide6 6.8+ requires GLIBC 2.32; pin to <6.8 for RHEL 8 compatibility
+  # (RHEL 8 ships GLIBC 2.28; RHEL 9 has 2.34 and could use a newer version).
+  - pyside6>=6.4,<6.8
+  - pyqtgraph
+
+  # Development / testing
+  - pytest
+  - pytest-cov
+
   - pip
-  - requests
-  
   - pip:
-    - h5py
+    # pyepics is not on conda-forge, must come from pip.
+    - pyepics           # EPICS Channel Access for Beamline Survey motor control
+    # NOTE: 'six' (imported in hdf5code.py) is a transitive dependency of
+    # h5py and will be present automatically — do NOT add it explicitly.
+    # It should be removed from hdf5code.py (see BUG-02 in matilda/__init__.py).

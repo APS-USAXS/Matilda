@@ -8,13 +8,12 @@ import copy
 import re
 import pprint as pp
 from pathlib import Path
-import matplotlib.pyplot as plt
 
 
 from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
 #this is to enable graphs in R data clacualtion for debugging. 
 debugme = 0
@@ -452,8 +451,8 @@ def calculatePD_Fly(data_dict):
         try:
             updBkgErrName = 'upd_bkgErr'+str(int(GainsIndx[i]))
             updBkgErr[i] =  metadata_dict[updBkgErrName]
-        except:
-            updBkgErrName = 'upd_bkg_err'+str(int(GainsIndx[i]))     #typo in Flyscan schema below 1.3 (before June 2025) 
+        except KeyError:
+            updBkgErrName = 'upd_bkg_err'+str(int(GainsIndx[i]))     #typo in Flyscan schema below 1.3 (before June 2025)
             updBkgErr[i] =  metadata_dict[updBkgErrName]
 
         #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
@@ -489,6 +488,7 @@ def calculatePD_Fly(data_dict):
         #Constant Indra_PDIntBackFixScaleVmax     = 0.3e-10
         
     if debugme:
+        import matplotlib.pyplot as plt  # lazy import — only needed for debug plots
         plt.figure()
         plt.plot(ARangles, np.log10(UPD_array), label='UPD_array')
         plt.plot(ARangles, np.log10(TimeInSec*updBkg), label='TimeInSec*updBkg')

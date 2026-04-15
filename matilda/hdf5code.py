@@ -1,13 +1,45 @@
 """
-    this contains needed hdf5 support for matilda
-    used by saving blank BL_QRS data.
+hdf5code.py
+===========
+HDF5 / NXcanSAS read-write helpers used throughout Matilda.
+
+Public functions
+----------------
+save_dict_to_hdf5(data_dict, location, hdf_file)
+    Recursively write a Python dict into an open HDF5 file at the given path.
+
+load_dict_from_hdf5(hdf_file, location)
+    Recursively read an HDF5 group back into a Python dict.
+
+saveNXcanSAS(Sample, path, filename)
+    Write processed I(Q) data as an NXcanSAS-compliant NXsubentry into the
+    original scan HDF5 file.
+
+readMyNXcanSAS(path, filename)
+    Read back the NXcanSAS entry written by saveNXcanSAS().
+
+readGenericNXcanSAS(path, filename)
+    Read any NXcanSAS entry from a Nexus file (not necessarily written by
+    Matilda).
+
+find_matching_groups(hdf_file, required_attributes, required_items)
+    Search an open HDF5 file for groups matching a set of attribute and
+    dataset criteria; returns a list of matching group paths.
+
+Notes
+-----
+* The 'six' library is imported (line 8) as a Python 2/3 compatibility shim.
+  It appears unused in Python 3 code — the import can likely be removed once
+  verified.  The original author flagged this with '#what is this for???'.
+* All functions expect the HDF5 file to follow the NeXus / NXcanSAS
+  conventions used by the APS USAXS Bluesky acquisition system.
 """
 import h5py
 import os
 import numpy as np
-import six  #what is this for???
 import datetime
 import logging
+from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
 
 
 def readGenericNXcanSAS(path, filename):
@@ -166,10 +198,14 @@ def saveNXcanSAS(Sample,path, filename):
         f.attrs['file_time']        = timeStamp 
         f.attrs['instrument']       = '12IDE USAXS'
         f.attrs['creator']          = 'Matilda NeXus writer'
-        f.attrs['Matilda_version']  = '1.0.0' # version 2025-07-06
+        try:
+            _matilda_ver = _pkg_version('Matilda')
+        except _PkgNotFoundError:
+            _matilda_ver = 'unknown'
+        f.attrs['Matilda_version']  = _matilda_ver
         f.attrs['NeXus_version']    = '4.3.0' #2025-5-9 4.3.0 is rc, it is current. 
-        f.attrs['HDF5_version']     = six.u(h5py.version.hdf5_version)
-        f.attrs['h5py_version']     = six.u(h5py.version.version)
+        f.attrs['HDF5_version']     = h5py.version.hdf5_version
+        f.attrs['h5py_version']     = h5py.version.version
 
         # now create the NXentry group called entry if does not exist
         if 'entry' not in f:

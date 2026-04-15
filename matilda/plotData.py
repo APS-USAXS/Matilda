@@ -1,12 +1,33 @@
-#matilda/plotData.py
-'''
-These are plots for Matylda data analysis.
+"""
+plotData.py
+===========
+Matplotlib-based plotting routines for Matilda data analysis.
 
-'''
+Generates JPEG summary plots and writes them to a web-visible directory
+(imagePath) for live monitoring.  Called after each processing cycle by
+the main loop in matilda.py.
+
+Current outputs
+---------------
+usaxs.jpg / stepusaxs.jpg         — raw USAXS/step-scan I vs Q
+usaxs_cal.jpg / stepusaxs_cal.jpg — calibrated USAXS/step-scan I vs Q
+saxs.jpg                          — raw SAXS I vs Q (log-log)
+saxs_cal.jpg                      — calibrated SAXS I vs Q (log-log)
+waxs.jpg                          — raw WAXS I vs Q (linear)
+waxs_cal.jpg                      — calibrated WAXS I vs Q (linear)
+
+GUI transition note
+-------------------
+This module uses matplotlib for headless (file-only) output.  Future GUI
+work should use pyqtgraph for interactive display.  matplotlib may be kept
+for file export or replaced entirely depending on requirements.
+
+TODO: plotUSAXSResults has an off-by-one indentation on the second plot
+      block (lines starting with '   # Get plot styling' after first plt.close()).
+      Functionally correct but visually misleading.
+"""
 import matplotlib.pyplot as plt
-import pprint as pp
 import logging
-import numpy as np
 import os
 
 
@@ -14,20 +35,45 @@ import os
 # define any globals here
 default_plt_font_size = 7
 
+# Up to 10 datasets per plot (enforced upstream).
+# tab10 gives 10 maximally-distinct colors; line styles add a second
+# visual channel so colorblind users can still tell datasets apart.
+PLOT_COLORS = [plt.get_cmap('tab10')(i / 10) for i in range(10)]
+PLOT_LINESTYLES = ['-', '--', '-.', ':']
 
 
-def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):  
 
+def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
+    """Save USAXS / step-scan summary plots to JPEG files.
+
+    Produces two JPEG files per call:
+    * Raw normalised I vs Q  (usaxs.jpg or stepusaxs.jpg)
+    * Calibrated I vs Q      (usaxs_cal.jpg or stepusaxs_cal.jpg)
+
+    Data sets use the tab10 colormap (10 distinct colors) with cycling line
+    styles (solid, dashed, dash-dot, dotted) for colorblind accessibility.
+    Y-axis is clamped to at most 14 decades below the maximum to avoid empty
+    log plots from outlier points.
+
+    Parameters
+    ----------
+    ListOfresults : list of dict
+        Each dict is the result of processFlyscan() or processStepscan().
+        Required keys: RawData.filename, reducedData.Q, reducedData.Intensity,
+        CalibratedData.Q, CalibratedData.Intensity (None if no blank).
+    imagePath : str or None
+        Directory to write JPEG files into.  If None, plotting is skipped.
+    isFlyscan : bool, optional
+        True  → save as usaxs*.jpg (flyscan).
+        False → save as stepusaxs*.jpg (step scan).
+        Default True.
+    """
     if imagePath is None:
         logging.warning("Image path is None, skipping plotting.")
         return
     
     # Number of data sets
     num_data_sets = len(ListOfresults)
-    # Choose a colormap
-    cmap = plt.get_cmap('viridis')
-    # Generate colors from the colormap
-    colors = [cmap(i) for i in np.linspace(0, 1, num_data_sets)]
     logging.info(f'Got {num_data_sets} USAXS data sets to plot')
 
     # Get plot styling
@@ -37,12 +83,11 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
 
     # Plot ydata against xdata
     plt.figure(figsize=style["figsize"])
-    for i, color in zip(range(len(ListOfresults)),colors):
-        data_dict = ListOfresults[i]
+    for i, data_dict in enumerate(ListOfresults):
         label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q"]
         UPD = data_dict["reducedData"]["Intensity"]
-        plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+        plt.plot(Q_array, UPD, color=PLOT_COLORS[i % 10], linestyle=PLOT_LINESTYLES[i % 4], label=label)
 
     plt.title(style["title"])
     plt.xlabel(style["xlabel"])
@@ -74,20 +119,19 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
     #plt.show()
     plt.close()
 
-   # Get plot styling
+    # Get plot styling
     style = get_usaxs_cal_plot_style()
     # Set the font size to specific size
     plt.rcParams['font.size'] = style["font_size"]
 
-   # Plot ydata against xdata
+    # Plot ydata against xdata
     plt.figure(figsize=style["figsize"])
-    for i, color in zip(range(len(ListOfresults)),colors):
-        data_dict = ListOfresults[i]
+    for i, data_dict in enumerate(ListOfresults):
         if data_dict["CalibratedData"]["Intensity"] is not None:
             label = data_dict["RawData"]["filename"]
             Q_array = data_dict["CalibratedData"]["Q"]
             UPD = data_dict["CalibratedData"]["Intensity"]
-            plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+            plt.plot(Q_array, UPD, color=PLOT_COLORS[i % 10], linestyle=PLOT_LINESTYLES[i % 4], label=label)
 
     plt.title(style["title"])
     plt.xlabel(style["xlabel"])
@@ -119,30 +163,45 @@ def plotUSAXSResults(ListOfresults, imagePath, isFlyscan=True):
 
 
 
-def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):  
-    
+def plotSWAXSResults(ListOfresults, imagePath, isSAXS=True):
+    """Save SAXS or WAXS summary plots to JPEG files.
+
+    Produces two JPEG files per call:
+    * Raw I vs Q           (saxs.jpg or waxs.jpg)
+    * Calibrated I vs Q    (saxs_cal.jpg or waxs_cal.jpg)
+
+    SAXS plots use log-log axes and limit the display range to 4 decades
+    below the maximum.  WAXS plots use linear axes with no range clamping.
+    Calibrated plots that have no data (CalibratedData.Intensity is None)
+    are silently skipped per scan.
+
+    Parameters
+    ----------
+    ListOfresults : list of dict
+        Each dict is the result of process2Ddata().  Required keys:
+        RawData.filename, reducedData.Q, reducedData.Intensity,
+        CalibratedData.Q, CalibratedData.Intensity (None if no blank).
+    imagePath : str or None
+        Directory to write JPEG files into.  If None, plotting is skipped.
+    isSAXS : bool, optional
+        True  → SAXS (log-log, saves saxs*.jpg).
+        False → WAXS (linear, saves waxs*.jpg).
+        Default True.
+    """
     if imagePath is None:
         logging.warning("Image path is None, skipping plotting.")
         return
     
-    # Number of data sets
-    num_data_sets = len(ListOfresults)
-    # Choose a colormap
-    cmap = plt.get_cmap('viridis')
-    # Generate colors from the colormap
-    colors = [cmap(i) for i in np.linspace(0, 1, num_data_sets)]
-
     # Set the font size to specific size
     plt.rcParams['font.size'] = default_plt_font_size 
 
     # Plot ydata against xdata
     plt.figure(figsize=(6, 6))
-    for i, color in zip(range(len(ListOfresults)),colors):
-        data_dict = ListOfresults[i]
+    for i, data_dict in enumerate(ListOfresults):
         label = data_dict["RawData"]["filename"]
         Q_array = data_dict["reducedData"]["Q"]
         UPD = data_dict["reducedData"]["Intensity"]
-        plt.plot(Q_array, UPD, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+        plt.plot(Q_array, UPD, color=PLOT_COLORS[i % 10], linestyle=PLOT_LINESTYLES[i % 4], label=label)
     plt.ylabel('Intensity')   
     if isSAXS:
         plt.title('Plot of SAXS Intensity vs. Q')   
@@ -188,13 +247,12 @@ def plotSWAXSResults(ListOfresults, imagePath, isSAXS = True):
     style = get_usaxs_cal_plot_style()
    # Plot ydata against xdata
     plt.figure(figsize=style["figsize"])
-    for i, color in zip(range(len(ListOfresults)),colors):
-        data_dict = ListOfresults[i]
+    for i, data_dict in enumerate(ListOfresults):
         if data_dict["CalibratedData"]["Intensity"] is not None:
             label = data_dict["RawData"]["filename"]
             Q_array = data_dict["CalibratedData"]["Q"]
             Intensity = data_dict["CalibratedData"]["Intensity"]
-            plt.plot(Q_array, Intensity, color=color, linestyle='-', label=label)  # You can customize the marker and linestyle
+            plt.plot(Q_array, Intensity, color=PLOT_COLORS[i % 10], linestyle=PLOT_LINESTYLES[i % 4], label=label)
 
     plt.ylabel('Intensity')   
     if isSAXS:

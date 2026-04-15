@@ -1,13 +1,38 @@
-# Convert Nika data to pyFAI using Fit2D 
-'''
-    Convert Nika SAS geometry parameters to pyFAI using Fit2D format.
-    Needs pyFAI library. 
-    Convert Nika SDD, pix size, BCX, BCY, HorTilt, verTilt 
-    First convert into Fit2D format
-    Then use pyFAI to convert Fit2D to poni format.
-    NOTE: this seems to wokr only for data from hdf5 files = Nexus NXsas files. 
-    Tiff ffiles seem to be loaded differently between Nika and pyFAI. Geomtry conversion (signs/X/Y changes are needed. )
-'''
+"""
+supportNikaFunctions.py
+=======================
+Convert USAXS/Nika instrument geometry parameters to pyFAI format.
+
+Nika is an Igor Pro macro package used at APS for SAXS/WAXS data reduction.
+The instrument geometry is stored in HDF5 files using Nika's conventions
+(SDD, beam-centre in pixels, horizontal/vertical tilt angles).  pyFAI uses
+the PONI (Point Of Normal Incidence) convention.
+
+This module bridges the two by first converting Nika → Fit2D geometry and
+then using pyFAI's built-in Fit2D → PONI conversion.
+
+Public function
+---------------
+convert_Nika_to_Fit2D(*, SSD, pix_size, BCX, BCY, HorTilt, VertTilt, wavelength)
+    Returns a pyFAI geometry object (PONI) ready for AzimuthalIntegrator.
+
+Units used (Nika convention, as stored in HDF5)
+-----------------------------------------------
+SSD         : sample-to-detector distance, mm
+pix_size    : pixel size, mm  (converted to µm internally for Fit2D)
+BCX, BCY    : beam centre, pixels
+HorTilt     : horizontal detector tilt, degrees
+VertTilt    : vertical detector tilt, degrees
+wavelength  : X-ray wavelength, Angstrom
+
+Notes
+-----
+* This conversion is validated for HDF5 / Nexus NXsas files from the APS
+  USAXS beamline.  TIFF files loaded directly appear to require additional
+  sign/axis flips that are NOT handled here.
+* Keyword-only arguments (*, ...) are intentional to avoid silent parameter
+  order mistakes.
+"""
 
 from pyFAI.geometry.fit2d import Fit2dGeometry, convert_from_Fit2d
 from pprint import pprint as pp

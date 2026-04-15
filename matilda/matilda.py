@@ -62,12 +62,12 @@ import os
 import subprocess
 
 
-from readfromtiled import FindLastScanData, FindLastBlankScan
-from convertFlyscan import processFlyscan
-from convertUSAXS import processStepscan
-from convertSWAXS import process2Ddata
-from supportFunctions import findProperBlankScan
-from plotData import plotUSAXSResults, plotSWAXSResults
+from .readfromtiled import FindLastScanData, FindLastBlankScan
+from .convertFlyscan import processFlyscan
+from .convertUSAXS import processStepscan
+from .convertSWAXS import process2Ddata
+from .supportFunctions import findProperBlankScan
+from .plotData import plotUSAXSResults, plotSWAXSResults
 
 
 #set ImagePath to None to prevent saving images
@@ -75,11 +75,20 @@ from plotData import plotUSAXSResults, plotSWAXSResults
 imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
 #imagePath = '/home/parallels/Desktop/'  # Path to save images
 
-# Conda setup for pynika calibration.
+# Conda setup for external tools (pynika, pyirena).
 # Full path to the conda executable used at this beamline.
 CONDA_EXECUTABLE = '/APSshare/miniconda/x86_64/bin/conda'
 # Full path to pynika's conda environment (mirrors the pynika-gui launch script).
 PYNIKA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pynika'
+# Full path to pyirena's conda environment.
+PYIRENA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pyirena'
+
+# Name of the per-folder JSON config that triggers pyirena analysis.
+_PYIRENA_CONFIG_FILENAME = 'pyirena_config.json'
+# Maximum number of (path, filename) entries kept in each per-technique
+# analyzed-files set.  Large enough to cover user transitions without growing
+# without bound.
+_MAX_PYIRENA_ANALYZED = 100
 
 # Regex pattern to detect AgBehenateLaB6 calibrant files (any capitalisation)
 _CALIBRANT_PATTERN = re.compile(r'agbehenatelab6', re.IGNORECASE)
@@ -91,28 +100,22 @@ NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 #recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
 # Configure logging
-# Get the directory of the current script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-# Define the log directory path
-log_dir = os.path.join(script_dir, 'log')
-# Create the log directory if it doesn't exist
+# Log directory: use MATILDA_LOG_DIR env variable if set, otherwise default to
+# ~/.local/share/matilda/log (standard XDG user data location).
+# On the beamline service, serv_matilda.sh sets MATILDA_LOG_DIR=/share1/log/matilda.
+_default_log_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "matilda", "log")
+log_dir = os.environ.get("MATILDA_LOG_DIR", _default_log_dir)
 os.makedirs(log_dir, exist_ok=True)
-# Define the log file path
 log_file = os.path.join(log_dir, 'matilda.log')
-handler = RotatingFileHandler(log_file, maxBytes=200000, backupCount=1)
+# Rotating log: 1 MB per file, 3 backups → max 4 MB total on disk.
+handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
 logging.basicConfig(
     handlers=[handler],
-    level=logging.INFO,        # Set the logging level
-    #level=logging.DEBUG,       # Set the logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Format of the log messages
-    datefmt='%Y-%m-%d %H:%M:%S'  # Date format
+    level=logging.INFO,
+    #level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
-# # Log messages
-# logging.debug('This is a debug message')
-# logging.info('This is an info message')
-# logging.warning('This is a warning message')
-# logging.error('This is an error message')
-# logging.critical('This is a critical message')
 
 
 # --- pynika auto-calibration helpers ---
@@ -182,9 +185,110 @@ def _checkAndRunPynikaCalibration(ListOfScans, instrument_type, calibrated_set):
             _runPynikaCalibration(scan_path, scan_filename, instrument_type, calibrated_set)
 
 
+# --- pyirena auto-analysis helpers ---
+
+def _runPyirenaAnalysis(path, filename, analyzed_set):
+    """
+    Run pyirena fit_pyirena() on a single reduced data file if
+    pyirena_config.json is present in the same folder.
+
+    Parameters
+    ----------
+    path : str
+        Directory containing the reduced HDF5 file.
+    filename : str
+        HDF5 filename of the reduced scan.
+    analyzed_set : set
+        Mutable set of (path, filename) tuples already analyzed this session.
+        Updated in-place on success to prevent re-running the same file.
+        Bounded to _MAX_PYIRENA_ANALYZED entries to limit memory use.
+    """
+    # Blanks are not analyzed.
+    if 'blank' in filename.lower():
+        return
+
+    file_key = (path, filename)
+    if file_key in analyzed_set:
+        return
+
+    config_file = os.path.join(path, _PYIRENA_CONFIG_FILENAME)
+    if not os.path.isfile(config_file):
+        return
+
+    data_file = os.path.join(path, filename)
+    if not os.path.exists(data_file):
+        logging.error(f"Pyirena: data file not found: {data_file}")
+        return
+
+    logging.info(f"Running pyirena analysis: {data_file}")
+    python_snippet = (
+        "from pyirena.batch import fit_pyirena; "
+        f"fit_pyirena({data_file!r}, {config_file!r}, "
+        "save_to_nexus=True, with_uncertainty=False, n_mc_runs=10)"
+    )
+    cmd = [CONDA_EXECUTABLE, 'run', '--no-capture-output', '-p', PYIRENA_CONDA_ENV_PATH,
+           'python', '-c', python_snippet]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            logging.info(f"Pyirena analysis succeeded for {filename}")
+            analyzed_set.add(file_key)
+            while len(analyzed_set) > _MAX_PYIRENA_ANALYZED:
+                analyzed_set.pop()
+        else:
+            logging.error(
+                f"Pyirena analysis failed for {filename} "
+                f"(exit {result.returncode}): {result.stderr.strip()}"
+            )
+    except subprocess.TimeoutExpired:
+        logging.error(f"Pyirena analysis timed out for {filename}")
+    except Exception as e:
+        logging.error(f"Pyirena analysis error for {filename}: {e}", exc_info=True)
+
+
+def _checkAndRunPyirenaAnalysis(ListOfScans, analyzed_set):
+    """
+    For each (path, filename) in ListOfScans, run pyirena analysis if
+    pyirena_config.json is present in that folder and the file has not
+    been analyzed yet this session.  Blank files are skipped automatically.
+    """
+    for scan_path, scan_filename in ListOfScans:
+        _runPyirenaAnalysis(scan_path, scan_filename, analyzed_set)
+
+
 # --- user facing functions ---
 
 def processUSAXSFolder(path):
+    """
+    Batch-reprocess all USAXS/SAXS/WAXS scans found under a single date folder.
+
+    Intended for offline re-reduction (e.g. from Igor or a notebook) where you
+    want to force-recalculate every file regardless of cached results.  Expects
+    the standard APS folder layout produced by the Bluesky acquisition system:
+
+        <path>/
+            <name>_usaxs/   — USAXS flyscan files (.h5)
+            <name>_saxs/    — SAXS area-detector files (.hdf)
+            <name>_waxs/    — WAXS area-detector files (.hdf)
+
+    All three sub-folder types must be present.  Files are sorted by the
+    trailing scan number embedded in the filename (see extract_number_from_filename).
+
+    Parameters
+    ----------
+    path : str
+        Absolute path to the date/experiment folder that contains the three
+        instrument sub-folders.
+
+    Notes
+    -----
+    * recalculateAllData is forced True — existing cached results are deleted
+      and recomputed from raw HDF5 data.
+    * No plotting is performed; results are only written back to the HDF5 files.
+    * The function silently returns if path does not exist.
+
+    TODO: pynika auto-calibration is not called here (only in the live loop).
+    """
     # Get the list of folders in the path folder
     if not os.path.exists(path):
         logging.error(f"The path {path} does not exist.")
@@ -280,7 +384,33 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=False,forceFir
 
 
 # Process the step scan data files
-def processStepscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirstBlank=False):
+def processStepscans(ListOfScans, ListOfBlanks, recalculateAllData=False, forceFirstBlank=False):
+    """
+    Process a list of USAXS step-scan files, pairing each with an appropriate blank.
+
+    Mirrors processFlyscans() but calls processStepscan() (convertUSAXS module)
+    instead of processFlyscan().  The blank-selection logic is identical.
+
+    Parameters
+    ----------
+    ListOfScans : list of (str, str)
+        (path, filename) tuples for step-scan HDF5 files to process.
+    ListOfBlanks : list of (str, str)
+        (path, filename) tuples for available blank/background measurements.
+    recalculateAllData : bool, optional
+        When True, delete any cached reduced data and recompute from raw.
+        Default False (reuse cached results if present).
+    forceFirstBlank : bool, optional
+        When True, always pair each scan with ListOfBlanks[0] instead of
+        searching for the nearest-preceding blank by scan number.
+        Default False.
+
+    Returns
+    -------
+    list of dict
+        One result dictionary per successfully processed scan (same structure
+        as returned by processStepscan).  Failed scans are logged and skipped.
+    """
     results=[]
     logging.info("Processing of Step scans with blanks")    
     for scan_path, scan_filename in ListOfScans:
@@ -345,7 +475,12 @@ def extract_number_from_filename(filename):
 
 
 
-if __name__ == "__main__":
+def main():
+    """Entry point for the Matilda service (15-second polling loop).
+
+    Invoked by the ``matilda`` console script installed by pyproject.toml,
+    or directly via ``python -m matilda.matilda``.
+    """
     try:
         listofFlyscansOld=dict()
         listofStepScansOld=dict()
@@ -356,6 +491,12 @@ if __name__ == "__main__":
         # name across detectors but live in different folders.
         calibratedSAXSFiles = set()
         calibratedWAXSFiles = set()
+        # Track files already submitted to pyirena analysis this session.
+        # Separate sets per technique because each folder has its own config.
+        analyzedFlyscanFiles = set()
+        analyzedStepFiles = set()
+        analyzedSAXSFiles = set()
+        analyzedWAXSFiles = set()
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
@@ -371,8 +512,9 @@ if __name__ == "__main__":
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processFlyscans(ListOfScans, listOfBlanks)
-                plotUSAXSResults(results, imagePath, isFlyscan=True) 
-                listofFlyscansOld = ListOfScans 
+                plotUSAXSResults(results, imagePath, isFlyscan=True)
+                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedFlyscanFiles)
+                listofFlyscansOld = ListOfScans
             
 
             logging.info("Processing the Step scans")
@@ -387,8 +529,9 @@ if __name__ == "__main__":
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processStepscans(ListOfScans, listOfBlanks)
-                plotUSAXSResults(results, imagePath, isFlyscan=False) 
-                listofStepScansOld = ListOfScans 
+                plotUSAXSResults(results, imagePath, isFlyscan=False)
+                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedStepFiles)
+                listofStepScansOld = ListOfScans
     
             #process SAXS and WAXS data
             logging.info("Processing the SAXS")
@@ -402,7 +545,8 @@ if __name__ == "__main__":
                 logging.info(f'Got blank list : {listOfBlanks}')
                 _checkAndRunPynikaCalibration(ListOfScans, "SAXS", calibratedSAXSFiles)
                 results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS = True)
+                plotSWAXSResults(results, imagePath, isSAXS=True)
+                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedSAXSFiles)
                 listofSAXSOld = ListOfScans
 
             logging.info("Processing the WAXS")
@@ -417,10 +561,15 @@ if __name__ == "__main__":
                 logging.info(f'Got blank list : {listOfBlanks}')
                 _checkAndRunPynikaCalibration(ListOfScans, "WAXS", calibratedWAXSFiles)
                 results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS = False)
+                plotSWAXSResults(results, imagePath, isSAXS=False)
+                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedWAXSFiles)
                 listOfWAXSOld = ListOfScans
 
             logging.info('Sleeping for 15 seconds')
             time.sleep(15)
     except KeyboardInterrupt:
-            logging.info('Keyboard interrupt') 
+            logging.info('Keyboard interrupt')
+
+
+if __name__ == "__main__":
+    main()

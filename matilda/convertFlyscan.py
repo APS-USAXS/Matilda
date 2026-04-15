@@ -1,4 +1,12 @@
-''' 
+"""
+convertFlyscan.py
+=================
+Reduce USAXS flyscan HDF5 files to calibrated 1-D I(Q) data.
+
+Main entry point
+----------------
+processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
+
 processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)
         For example of use see: test_matildaLocal() at the end of this file. 
         Does:
@@ -25,29 +33,77 @@ processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFile
                      "Error":DSM_Error,
                      "dQ":DSM_dQ,
                      "units":"[cm2/cm3]",
-'''
+
+Data flow
+---------
+importFlyscan()                 — read raw arrays from HDF5 NXsas file
+calculatePD_Fly()               — compute normalised detector signal
+beamCenterCorrection()          — apply beam-centre angle offset
+smooth_r_data()                 — optional smoothing
+getBlankFlyscan()               — load and process blank scan
+normalizeByTransmission()       — apply transmission correction
+calibrateAndSubtractFlyscan()   — subtract blank, apply K-factor / Omega
+desmearData()                   — Lake/Strobl desmearing (slit-smearing correction)
+saveNXcanSAS() / readMyNXcanSAS() — cache results in the original HDF5 file
+
+Notes
+-----
+* matplotlib is imported but currently only used for optional/debug plots
+  (all plt.show() calls are commented out).  Target for removal when GUI
+  work begins.
+* pprint is imported twice (as pprint and as pp); one import is redundant.
+"""
 import h5py
 import numpy as np
-import pprint
 import os
-import matplotlib.pyplot as plt
 import pprint as pp
 import logging
 #from scipy.optimize import curve_fit
 
 
-from supportFunctions import subtract_data 
-from convertUSAXS import rebinData
-from hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
-from supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
-from desmearing import desmearData
+from .supportFunctions import subtract_data
+from .convertUSAXS import rebinData
+from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
+from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
+from .desmearing import desmearData
 
 
-# Thos code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
-# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in teh Nexus file
-# If exist and recalculateAllData is False, it will reuse old ones. This is doen for plotting.
+# This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
+# It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in the Nexus file
+# If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+    """Reduce a single USAXS flyscan HDF5 file to calibrated 1-D I(Q).
+
+    Results are cached inside the original HDF5 file as NXcanSAS groups so
+    that subsequent calls with recalculateAllData=False are fast (data are
+    read from file rather than recomputed).
+
+    Parameters
+    ----------
+    path : str
+        Directory containing the sample HDF5 file.
+    filename : str
+        Filename of the sample HDF5 file (.h5).
+    blankPath : str or None, optional
+        Directory containing the blank HDF5 file.  If None, only raw QR
+        data are produced (no calibration or blank subtraction).
+    blankFilename : str or None, optional
+        Filename of the blank HDF5 file.  If None, only raw QR data.
+    recalculateAllData : bool, optional
+        When True, delete cached NXcanSAS groups and recompute everything.
+        Default False.
+
+    Returns
+    -------
+    dict
+        Sample dictionary with keys:
+        * RawData       — raw detector arrays and metadata
+        * reducedData   — Q, Intensity, Error, UPD_gains (normalised, slit-smeared)
+        * CalibratedData — Q, Intensity, Error, dQ, units (desmeared, blank-subtracted)
+                          Present only when a blank is provided.
+        * SMR data stored under CalibratedData['SMR_*'] keys.
+    """
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
@@ -267,19 +323,20 @@ def test_matildaLocal():
     # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"] 
     # SMR_Int =Sample["CalibratedData"]["SMR_Int"] 
     # #SMR_Error =Sample["CalibratedData"]["SMR_Error"] 
-    DSM_Qvec =Sample["CalibratedData"]["Q"] 
-    DSM_Int =Sample["CalibratedData"]["Intensity"] 
-    #DSM_Error =Sample["CalibratedData"]["Error"] 
-    plt.figure(figsize=(6, 12))
-    #plt.plot(SMR_Qvec, SMR_Int, linestyle='-')  # You can customize the marker and linestyle
-    plt.plot(DSM_Qvec, DSM_Int, linestyle='-')  # You can customize the marker and linestyle
-    plt.title('Plot of Intensity vs. Q')
-    plt.xlabel('log(Q) [1/A]')
-    plt.ylabel('Intensity')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True)
-    plt.show() 
+    DSM_Qvec =Sample["CalibratedData"]["Q"]
+    DSM_Int =Sample["CalibratedData"]["Intensity"]
+    #DSM_Error =Sample["CalibratedData"]["Error"]
+    # Debug plot (requires matplotlib; commented out for production):
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(6, 12))
+    # plt.plot(DSM_Qvec, DSM_Int, linestyle='-')
+    # plt.title('Plot of Intensity vs. Q')
+    # plt.xlabel('log(Q) [1/A]')
+    # plt.ylabel('Intensity')
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.grid(True)
+    # plt.show()
 
 
 

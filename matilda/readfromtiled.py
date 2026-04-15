@@ -1,17 +1,45 @@
-'''
-    readTiled.py 
-    version
-    0.2   2025-04-15
-    0.3   2025-06-01
+"""
+readfromtiled.py
+================
+Query the USAXS Tiled server for scan metadata and file paths.
 
-    useful functions are:
-    readfromtiled.FindLastScanData(plan_name,NumScans=10, LastNdays=1)
-    readfromtiled.FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=0)
-    readfromtiled.FindLastBlankScan(plan_name,NumScans=1, lastNdays=0)
+Versions
+--------
+0.2  2025-04-15
+0.3  2025-06-01
 
-    method used builds on https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
-    and follows Igor code to get the right data sets
-'''
+Public API
+----------
+FindLastScanData(plan_name, NumScans=10, LastNdays=1)
+    Return the most-recent N completed scans of a given Bluesky plan type
+    from the last N days.
+
+FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=0)
+    Return scans matching both a plan name and a scan_title substring.
+
+FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1)
+    Return the most-recent blank/background scans for a given plan type,
+    optionally restricted to a specific file-system path.
+
+All three functions return a list of [hdf5_path, hdf5_file] pairs suitable
+for passing to the processXxx() functions in matilda.py.  On network failure
+they return an empty list rather than raising an exception.
+
+Tiled server
+------------
+Target: http://usaxscontrol.xray.aps.anl.gov:8000
+Catalog: usaxs_MongoDB
+Hostname detection: if running on usaxscontrol itself, 'localhost' is used
+to avoid proxy/firewall issues.
+
+Method based on:
+    https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
+and mirrors the Igor macro logic for scan selection.
+
+TODO: bare except clauses (lines ~226, ~346, ~425) should be narrowed to
+      'except Exception' to avoid silently swallowing KeyboardInterrupt.
+TODO: debug print() calls should be replaced with logging.debug().
+"""
 
 # import necessary libraries
 import requests
@@ -24,9 +52,11 @@ from typing import Any, Optional
 
 
 def iso_to_ts(isotime):
+    """Convert an ISO-8601 string to a POSIX timestamp (float seconds)."""
     return datetime.datetime.fromisoformat(isotime).timestamp()
 
 def ts_to_iso(time):
+    """Convert a POSIX timestamp (float seconds) to a local ISO-8601 string."""
     return datetime.datetime.fromtimestamp(time).isoformat()
 
 current_hostname = socket.gethostname()
@@ -108,7 +138,18 @@ def successful_run(uid: Optional[str] = None) -> bool:
 
 
 def print_results_summary(r):
-    """We'll use this a few times."""
+    """Print a one-line summary of the first and last run in a Tiled response dict.
+
+    Parameters
+    ----------
+    r : dict
+        Raw JSON response from tiled_get(); must contain a 'data' list.
+
+    Notes
+    -----
+    Helper used during interactive debugging / development; not called by the
+    main processing loop.
+    """
     xref = dict(First=0, Last=-1)
     for k, v in dict(First=0, Last=-1).items():
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled
@@ -122,6 +163,21 @@ def print_results_summary(r):
 
 
 def convert_results(r):
+    """Convert a raw Tiled search response into a list of [path, filename] pairs.
+
+    Skips any run that did not finish successfully (exit_status != 'success').
+    Skips runs where hdf5_file is None (e.g. non-file-writing plans).
+
+    Parameters
+    ----------
+    r : dict
+        Raw JSON response from tiled_get() or requests.get().json().
+
+    Returns
+    -------
+    list of [str, str]
+        Each element is [hdf5_path, hdf5_file] for a successfully completed run.
+    """
     OutputList=[]
     for v in range(len(r["data"])):
         uid = r["data"][v]["id"]
@@ -146,7 +202,31 @@ def convert_results(r):
 #print_results_summary(r)
 
 
-def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
+def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
+    """Return scans matching both a Bluesky plan name and a scan title.
+
+    Parameters
+    ----------
+    plan_name : str
+        Bluesky plan name to filter on (e.g. 'Flyscan', 'SAXS', 'WAXS', 'uascan').
+    scan_title : str
+        Exact scan title string to match (stored in start.plan_args.scan_title).
+    NumScans : int, optional
+        Maximum number of results to return (Tiled page limit). Default 1.
+    lastNdays : int, optional
+        Restrict search to the last N days.  0 means no time restriction.
+        Default 1.
+
+    Returns
+    -------
+    list of [str, str]
+        [hdf5_path, hdf5_file] pairs, empty list on network failure.
+
+    TODO: the two filter[eq] blocks for plan_name and title share the same
+          Tiled filter key — the second silently overwrites the first.
+          This is a known Tiled API quirk; the title filter may not work.
+    TODO: debug print(uri) on line ~217 should be logging.debug().
+    """
     #this filters for specific time AND for specific plan_name
     # select_metadata = ",".join([
     #     "plan_name:start.plan_name",
@@ -214,7 +294,7 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
     #returns last scan which conatins case independent "water blank" in name
     #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
     #returns last scan which conatisn case independet "water blank" in name
-    print(uri)
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
@@ -223,14 +303,40 @@ def FindScanDataByName(plan_name,scan_title,NumScans=1,lastNdays=1):
         logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and should not crash anything.
         logging.error(f'Could not get data from tiled server at {server}')
         logging.error(f"Failed {uri=}")
         return []
     
 
-def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
+def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
+    """Return the most-recent blank/background scans for a given plan type.
+
+    Searches the Tiled catalog for scans whose title matches the regex
+    ``(?i)blank`` (case-insensitive), i.e. any scan whose title contains
+    the word "blank".
+
+    Parameters
+    ----------
+    plan_name : str
+        Bluesky plan name (e.g. 'Flyscan', 'SAXS', 'WAXS', 'uascan').
+    path : str or None, optional
+        If provided, additionally filter by hdf5_path matching this string
+        (regex-matched by Tiled).  Default None (no path restriction).
+    NumScans : int, optional
+        Maximum number of blank scans to return.  Default 1.
+    lastNdays : int, optional
+        Restrict search to the last N days.  0 means no time restriction.
+        Default 1.
+
+    Returns
+    -------
+    list of [str, str]
+        [hdf5_path, hdf5_file] pairs, empty list on network failure.
+
+    TODO: debug print(uri) should be logging.debug().
+    """
     #this filters for last collected Blank for specific plan_name
     if path is None:
         if lastNdays > 0:
@@ -334,23 +440,50 @@ def FindLastBlankScan(plan_name,path=None, NumScans=1, lastNdays=1):
                 f"&select_metadata={{{select_metadata}}}"                               # select metadata
                 )
                    
-    #logging.info(f"{uri=}")
-    print(uri)
-
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and shoudl not crash anything.
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
         return []
  
 
-def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
+def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
+    """Return the most-recent completed scans for a given Bluesky plan type.
+
+    This is the primary entry point called by the matilda main loop every 15 s.
+    Only runs with exit_status == 'success' are included (via convert_results).
+
+    Parameters
+    ----------
+    plan_name : str
+        Bluesky plan name to filter on.  Known values used by matilda:
+        'Flyscan', 'uascan', 'SAXS', 'WAXS'.
+    NumScans : int, optional
+        Maximum number of scans to return (Tiled page[limit]).  Default 10.
+    LastNdays : int, optional
+        Restrict search to the last N days.  0 means all time.  Default 1.
+
+    Returns
+    -------
+    list of [str, str]
+        [hdf5_path, hdf5_file] pairs sorted newest-first by Tiled (sort=-time).
+        Returns an empty list on network failure.
+
+    Notes
+    -----
+    * A small time offset that was previously applied to work around file-flush
+      latency has been removed (see commented-out offsetTime code).
+    * The filter[contains][condition][exit_status] clause is a Tiled-specific
+      filter that checks whether the 'exit_status' key exists in the stop doc.
+    TODO: debug print(f"{uri=}") should be logging.debug().
+    """
     #print (FindLastScanData("Flyscan",10,LastNdays=1))
     #print (FindLastScanData("uascan",10,LastNdays=1))
     #print (FindLastScanData("SAXS",10,LastNdays=1))
@@ -414,15 +547,14 @@ def FindLastScanData(plan_name,NumScans=10, LastNdays=1):
             f"&select_metadata={{{select_metadata}}}"                               # select metadata
             )
           
-    #logging.info(f"{uri=}")
-    print(f"{uri=}")
+    logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
         # this is now a list of Flyscan data sets
         ScanList = convert_results(r)
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
-    except: 
+    except Exception:
         # url communication failed, happens and shoudl not crash anything.
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")

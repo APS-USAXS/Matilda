@@ -322,9 +322,12 @@ def _find_matching_partner(path, filename, partner_suffix):
     if not os.path.isdir(partner_folder):
         return None
 
-    # Glob for files matching the same prefix and scan number.
-    pattern = os.path.join(partner_folder, f"{prefix}_*_{scan_number}.*")
-    matches = _glob.glob(pattern)
+    # Glob for HDF5 files matching the same prefix and scan number.
+    # Only consider .h5, .hdf, .hdf5 extensions — exclude images (.jpg, .tiff, etc.).
+    matches = []
+    for ext in ('h5', 'hdf', 'hdf5'):
+        pattern = os.path.join(partner_folder, f"{prefix}_*_{scan_number}.{ext}")
+        matches.extend(_glob.glob(pattern))
     if not matches:
         return None
 

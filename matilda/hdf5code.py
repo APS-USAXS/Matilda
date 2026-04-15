@@ -139,7 +139,153 @@ def readGenericNXcanSAS(path, filename):
             "thickness":thickness,
             'label':label,
         }
+
+        # Optionally read SAStransmission_spectrum if present
+        trans_path = FirstEntry + '/sastransmission_spectrum/'
+        if trans_path in f:
+            T_val = _get_h5_value(f, trans_path + 'T')
+            lambda_val = _get_h5_value(f, trans_path + 'lambda')
+            if T_val is not None:
+                Data['transmission'] = float(T_val[0]) if hasattr(T_val, '__len__') else float(T_val)
+            if lambda_val is not None:
+                Data['wavelength'] = float(lambda_val[0]) if hasattr(lambda_val, '__len__') else float(lambda_val)
+
         return Data
+
+
+# ---------------------------------------------------------------------------
+# NXcanSAS metadata helper writers
+# ---------------------------------------------------------------------------
+
+def _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength, name='sample'):
+    """Write an NXcanSAS SAStransmission_spectrum group.
+
+    Parameters
+    ----------
+    nxDataEntry : h5py.Group
+        The NXsubentry group to write into.
+    transmission : float or None
+        Scalar transmission value (T = I/I0). Skipped if None.
+    wavelength : float or None
+        Wavelength in Angstroms. Skipped if None.
+    name : str
+        'sample' or 'can' per the NXcanSAS specification.
+    """
+    if transmission is None or wavelength is None:
+        return
+
+    grp_name = 'sastransmission_spectrum'
+    if grp_name in nxDataEntry:
+        del nxDataEntry[grp_name]
+
+    nxtrans = nxDataEntry.create_group(grp_name)
+    nxtrans.attrs['NX_class'] = 'NXdata'
+    nxtrans.attrs['canSAS_class'] = 'SAStransmission_spectrum'
+    nxtrans.attrs['signal'] = 'T'
+    nxtrans.attrs['T_axes'] = 'lambda'
+    nxtrans.attrs['name'] = name
+
+    ds = nxtrans.create_dataset('T', data=np.array([float(transmission)]))
+    ds.attrs['units'] = 'dimensionless'
+    ds.attrs['long_name'] = 'Transmission'
+
+    ds = nxtrans.create_dataset('Tdev', data=np.array([0.0]))
+    ds.attrs['units'] = 'dimensionless'
+    ds.attrs['long_name'] = 'Transmission uncertainty'
+
+    ds = nxtrans.create_dataset('lambda', data=np.array([float(wavelength)]))
+    ds.attrs['units'] = 'angstrom'
+    ds.attrs['long_name'] = 'Wavelength'
+
+
+def _write_SASsample(nxDataEntry, samplename, thickness):
+    """Write an NXcanSAS SASsample group.
+
+    Parameters
+    ----------
+    nxDataEntry : h5py.Group
+        The NXsubentry group to write into.
+    samplename : str
+        Sample name.
+    thickness : float or None
+        Sample thickness in mm.
+    """
+    grp_name = 'sassample'
+    if grp_name in nxDataEntry:
+        del nxDataEntry[grp_name]
+
+    nxsample = nxDataEntry.create_group(grp_name)
+    nxsample.attrs['NX_class'] = 'NXsample'
+    nxsample.attrs['canSAS_class'] = 'SASsample'
+
+    nxsample.create_dataset('name', data=samplename)
+    if thickness is not None:
+        ds = nxsample.create_dataset('thickness', data=float(thickness))
+        ds.attrs['units'] = 'mm'
+
+
+def _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
+                         fwhm=None, beam_center=None, chi_square=None):
+    """Write an NXcanSAS SASinstrument group with source and detector info.
+
+    Parameters
+    ----------
+    nxDataEntry : h5py.Group
+        The NXsubentry group to write into.
+    wavelength : float or None
+        Wavelength in Angstroms.
+    detector_distance : float or None
+        Sample-to-detector distance in mm.
+    fwhm : float or None
+        FWHM of rocking curve in degrees (USAXS only).
+    beam_center : float or None
+        Beam center angle in degrees (USAXS only).
+    chi_square : float or None
+        Chi-square of the beam center fit (USAXS only).
+    """
+    if wavelength is None and detector_distance is None:
+        return
+
+    grp_name = 'sasinstrument'
+    if grp_name in nxDataEntry:
+        del nxDataEntry[grp_name]
+
+    nxinstr = nxDataEntry.create_group(grp_name)
+    nxinstr.attrs['NX_class'] = 'NXinstrument'
+    nxinstr.attrs['canSAS_class'] = 'SASinstrument'
+    nxinstr.create_dataset('name', data='APS 12IDE USAXS/SAXS/WAXS')
+
+    if wavelength is not None:
+        nxsource = nxinstr.create_group('sassource')
+        nxsource.attrs['NX_class'] = 'NXsource'
+        nxsource.attrs['canSAS_class'] = 'SASsource'
+        ds = nxsource.create_dataset('wavelength', data=float(wavelength))
+        ds.attrs['units'] = 'angstrom'
+        nxsource.create_dataset('radiation', data='x-ray synchrotron')
+
+    if detector_distance is not None:
+        nxdet = nxinstr.create_group('sasdetector')
+        nxdet.attrs['NX_class'] = 'NXdetector'
+        nxdet.attrs['canSAS_class'] = 'SASdetector'
+        nxdet.create_dataset('name', data='detector')
+        ds = nxdet.create_dataset('SDD', data=float(detector_distance))
+        ds.attrs['units'] = 'mm'
+
+    if fwhm is not None or beam_center is not None or chi_square is not None:
+        nxnote = nxinstr.create_group('sasnote')
+        nxnote.attrs['NX_class'] = 'NXnote'
+        nxnote.attrs['canSAS_class'] = 'SASnote'
+        if fwhm is not None:
+            ds = nxnote.create_dataset('FWHM', data=float(fwhm))
+            ds.attrs['units'] = 'degrees'
+            ds.attrs['long_name'] = 'FWHM of rocking curve'
+        if beam_center is not None:
+            ds = nxnote.create_dataset('beam_center', data=float(beam_center))
+            ds.attrs['units'] = 'degrees'
+            ds.attrs['long_name'] = 'Beam center angle'
+        if chi_square is not None:
+            nxnote.create_dataset('chi_square', data=float(chi_square))
+
 
 def saveNXcanSAS(Sample,path, filename):
     
@@ -180,12 +326,44 @@ def saveNXcanSAS(Sample,path, filename):
     if "BlankData" in Sample:
         BL_R_Int = Sample["BlankData"]["Intensity"]
         BL_Q_vec = Sample["BlankData"]["Q"]
-        BL_Error = Sample["BlankData"]["Error"]    
+        BL_Error = Sample["BlankData"]["Error"]
     else:
         BL_R_Int = None
         BL_Q_vec = None
         BL_Error = None
-        
+
+    # --- Extract metadata for NXcanSAS groups ---
+    # Transmission: USAXS stores in CalibratedData, SAXS/WAXS in calib2DData
+    transmission = Sample.get("CalibratedData", {}).get("MeasuredTransmission", None)
+    if transmission is None:
+        transmission = Sample.get("calib2DData", {}).get("transmission", None)
+
+    # Wavelength: USAXS stores in reducedData, SAXS/WAXS in RawData instrument
+    wavelength = Sample.get("reducedData", {}).get("wavelength", None)
+    if wavelength is None:
+        try:
+            wavelength = Sample["RawData"]["instrument"]["monochromator"]["wavelength"]
+        except (KeyError, TypeError):
+            wavelength = Sample.get("RawData", {}).get("metadata", {}).get("wavelength", None)
+
+    # Sample thickness: prefer CalibratedData, fall back to RawData
+    sample_thickness = Sample.get("CalibratedData", {}).get("thickness", None)
+    if sample_thickness is None:
+        sample_thickness = Sample.get("RawData", {}).get("sample", {}).get("thickness", None)
+
+    # Detector distance: USAXS in metadata, SAXS/WAXS in instrument
+    detector_distance = Sample.get("RawData", {}).get("metadata", {}).get("detector_distance", None)
+    if detector_distance is None:
+        try:
+            detector_distance = Sample["RawData"]["instrument"]["detector"]["distance"]
+        except (KeyError, TypeError):
+            pass
+
+    # USAXS-specific metadata (None for SAXS/WAXS)
+    fwhm = Sample.get("reducedData", {}).get("FWHM", None)
+    beam_center = Sample.get("reducedData", {}).get("Center", None)
+    chi_square = Sample.get("reducedData", {}).get("Chi-Square", None)
+
     #this is Desmeared USAXS data, SLitSmeared data and plot data, all at once.
     # create the HDF5 NeXus file with same structure as our raw data files have...
     Filepath = os.path.join(path, filename)
@@ -278,7 +456,13 @@ def saveNXcanSAS(Sample,path, filename):
             # dI axis data
             ds = nxdata.create_dataset('Idev', data=Error)
             ds.attrs['units'] = 'cm2/cm3'
-            ds.attrs['long_name'] = 'Uncertainties'  
+            ds.attrs['long_name'] = 'Uncertainties'
+
+            # NXcanSAS metadata groups for desmeared entry
+            _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength)
+            _write_SASsample(nxDataEntry, samplename, sample_thickness)
+            _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
+                                fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
 
         if SMR_Int is not None:
             logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
@@ -337,7 +521,13 @@ def saveNXcanSAS(Sample,path, filename):
             # dI axis data
             ds = nxdata.create_dataset('Idev', data=SMR_Error)
             ds.attrs['units'] = 'cm2/cm3'
-            ds.attrs['long_name'] = 'Uncertainties'  
+            ds.attrs['long_name'] = 'Uncertainties'
+
+            # NXcanSAS metadata groups for SMR entry
+            _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength)
+            _write_SASsample(nxDataEntry, samplename, sample_thickness)
+            _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
+                                fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
 
         if R_Int is not None:
             logging.info(f"Wrote QRS group for file {filename}. ")
@@ -501,6 +691,38 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
                 Sample["RawData"]["filename"] = attributes["label"]
                 Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
                 Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
+
+            # Read SAStransmission_spectrum if present (written by saveNXcanSAS)
+            # location was modified above to point to sasdata/, go back to parent
+            parent_location = location.rsplit('sasdata/', 1)[0]
+            trans_location = parent_location + 'sastransmission_spectrum/'
+            if trans_location in f:
+                T_val = _get_h5_value(f, trans_location + 'T')
+                lambda_val = _get_h5_value(f, trans_location + 'lambda')
+                if T_val is not None:
+                    Sample['CalibratedData']['transmission'] = float(T_val[0]) if hasattr(T_val, '__len__') else float(T_val)
+                if lambda_val is not None:
+                    Sample['CalibratedData']['wavelength'] = float(lambda_val[0]) if hasattr(lambda_val, '__len__') else float(lambda_val)
+
+            # Read SASsample if present
+            sample_location = parent_location + 'sassample/'
+            if sample_location in f:
+                thick_val = _get_h5_value(f, sample_location + 'thickness')
+                if thick_val is not None:
+                    Sample['CalibratedData']['thickness'] = float(thick_val)
+
+            # Read SASinstrument if present
+            instr_location = parent_location + 'sasinstrument/'
+            if instr_location in f:
+                if 'metadata' not in Sample.get('RawData', {}):
+                    Sample['RawData']['metadata'] = {}
+                source_wl = _get_h5_value(f, instr_location + 'sassource/wavelength')
+                if source_wl is not None:
+                    Sample['RawData']['metadata']['wavelength'] = float(source_wl)
+                sdd_val = _get_h5_value(f, instr_location + 'sasdetector/SDD')
+                if sdd_val is not None:
+                    Sample['RawData']['metadata']['detector_distance'] = float(sdd_val)
+
         else:
             Sample["RawData"]["filename"] = filename
             Sample['CalibratedData']['Intensity'] = None

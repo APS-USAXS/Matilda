@@ -267,6 +267,7 @@ def draw_error_bars(
     I: np.ndarray,
     dI: np.ndarray,
     y_global_max: float | None = None,
+    color: tuple | None = None,
 ) -> pg.PlotDataItem | None:
     """Draw I(Q) error bars as NaN-separated line segments.
 
@@ -303,9 +304,13 @@ def draw_error_bars(
     if not x_lines:
         return None
 
+    if color is not None:
+        err_pen = pg.mkPen((*color, 120), width=1)
+    else:
+        err_pen = SASPlotStyle.ERROR_PEN
     return plot.plot(
         x_lines, y_lines,
-        pen=SASPlotStyle.ERROR_PEN,
+        pen=err_pen,
         connect='finite',
     )
 

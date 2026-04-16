@@ -47,18 +47,11 @@ pg.setConfigOption("foreground", "k")
 
 # ── Palette ──────────────────────────────────────────────────────────────────
 
-# Left-axis (calibrated) curve colors — colorblind-friendly
-_CAL_COLORS = [
-    (0,   114, 189),   # blue   — SMR / subtracted
-    (217,  83,  25),   # orange — DSM / calibrated
-    ( 32, 178,  34),   # green  — future
-]
-
 # Right-axis raw curves: (color, Qt.PenStyle, width)
 # Index 0 = sample raw, Index 1 = blank raw
 _RAW_STYLES = [
-    ((100, 100, 100), Qt.PenStyle.DashLine, 1.5),    # grey dashed  — sample
-    ((160, 160, 210), Qt.PenStyle.DotLine,  1.5),    # blue-grey dotted — blank
+    ((100, 100, 100), Qt.PenStyle.DashLine, 1.5),    # grey dashed  — sample raw
+    (( 40, 180, 170), Qt.PenStyle.DotLine,  1.5),    # teal dotted  — blank raw
 ]
 
 
@@ -107,7 +100,7 @@ class GraphPanel(QWidget):
 
         self._btn_errbar = QPushButton("Error bars")
         self._btn_errbar.setCheckable(True)
-        self._btn_errbar.setChecked(True)
+        self._btn_errbar.setChecked(False)
         self._btn_errbar.setToolTip("Show/hide error bars on calibrated curves")
         self._btn_errbar.clicked.connect(self._toggle_error_bars)
         tb.addWidget(self._btn_errbar)
@@ -254,17 +247,19 @@ class GraphPanel(QWidget):
             self._right_items.append(item)
             self._legend.addItem(item, label)
 
-        # Set right Y range: percentile-based view, 1-decade hard limits.
+        # Set right Y range: show full data top-to-bottom, limit decades.
+        # USAXS data can span ~13 decades; cap display at 10.
+        # SAXS/WAXS typically spans less; cap at 5.
         if all_right_I:
             combined_r = np.concatenate(all_right_I)
             valid_r = combined_r[combined_r > 0]
             if len(valid_r) >= 3:
                 log_r = np.log10(valid_r)
-                lo_r  = float(np.percentile(log_r, 2))  - 0.5
-                hi_r  = float(np.percentile(log_r, 99)) + 0.5
+                hi_r  = float(np.max(log_r)) + 0.3
+                max_decades = 10 if technique in ("Flyscan", "StepScan") else 5
+                lo_r  = max(float(np.min(log_r)) - 0.3, hi_r - max_decades)
                 self._right_vb.enableAutoRange(axis=pg.ViewBox.YAxis, enable=False)
                 self._right_vb.setYRange(lo_r, hi_r, padding=0)
-                # Hard zoom limit: 1 decade outside actual data min/max
                 self._right_vb.setLimits(
                     yMin=float(np.min(log_r)) - 1,
                     yMax=float(np.max(log_r)) + 1,
@@ -272,7 +267,7 @@ class GraphPanel(QWidget):
 
         # ── Left axis: calibrated / cm⁻¹ (solid colored lines) ───────────
         all_cal_I: list[np.ndarray] = []
-        for i, (q, I, dI, label) in enumerate(calibrated):
+        for i, (q, I, dI, label, color) in enumerate(calibrated):
             mask = (q > 0) & (I > 0) & np.isfinite(q) & np.isfinite(I)
             q_, I_ = q[mask], I[mask]
             if len(q_) < 2:
@@ -280,7 +275,6 @@ class GraphPanel(QWidget):
             all_q.append(q_)
             all_cal_I.append(I_)
 
-            color = _CAL_COLORS[i % len(_CAL_COLORS)]
             pen   = pg.mkPen(color=color, width=1.5)
             scatter = self._plot.plot(q_, I_, pen=pen, name=label)
             self._left_items.append(scatter)
@@ -302,6 +296,7 @@ class GraphPanel(QWidget):
                     eb = draw_error_bars(
                         self._plot, q_, I_, dI_,
                         y_global_max=y_global_max,
+                        color=color,
                     )
                     if eb is not None:
                         self._left_items.append(eb)
@@ -384,7 +379,7 @@ class GraphPanel(QWidget):
                 for row in zip(q, I, err):
                     writer.writerow(row)
                 writer.writerow([])
-            for q, I, dI, label in calibrated:
+            for q, I, dI, label, _color in calibrated:
                 writer.writerow([f"# {label}"])
                 writer.writerow(["Q (1/A)", "Intensity (1/cm)", "Error"])
                 err = dI if dI is not None else [0.0] * len(q)
@@ -407,6 +402,11 @@ def _safe(d: dict, key: str) -> np.ndarray | None:
     return arr if arr.size > 1 else None
 
 
+# Colors for calibrated curves by role
+_COLOR_INTERMEDIATE = (0,   114, 189)   # blue — SMR (intermediate)
+_COLOR_FINAL        = (204,  30,  30)   # red  — DSM / Calibrated (final result)
+
+
 def _extract_curves(
     result: dict,
     technique: str,
@@ -418,8 +418,9 @@ def _extract_curves(
     raw_curves : list of (Q, I, dI, label)
         Curves for the right (arb. units) axis.
         Index 0 = sample raw; index 1 = blank raw (if available).
-    calibrated : list of (Q, I, dI, label)
+    calibrated : list of (Q, I, dI, label, color)
         One or more curves for the left (cm⁻¹) axis.
+        *color* is an (R, G, B) tuple.
     """
     raw_curves: list[tuple] = []
     calibrated: list[tuple] = []
@@ -446,13 +447,13 @@ def _extract_curves(
         si = _safe(cd, "SMR_Int")
         se = _safe(cd, "SMR_Error")
         if sq is not None and si is not None:
-            calibrated.append((sq, si, se, "Slit-smeared (SMR)"))
+            calibrated.append((sq, si, se, "Slit-smeared (SMR)", _COLOR_INTERMEDIATE))
 
         dq = _safe(cd, "Q")
         di = _safe(cd, "Intensity")
         de = _safe(cd, "Error")
         if dq is not None and di is not None:
-            calibrated.append((dq, di, de, "Desmeared (DSM)"))
+            calibrated.append((dq, di, de, "Desmeared (DSM)", _COLOR_FINAL))
 
     elif technique in ("SAXS", "WAXS"):
         rd = result.get("reducedData", {})
@@ -475,6 +476,6 @@ def _extract_curves(
         ci = _safe(cd, "Intensity")
         ce = _safe(cd, "Error")
         if cq is not None and ci is not None:
-            calibrated.append((cq, ci, ce, "Calibrated"))
+            calibrated.append((cq, ci, ce, "Calibrated", _COLOR_FINAL))
 
     return raw_curves, calibrated

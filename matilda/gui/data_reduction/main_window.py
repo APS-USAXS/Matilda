@@ -243,6 +243,7 @@ class MatildaReductionWindow(QMainWindow):
         self._error_log.clear()
         blanks = self._file_tree.get_blanks()
         params = self._param_tabs.get_all_params()
+        all_files = self._file_tree.get_all_files()
 
         self._progress.setMaximum(len(file_list))
         self._progress.setValue(0)
@@ -252,7 +253,7 @@ class MatildaReductionWindow(QMainWindow):
         self._status_label.setText(f"Processing  0 / {len(file_list)}…")
         self._graph.clear()
 
-        self._worker = ReductionWorker(file_list, blanks, params, parent=self)
+        self._worker = ReductionWorker(file_list, blanks, params, all_files=all_files, parent=self)
         self._worker.progress.connect(self._on_progress)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.file_error.connect(self._on_file_error)

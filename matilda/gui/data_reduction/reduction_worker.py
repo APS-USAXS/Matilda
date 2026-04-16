@@ -11,6 +11,7 @@ GUI parameters (thickness, npts, desmearing, minQMinFindRatio) are forwarded
 from the params dict to the converter functions.
 """
 
+import logging
 import os
 
 try:
@@ -23,6 +24,7 @@ from .technique_detector import detect_technique
 from matilda.convertFlyscan import processFlyscan
 from matilda.convertUSAXS import processStepscan
 from matilda.convertSWAXS import process2Ddata
+from matilda.supportFunctions import findProperBlankScan
 
 
 class ReductionWorker(QThread):
@@ -50,12 +52,14 @@ class ReductionWorker(QThread):
         file_list: list[tuple[str, str]],
         blanks: dict[str, tuple[str, str] | None],
         params_by_technique: dict[str, dict],
+        all_files: list[tuple[str, str]] | None = None,
         parent=None,
     ):
         super().__init__(parent)
         self._file_list = file_list
         self._blanks = blanks
         self._params = params_by_technique
+        self._all_files = all_files or []
         self._cancelled = False
 
     def cancel(self):
@@ -73,7 +77,7 @@ class ReductionWorker(QThread):
             filepath  = os.path.join(path, filename)
             technique = detect_technique(path, filename)
             params    = self._params.get(technique, {})
-            blank     = self._resolve_blank(technique)
+            blank     = self._resolve_blank(technique, path, filename, params)
 
             try:
                 result = self._process_one(path, filename, technique, blank, params)
@@ -88,21 +92,58 @@ class ReductionWorker(QThread):
     # ── Private helpers ───────────────────────────────────────────────────────
 
     def _resolve_blank(
-        self, technique: str
+        self, technique: str, path: str, filename: str, params: dict,
     ) -> tuple[str | None, str | None]:
-        """Return (blankPath, blankFilename) with cross-technique USAXS fallback."""
+        """Return (blankPath, blankFilename).
+
+        When blank_mode is "manual", use only the explicitly assigned blank.
+        When blank_mode is "auto (nearest preceding)" (default), try the
+        manually assigned blank first, then fall back to automatic detection
+        using the same nearest-preceding logic as the matilda daemon.
+        """
+        blank_mode = params.get("blank_mode", "auto (nearest preceding)")
+
+        # ── Manual-only mode: return assigned blank or nothing ────────────
+        if "manual" in blank_mode.lower():
+            blank = self._blanks.get(technique)
+            if blank:
+                return blank
+            # USAXS blanks are cross-compatible
+            if technique == "Flyscan":
+                blank = self._blanks.get("StepScan")
+            elif technique == "StepScan":
+                blank = self._blanks.get("Flyscan")
+            return blank if blank else (None, None)
+
+        # ── Auto mode: try assigned blank first, then auto-detect ─────────
         blank = self._blanks.get(technique)
         if blank:
             return blank
-
-        # USAXS blanks are cross-compatible
+        # USAXS cross-compatible fallback
         if technique == "Flyscan":
             blank = self._blanks.get("StepScan")
         elif technique == "StepScan":
             blank = self._blanks.get("Flyscan")
-
         if blank:
             return blank
+
+        # No manual blank assigned — build a blank list from the loaded
+        # files and use findProperBlankScan (same logic as the daemon).
+        # USAXS blanks are cross-compatible (Flyscan ↔ StepScan).
+        compatible = {technique}
+        if technique in ("Flyscan", "StepScan"):
+            compatible = {"Flyscan", "StepScan"}
+        blank_candidates = [
+            (p, f) for p, f in self._all_files
+            if "blank" in f.lower()
+            and detect_technique(p, f) in compatible
+        ]
+        if blank_candidates:
+            bp, bf = findProperBlankScan(path, filename, blank_candidates)
+            if bp is not None and bf is not None:
+                logging.info(f"Auto-selected blank for {filename}: {bf}")
+                return (bp, bf)
+
         return (None, None)
 
     def _process_one(

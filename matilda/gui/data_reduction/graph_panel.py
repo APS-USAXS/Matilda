@@ -39,11 +39,43 @@ except ImportError:
     from PyQt6.QtCore import Qt, pyqtSignal as Signal
     from PyQt6.QtGui import QPen
 
-from .sas_plot import make_sas_plot, draw_error_bars, set_robust_y_range
+from .sas_plot import make_sas_plot, draw_error_bars
 
 # White background, black foreground — set before any pg widget is created.
 pg.setConfigOption("background", "w")
 pg.setConfigOption("foreground", "k")
+
+_TWO_PI = 2.0 * np.pi
+
+
+class _DspacingAxis(pg.AxisItem):
+    """Top axis showing d = 2*pi/Q in Angstroms.
+
+    The main X axis is log10(Q).  This axis converts each tick value
+    from log10(Q) → d = 2*pi / 10^log10(Q) and formats the result
+    in Angstroms (no SI prefix).
+    """
+
+    def tickStrings(self, values, scale, spacing):
+        strings = []
+        for v in values:
+            q = 10.0 ** v
+            if q > 0:
+                d = _TWO_PI / q
+                if d >= 1e4:
+                    strings.append(f"{d:.3g}")
+                elif d >= 10:
+                    strings.append(f"{d:.0f}")
+                elif d >= 1:
+                    strings.append(f"{d:.1f}")
+                elif d >= 0.1:
+                    strings.append(f"{d:.2f}")
+                else:
+                    strings.append(f"{d:.2g}")
+            else:
+                strings.append("")
+        return strings
+
 
 # ── Palette ──────────────────────────────────────────────────────────────────
 
@@ -143,6 +175,22 @@ class GraphPanel(QWidget):
             jpeg_default_name="matilda_graph",
         )
         self._legend = self._plot.addLegend(offset=(10, 10))
+
+        # ── Top X axis: D-spacing (d = 2π/Q) in Ångströms ────────────────
+        # Replace the default (hidden) top axis with a D-spacing axis that
+        # shares the main ViewBox X range but formats ticks as d values.
+        # Grid lines come from the bottom Q axis only.
+        self._top_ax = _DspacingAxis("top")
+        self._top_ax.enableAutoSIPrefix(False)
+        self._top_ax.setLabel("D  (Å)")
+        self._top_ax.setGrid(False)
+        self._top_ax.linkToView(self._plot.vb)
+        # Remove default top axis item from the layout and insert ours
+        old_top = self._plot.layout.itemAt(1, 1)
+        if old_top is not None:
+            self._plot.layout.removeItem(old_top)
+        self._plot.layout.addItem(self._top_ax, 1, 1)
+        self._top_ax.setStyle(showValues=True)
 
         # ── Right Y axis (raw/arb. units) ─────────────────────────────────
         self._right_vb = pg.ViewBox()
@@ -303,16 +351,18 @@ class GraphPanel(QWidget):
                         self._error_bar_items.append(eb)
                         eb.setVisible(self._btn_errbar.isChecked())
 
-        # Set left Y range: percentile-based view, 1-decade hard limits.
+        # Set left Y range: show full data range top-to-bottom.
         if all_cal_I:
             combined_c = np.concatenate(all_cal_I)
-            set_robust_y_range(self._plot, combined_c)
-            # Override limits to 1 decade outside actual data min/max
             valid_c = combined_c[combined_c > 0]
-            if len(valid_c) >= 2:
+            if len(valid_c) >= 3:
+                log_c = np.log10(valid_c)
+                hi_c  = float(np.max(log_c)) + 0.3
+                lo_c  = float(np.min(log_c)) - 0.3
+                self._plot.setYRange(lo_c, hi_c, padding=0)
                 self._plot.getViewBox().setLimits(
-                    yMin=np.log10(float(valid_c.min())) - 1,
-                    yMax=np.log10(float(valid_c.max())) + 1,
+                    yMin=lo_c - 1,
+                    yMax=hi_c + 1,
                 )
 
         # ── Shared X axis: set initial view + 1-decade hard limit ─────────

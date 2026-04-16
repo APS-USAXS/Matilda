@@ -184,14 +184,14 @@ def sanitize_sample_name(name: str) -> str:
 
     Rules (matching Bluesky / spec command-file conventions):
     - Empty string is returned unchanged (empty = skip row in export).
-    - All characters that are not [A-Za-z0-9_] are replaced with '_'.
-    - If the first character is a digit, 'X' is prepended.
+    - '%' is replaced with 'pct'.
+    - All other characters that are not [A-Za-z0-9_] are replaced with '_'.
+    - Names may start with a digit.
     """
     if not name:
         return name
-    cleaned = re.sub(r'[^A-Za-z0-9_]', '_', name)
-    if cleaned[0].isdigit():
-        cleaned = 'X' + cleaned
+    cleaned = name.replace('%', 'pct')
+    cleaned = re.sub(r'[^A-Za-z0-9_]', '_', cleaned)
     return cleaned
 
 
@@ -199,7 +199,7 @@ def validate_sample_name(name: str) -> bool:
     """Return True if *name* is already a valid sample name (or empty)."""
     if not name:
         return True
-    return bool(re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', name))
+    return bool(re.match(r'^[A-Za-z0-9_]+$', name))
 
 
 # ---------------------------------------------------------------------------

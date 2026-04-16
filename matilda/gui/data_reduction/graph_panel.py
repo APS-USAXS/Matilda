@@ -234,11 +234,17 @@ class GraphPanel(QWidget):
             self._right_vb.removeItem(item)
         self._right_items.clear()
 
-        # Do NOT call setLimits(xMin=None, ...) here — passing None to
-        # setLimits triggers _effectiveLimits() which does max(None, float)
-        # and raises TypeError in Python 3 (pyqtgraph bug, some versions).
-        # Limits are always overwritten by update_curves() when new data
-        # arrives, so no explicit reset is needed.
+        # Reset axis limits to unconstrained so the next update_curves()
+        # can set fresh ranges without being clamped by the old data's limits.
+        # We use extreme finite values instead of None (which triggers a
+        # pyqtgraph TypeError in _effectiveLimits on some versions).
+        _INF = 1e30
+        self._plot.getViewBox().setLimits(
+            xMin=-_INF, xMax=_INF, yMin=-_INF, yMax=_INF,
+        )
+        self._right_vb.setLimits(
+            xMin=-_INF, xMax=_INF, yMin=-_INF, yMax=_INF,
+        )
 
         self._last_result    = None
         self._last_technique = None

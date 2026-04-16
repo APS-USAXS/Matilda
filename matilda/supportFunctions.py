@@ -321,7 +321,9 @@ def calibrateAndSubtractFlyscan(Sample):
             "blankname":blankname,
             "thickness":thickness,
             "slitLength":slitLength,
-            "units":"[cm2/cm3]"
+            "units":"[cm2/cm3]",
+            "MeasuredTransmission":MeasuredTransmission,
+            "MSAXSCorrection":MSAXSCorrection,
             }
 
 

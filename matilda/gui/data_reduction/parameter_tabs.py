@@ -96,6 +96,18 @@ class ParameterTabWidget(QTabWidget):
         if tab is not None:
             tab.set_blank_label(label)
 
+    def set_blank_mode(self, technique: str, mode: str):
+        """Switch the blank-mode dropdown on the matching tab.
+
+        *mode* should be one of the combo-box items, e.g. ``"manual"``
+        or ``"auto (nearest preceding)"``.
+        """
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "_blank_mode"):
+            idx = tab._blank_mode.findText(mode)
+            if idx >= 0:
+                tab._blank_mode.setCurrentIndex(idx)
+
     def update_hdf5_thickness(self, technique: str, value: float | None):
         """Push the HDF5 thickness value to the matching tab."""
         tab = self._tabs.get(technique)

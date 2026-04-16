@@ -432,8 +432,8 @@ def _extract_curves(
         if q is not None and I is not None:
             raw_curves.append((q, I, dI, "Raw (R_data)"))
 
-        # Blank raw curve (if the worker fetched it)
-        brd = result.get("blankReducedData")
+        # Blank raw curve
+        brd = result.get("BlankData")
         if brd:
             bq = _safe(brd, "Q")
             bI = _safe(brd, "Intensity")
@@ -462,8 +462,8 @@ def _extract_curves(
         if q is not None and I is not None:
             raw_curves.append((q, I, dI, "Normalized (raw 1D)"))
 
-        # Blank raw curve (if the worker fetched it)
-        brd = result.get("blankReducedData")
+        # Blank raw curve
+        brd = result.get("BlankData")
         if brd:
             bq = _safe(brd, "Q")
             bI = _safe(brd, "Intensity")

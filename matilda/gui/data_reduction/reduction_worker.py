@@ -45,6 +45,7 @@ class ReductionWorker(QThread):
     progress  = Signal(int, int)         # (current, total)
     file_done = Signal(str, dict, str)   # (filepath, result, technique)
     file_error = Signal(str, str)        # (filepath, error_message)
+    blank_auto = Signal(str, str)        # (technique, blank_filename)
     all_done  = Signal()
 
     def __init__(
@@ -142,6 +143,7 @@ class ReductionWorker(QThread):
             bp, bf = findProperBlankScan(path, filename, blank_candidates)
             if bp is not None and bf is not None:
                 logging.info(f"Auto-selected blank for {filename}: {bf}")
+                self.blank_auto.emit(technique, bf)
                 return (bp, bf)
 
         return (None, None)

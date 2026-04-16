@@ -189,11 +189,16 @@ class MatildaReductionWindow(QMainWindow):
 
     def _on_blank_assigned(self, technique: str, path: str, fname: str):
         self._param_tabs.set_blank(technique, fname)
+        self._param_tabs.set_blank_mode(technique, "manual")
         self._status_label.setText(f"Blank set for {technique}: {fname}")
 
     def _on_blank_cleared(self, technique: str):
         self._param_tabs.set_blank(technique, "")
         self._status_label.setText(f"Blank cleared for {technique}")
+
+    def _on_blank_auto(self, technique: str, blank_filename: str):
+        """Update the blank label when the worker auto-selects a blank."""
+        self._param_tabs.set_blank(technique, f"auto: {blank_filename}")
 
     def _on_blank_browse(self, technique: str):
         """Open a file dialog to browse for a blank outside the current tree."""
@@ -207,6 +212,7 @@ class MatildaReductionWindow(QMainWindow):
             folder = os.path.dirname(path)
             fname  = os.path.basename(path)
             self._file_tree.set_blank_external(technique, folder, fname)
+            self._param_tabs.set_blank_mode(technique, "manual")
 
     # ── Processing ────────────────────────────────────────────────────────────
 
@@ -257,6 +263,7 @@ class MatildaReductionWindow(QMainWindow):
         self._worker.progress.connect(self._on_progress)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.file_error.connect(self._on_file_error)
+        self._worker.blank_auto.connect(self._on_blank_auto)
         self._worker.all_done.connect(self._on_all_done)
         self._worker.start()
 

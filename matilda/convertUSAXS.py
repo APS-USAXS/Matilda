@@ -54,7 +54,9 @@ from .plotData import plotUSAXSResults
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in the Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
-def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
+                     desmear_iter=20, extrap_method='PowerLaw w flat',
+                     extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
 
     Structurally identical to processFlyscan() (convertFlyscan module) —
@@ -75,6 +77,16 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
         Filename of blank HDF5 file.  None → only raw QR data.
     recalculateAllData : bool, optional
         True → delete cached NXcanSAS data and recompute.  Default False.
+    desmear_iter : int, optional
+        Maximum Lake/Strobl desmearing iterations.  Default 20.
+    extrap_method : str, optional
+        High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
+    extrap_qstart : float, optional
+        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+    minQMinFindRatio : float, optional
+        Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
+    thickness_override : float or None, optional
+        When not None, use this value (mm) instead of the HDF5 thickness.
 
     Returns
     -------
@@ -148,7 +160,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
             ):
                 Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
-                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
+                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
@@ -158,7 +170,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod='PowerLaw w flat',ExtrapQstart=0.1, MaxNumIter = 20)
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod=extrap_method,ExtrapQstart=extrap_qstart, MaxNumIter=desmear_iter)
                     desmearedData=list()
                     desmearedData={
                         "Intensity":DSM_Int,

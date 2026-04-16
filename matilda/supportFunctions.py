@@ -214,7 +214,7 @@ def normalizeByTransmission(Sample):
             }
     return result
     
-def calibrateAndSubtractFlyscan(Sample):
+def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_override=None):
     # This is a step where we subtract and calibrate the sample and Blank. 
     Intensity = Sample["reducedData"]["Intensity"]
     BL_Intensity = Sample["BlankData"]["Intensity"]
@@ -277,14 +277,14 @@ def calibrateAndSubtractFlyscan(Sample):
     # plt.show()    
     # # Find the first index where IntRatio > MinQMinFindRatio
     # np.argmax returns the first index of True. If all are False, it returns 0.
-    potential_first_index = np.argmax(IntRatio > MinQMinFindRatio)
-    if IntRatio[potential_first_index] > MinQMinFindRatio:
+    potential_first_index = np.argmax(IntRatio > minQMinFindRatio)
+    if IntRatio[potential_first_index] > minQMinFindRatio:
         indexRatio = potential_first_index
-        #print(f"First index where IntRatio > {MinQMinFindRatio} is {indexRatio} with value {IntRatio[indexRatio]}.")
+        #print(f"First index where IntRatio > {minQMinFindRatio} is {indexRatio} with value {IntRatio[indexRatio]}.")
     else:
-        # This means no element in IntRatio was > MinQMinFindRatio (argmax returned 0 and IntRatio[0] was not > 1.03)
+        # This means no element in IntRatio was > minQMinFindRatio (argmax returned 0 and IntRatio[0] was not > 1.03)
         indexRatio = len(IntRatio) # Default to end of array if no such point is found
-        logging.warning(f"No points found where IntRatio > {MinQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
+        logging.warning(f"No points found where IntRatio > {minQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
         
     largest_value = max(indexSample, indexBlank, indexRatio)
     # Ensure the start_index is within bounds and there's data to slice
@@ -302,7 +302,7 @@ def calibrateAndSubtractFlyscan(Sample):
     # now calibration... 
     SDD = Sample["RawData"]["metadata"]['detector_distance']
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
-    thickness = Sample["RawData"]["sample"]['thickness']
+    thickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]['thickness']
     BLPeakMax = Sample["BlankData"]["Maximum"]
     blankname = Sample["BlankData"]["blankname"]
     #Igor:	variable SlitLength=0.5*((4*pi)/wavelength)*sin(PhotoDiodeSize/(2*SDDistance))

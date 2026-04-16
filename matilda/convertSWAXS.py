@@ -35,6 +35,36 @@ from .supportNikaFunctions import convert_Nika_to_Fit2D
 from .readfromtiled import FindLastBlankScan
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
+# ── Integrator cache ──────────────────────────────────────────────────────────
+# pyFAI builds internal lookup tables on the first integrate1d() call for a
+# given geometry.  For files in the same folder the geometry is usually
+# identical, so reusing the same AzimuthalIntegrator avoids rebuilding those
+# tables on every call (3× per file × N files).
+_cached_integrator = None
+_cached_geometry_key = None
+
+
+def _get_integrator(my_poni):
+    """Return a cached AzimuthalIntegrator if geometry matches, else create one."""
+    global _cached_integrator, _cached_geometry_key
+    key = (my_poni.dist, my_poni.poni1, my_poni.poni2,
+           my_poni.rot1, my_poni.rot2, my_poni.rot3,
+           my_poni.detector.pixel1, my_poni.detector.pixel2,
+           my_poni.wavelength)
+    if _cached_geometry_key == key and _cached_integrator is not None:
+        return _cached_integrator
+    ai = AzimuthalIntegrator(
+        dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2,
+        rot1=my_poni.rot1, rot2=my_poni.rot2, rot3=my_poni.rot3,
+        pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2,
+        wavelength=my_poni.wavelength,
+    )
+    _cached_integrator = ai
+    _cached_geometry_key = key
+    logging.info("Created new pyFAI AzimuthalIntegrator (geometry changed or first call)")
+    return ai
+
+
 # TODO: split into multiple steps as needed
 # Import images for sample and blank as separate calls and get sample and blank objects
 #   calibration step, calculate corrections, apply corrections
@@ -45,7 +75,8 @@ from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, read
 
 
 ## main code here
-def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
+                   npts=None, thickness_override=None):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
@@ -90,25 +121,25 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
             else:
                 plan_name="WAXS"
 
-            Sample["reducedData"] = reduceADData(Sample, useRawData=True)   #this generates Int vs Q for raw data plot
+            Sample["reducedData"] = reduceADData(Sample, useRawData=True, npts=npts)   #this generates Int vs Q for raw data plot
                                         # q = Sample["reducedData"]["Q"]
                                         # intensity = Sample["reducedData"]["Intensity"]
-                                        # error = Sample["reducedData"]["Error"]            
+                                        # error = Sample["reducedData"]["Error"]
                                         # samplename = Sample["RawData"]["samplename"]
-            
-            if blankPath is not None and blankFilename is not None and "blank" not in filename.lower():               
+
+            if blankPath is not None and blankFilename is not None and "blank" not in filename.lower():
                 blank = importADData(blankPath, blankFilename)               #this is for blank path and blank name
-                Sample["BlankData"] = reduceADData(blank, useRawData=True)   #this generates Int vs Q for blank data plot
+                Sample["BlankData"] = reduceADData(blank, useRawData=True, npts=npts)   #this generates Int vs Q for blank data plot
                                         # qcalib = Sample["BlankData"]["Q"]
                                         # intensity = Sample["BlankData"]["Intensity"]
-                                        # error = Sample["BlankData"]["Error"]            
-                                        # blankname = Sample["RawData"]["blankname"] 
-                Sample["calib2DData"] = calibrateAD2DData(Sample, blank)
+                                        # error = Sample["BlankData"]["Error"]
+                                        # blankname = Sample["RawData"]["blankname"]
+                Sample["calib2DData"] = calibrateAD2DData(Sample, blank, thickness_override=thickness_override)
                                     #returns 2D calibrated data
                                         # result = {"data":calib2Ddata,
                                         #           "blankname":blankname,
                                         #           "transmission":transmission
-                Sample["CalibratedData"] = reduceADData(Sample, useRawData=False)  #this generates Calibrated 1D data.
+                Sample["CalibratedData"] = reduceADData(Sample, useRawData=False, npts=npts)  #this generates Calibrated 1D data.
                                         #returns :   
                                         # qcalib= Sample["CalibratedData"]["Q"]
                                         # dqcalib= Sample["CalibratedData"]["dQ"]
@@ -254,17 +285,11 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
 
         #logging.info(f"Finished creating mask")
         
-        #now define integrator... using pyFAI here. 
-        # this does not work, they really do not have way to pass whole poni in? 
-        #ai = AzimuthalIntegrator(poni=my_poni)
-        # but this works fine
-        ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
-                            rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
-                            wavelength=my_poni.wavelength)
-        
+        ai = _get_integrator(my_poni)
+
         #   You can specify the number of bins for the integration
         #   set npt to larger of dimmension of my2DData
-        #   error_model= "azimuthal" or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)
+        #   error_model= “azimuthal” or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)
 
         if usingWAXS:
             npt = max(my2DData.shape)
@@ -342,20 +367,20 @@ def importADData(path, filename):
             #logging.info(f"Read data")
             return Sample
 
-def calibrateAD2DData(Sample, Blank):
+def calibrateAD2DData(Sample, Blank, thickness_override=None):
     '''
         Here is how we are suppose to process the data:
         Int = Corrfactor / I0 / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
-        SolidAngeCorr - is done by pyFAI later, no need to do here... 
+        SolidAngeCorr - is done by pyFAI later, no need to do here...
         Here is lookup from Nika:
-        SAXS and WAXS are same : 
+        SAXS and WAXS are same :
         SampleThickness = entry:sample:thickness
         SampleI0 = entry:control:integral
         SampleMeasurementTime = entry:control:preset
         Corrfactor = entry:Metadata:I_scaling
     '''
-    blankname = Blank["RawData"]["filename"]     
-    sampleThickness=Sample["RawData"]["sample"]["thickness"]
+    blankname = Blank["RawData"]["filename"]
+    sampleThickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]["thickness"]
     #sampleMeasurementTime=Sample["RawData"]["control"]["preset"]
     corrFactor=Sample["RawData"]["metadata"]["I_scaling"]
     #blankMeasurementTime=Blank["RawData"]["control"]["preset"]
@@ -413,7 +438,7 @@ def calibrateAD2DData(Sample, Blank):
     return result
     
 
-def reduceADData(Sample, useRawData=True):
+def reduceADData(Sample, useRawData=True, npts=None):
         '''
         Here we take 2D data from Sample and reduce them to 1D 
         These 2D data in  Sample["RawData"]["data"] can be raw as in read only or normalized or even subtracted and calibrated. 
@@ -477,20 +502,14 @@ def reduceADData(Sample, useRawData=True):
 
         #logging.info(f"Finished creating mask")
         
-        #now define integrator... using pyFAI here. 
-        # this does not work, they really do not have way to pass whole poni in? 
-        #ai = AzimuthalIntegrator(poni=my_poni)
-        # but this works fine
-        ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
-                            rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
-                            wavelength=my_poni.wavelength)
-        
+        ai = _get_integrator(my_poni)
+
         #   You can specify the number of bins for the integration
         #   set npt to larger of dimmension of my2DData
-        if usingWAXS:
-            npt = max(my2DData.shape)
+        if npts is not None:
+            npt = npts
         else:
-            npt=200 
+            npt = max(my2DData.shape)
         #npt = 1000  # Number of bins, if should be lower
         # Perform azimuthal integration
         #   error_model= "azimuthal" or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)

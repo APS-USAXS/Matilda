@@ -7,11 +7,8 @@ Always passes recalculateAllData=True (the user is explicitly requesting
 re-reduction with custom parameters, so cached NXcanSAS groups are deleted
 and the full pipeline is re-run).
 
-NOTE (future): The converters (convertFlyscan, convertUSAXS, convertSWAXS)
-currently do not accept all GUI parameters (thickness, npts, az_min/max,
-extrap settings).  When those converters are updated to accept keyword
-overrides, the _process_one() method below is the single place to wire them.
-The params dict is passed through unchanged so it is ready for that wiring.
+GUI parameters (thickness, npts, desmearing, minQMinFindRatio) are forwarded
+from the params dict to the converter functions.
 """
 
 import os
@@ -125,6 +122,12 @@ class ReductionWorker(QThread):
                 blankPath=bpath,
                 blankFilename=bfile,
                 recalculateAllData=recalc,
+                num_points=params.get("npts", 500),
+                desmear_iter=params.get("desmear_iter", 20),
+                extrap_method=params.get("extrap_method", "PowerLaw w flat"),
+                extrap_qstart=params.get("extrap_qstart", 0.1),
+                minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
+                thickness_override=params.get("thickness"),
             )
         elif technique == "StepScan":
             result = processStepscan(
@@ -132,6 +135,11 @@ class ReductionWorker(QThread):
                 blankPath=bpath,
                 blankFilename=bfile,
                 recalculateAllData=recalc,
+                desmear_iter=params.get("desmear_iter", 20),
+                extrap_method=params.get("extrap_method", "PowerLaw w flat"),
+                extrap_qstart=params.get("extrap_qstart", 0.1),
+                minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
+                thickness_override=params.get("thickness"),
             )
         elif technique in ("SAXS", "WAXS"):
             result = process2Ddata(
@@ -139,6 +147,8 @@ class ReductionWorker(QThread):
                 blankPath=bpath,
                 blankFilename=bfile,
                 recalculateAllData=recalc,
+                npts=params.get("npts"),
+                thickness_override=params.get("thickness"),
             )
         else:
             raise ValueError(

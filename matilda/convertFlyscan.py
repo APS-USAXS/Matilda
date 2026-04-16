@@ -72,7 +72,9 @@ from .desmearing import desmearData
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
 # It will check if QR/NXcanSAS data exist and if not, it will create properly calibrated NXcanSAS in the Nexus file
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
-def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False):
+def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
+                    num_points=500, desmear_iter=20, extrap_method='PowerLaw w flat',
+                    extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None):
     """Reduce a single USAXS flyscan HDF5 file to calibrated 1-D I(Q).
 
     Results are cached inside the original HDF5 file as NXcanSAS groups so
@@ -93,6 +95,18 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
     recalculateAllData : bool, optional
         When True, delete cached NXcanSAS groups and recompute everything.
         Default False.
+    num_points : int, optional
+        Number of output points after rebinning.  Default 500.
+    desmear_iter : int, optional
+        Maximum Lake/Strobl desmearing iterations.  Default 20.
+    extrap_method : str, optional
+        High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
+    extrap_qstart : float, optional
+        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+    minQMinFindRatio : float, optional
+        Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
+    thickness_override : float or None, optional
+        When not None, use this value (mm) instead of the HDF5 thickness.
 
     Returns
     -------
@@ -169,18 +183,18 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
             ):
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
-                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample))
+                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
                     if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
-                        Sample["CalibratedData"].update(rebinData(Sample, num_points=500, isSMRData=True))         #Rebin data
+                        Sample["CalibratedData"].update(rebinData(Sample, num_points=num_points, isSMRData=True))         #Rebin data
                     slitLength=Sample["CalibratedData"]["slitLength"]
                     #DesmearNumberOfIterations = 10
                     SMR_Int =Sample["CalibratedData"]["SMR_Int"]
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod='PowerLaw w flat',ExtrapQstart=0.1, MaxNumIter = 20)
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod=extrap_method,ExtrapQstart=extrap_qstart, MaxNumIter=desmear_iter)
                     desmearedData=list()
                     desmearedData={
                         "Intensity":DSM_Int,

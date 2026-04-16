@@ -226,19 +226,27 @@ class _USAXSTab(_TechniqueTab):
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
 
-        # ── Output points (informational — not yet wired to converter) ───────
-        self._npts = QSpinBox()
-        self._npts.setRange(0, 5000)
-        self._npts.setValue(500)
-        self._npts.setEnabled(False)
-        self._npts.setToolTip(
-            "Not yet passed to the converter.\n"
-            "The converter rebins to a hardcoded 500 points."
+        # ── Min Q ratio (MinQMinFindRatio) ───────────────────────────────────
+        self._min_q_ratio = QDoubleSpinBox()
+        self._min_q_ratio.setRange(1.00, 2.00)
+        self._min_q_ratio.setValue(1.05)
+        self._min_q_ratio.setDecimals(2)
+        self._min_q_ratio.setSingleStep(0.01)
+        self._min_q_ratio.setToolTip(
+            "Threshold for Q-minimum selection after blank subtraction.\n"
+            "The first Q point where the sample/blank intensity ratio\n"
+            "exceeds this value defines the low-Q cutoff."
         )
-        form.addRow("Output points:", self._npts)
-        _npts_note = QLabel("(not passed to converter — no effect)")
-        _npts_note.setStyleSheet("color: grey; font-size: 10px; font-style: italic;")
-        form.addRow("", _npts_note)
+        form.addRow("Min Q ratio:", self._min_q_ratio)
+
+        # ── Output points (Flyscan only) ─────────────────────────────────────
+        self._npts = None
+        if technique == "Flyscan":
+            self._npts = QSpinBox()
+            self._npts.setRange(50, 5000)
+            self._npts.setValue(500)
+            self._npts.setToolTip("Number of output points after rebinning")
+            form.addRow("Output points:", self._npts)
 
         form.addRow(_separator())
         form.addRow(QLabel("<b>Desmearing</b>"))
@@ -283,15 +291,18 @@ class _USAXSTab(_TechniqueTab):
             self._blank_label.setStyleSheet("color: grey; font-style: italic;")
 
     def get_params(self) -> dict:
-        return {
+        params = {
             "blank_mode":         self._blank_mode.currentText(),
             "thickness":          self._get_thickness(),
-            "npts":               self._npts.value(),
+            "minQMinFindRatio":   self._min_q_ratio.value(),
             "desmear_iter":       self._desmear_iter.value(),
             "extrap_method":      self._extrap_method.currentText(),
             "extrap_qstart":      self._extrap_qstart.value(),
             "recalculateAllData": True,
         }
+        if self._npts is not None:
+            params["npts"] = self._npts.value()
+        return params
 
 
 # ── SAXS tab ──────────────────────────────────────────────────────────────────
@@ -325,19 +336,21 @@ class _SAXSTab(_TechniqueTab):
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
 
-        # ── Output Q points (informational — not yet wired to converter) ─────
+        # ── Output Q points ───────────────────────────────────────────────────
+        self._max_pts = QCheckBox("Max number of points")
+        self._max_pts.setToolTip(
+            "When checked, use the maximum number of output points\n"
+            "(determined by the detector dimensions)."
+        )
+        form.addRow("", self._max_pts)
+
         self._npts = QSpinBox()
         self._npts.setRange(10, 5000)
         self._npts.setValue(200)
-        self._npts.setEnabled(False)
-        self._npts.setToolTip(
-            "Not yet passed to the converter.\n"
-            "The converter uses a hardcoded 200 Q points for SAXS."
-        )
+        self._npts.setToolTip("Number of output Q points for azimuthal integration")
         form.addRow("Output Q points:", self._npts)
-        _npts_note = QLabel("(not passed to converter — no effect)")
-        _npts_note.setStyleSheet("color: grey; font-size: 10px; font-style: italic;")
-        form.addRow("", _npts_note)
+
+        self._max_pts.toggled.connect(lambda checked: self._npts.setEnabled(not checked))
 
         form.addRow(_separator())
         form.addRow(QLabel("<b>Azimuthal Integration</b>"))
@@ -377,7 +390,7 @@ class _SAXSTab(_TechniqueTab):
         return {
             "blank_mode":         self._blank_mode.currentText(),
             "thickness":          self._get_thickness(),
-            "npts":               self._npts.value(),
+            "npts":               None if self._max_pts.isChecked() else self._npts.value(),
             "az_min":             self._az_min.value(),
             "az_max":             self._az_max.value(),
             "recalculateAllData": True,

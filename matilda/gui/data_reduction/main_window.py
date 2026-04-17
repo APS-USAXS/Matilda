@@ -15,6 +15,7 @@ Bottom bar:
 
 import json
 import os
+import webbrowser
 
 import h5py
 import numpy as np
@@ -73,6 +74,30 @@ class MatildaReductionWindow(QMainWindow):
         self._folder_label = QLabel("  (no folder selected)")
         self._folder_label.setStyleSheet("color: grey;")
         tb.addWidget(self._folder_label)
+
+        # Spacer to push help button to the right
+        spacer = QWidget()
+        spacer.setMinimumWidth(0)
+        try:
+            from PySide6.QtWidgets import QSizePolicy
+        except ImportError:
+            from PyQt6.QtWidgets import QSizePolicy
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        tb.addWidget(spacer)
+
+        btn_help = QPushButton("? Help")
+        btn_help.setStyleSheet(
+            "QPushButton { background-color: #e84040; color: white;"
+            " font-weight: bold; padding: 4px 12px; border-radius: 3px; }"
+            "QPushButton:hover { background-color: #cc3030; }"
+        )
+        btn_help.setToolTip("Open Matilda GUI documentation in web browser")
+        btn_help.clicked.connect(
+            lambda: webbrowser.open(
+                "https://github.com/APS-USAXS/Matilda/blob/main/docs/matilda-gui.md"
+            )
+        )
+        tb.addWidget(btn_help)
 
         # ── Central area ──────────────────────────────────────────────────────
         central = QWidget()

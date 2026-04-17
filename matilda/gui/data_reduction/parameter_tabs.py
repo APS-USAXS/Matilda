@@ -114,6 +114,13 @@ class ParameterTabWidget(QTabWidget):
         if tab is not None:
             tab.update_hdf5_thickness(value)
 
+    def update_mu_thickness(self, technique: str, thickness_mm: float):
+        """Show the calculated thickness on the matching tab's μ label."""
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "_mu_thickness_lbl"):
+            if tab._use_mu.isChecked():
+                tab._mu_thickness_lbl.setText(f"t = {thickness_mm:.4f} mm")
+
     def get_params(self, technique: str) -> dict:
         """Return reduction parameters for *technique* as a plain dict."""
         tab = self._tabs.get(technique)
@@ -199,6 +206,8 @@ class _TechniqueTab(QWidget):
         )
         form.addRow("", self._use_mu)
 
+        # μ input + calculated thickness readout
+        mu_row = QHBoxLayout()
         self._mu_spin = QDoubleSpinBox()
         self._mu_spin.setRange(0.001, 1000.0)
         self._mu_spin.setValue(12.5)
@@ -208,7 +217,11 @@ class _TechniqueTab(QWidget):
         self._mu_spin.setToolTip(
             "Linear absorption coefficient from Scattering Contrast Calculator"
         )
-        form.addRow("μ (1/cm):", self._mu_spin)
+        mu_row.addWidget(self._mu_spin, 1)
+        self._mu_thickness_lbl = QLabel("")
+        self._mu_thickness_lbl.setStyleSheet("color: grey; font-size: 11px;")
+        mu_row.addWidget(self._mu_thickness_lbl)
+        form.addRow("μ (1/cm):", mu_row)
 
         self._per_gram = QCheckBox("Normalize per gram")
         self._per_gram.setToolTip(
@@ -227,19 +240,31 @@ class _TechniqueTab(QWidget):
         self._density_spin.setToolTip("Solid-frame density of the sample material")
         form.addRow("Density:", self._density_spin)
 
+        form.addRow(_separator())
+
         # Wiring: use_mu toggles mu_spin and per_gram availability
         def _on_use_mu_toggled(checked):
             self._mu_spin.setEnabled(checked)
             self._per_gram.setEnabled(checked)
             if not checked:
                 self._per_gram.setChecked(False)
+                self._mu_thickness_lbl.setText("")
             # Disable thickness override when using μ
             self._thickness_override.setEnabled(not checked)
             if checked:
                 self._thickness_override.setChecked(False)
+                self._update_mu_thickness()
 
         self._use_mu.toggled.connect(_on_use_mu_toggled)
         self._per_gram.toggled.connect(self._density_spin.setEnabled)
+        self._mu_spin.valueChanged.connect(lambda _: self._update_mu_thickness())
+
+    def _update_mu_thickness(self):
+        """Reset the thickness label when μ value changes (actual value shown after processing)."""
+        if not self._use_mu.isChecked():
+            self._mu_thickness_lbl.setText("")
+            return
+        self._mu_thickness_lbl.setText("t = −ln(T)/μ  (process to calculate)")
 
     def _get_calibration_params(self) -> dict:
         """Return calibration-mode parameters."""

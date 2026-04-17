@@ -277,6 +277,11 @@ class MatildaReductionWindow(QMainWindow):
         path  = os.path.dirname(filepath)
         self._status_label.setText(f"Done: {fname}  [{technique}]")
         self._graph.update_curves(result, technique, path=path, filename=fname)
+        # Show calculated thickness in the mu label (if mu mode was used)
+        cd = result.get("CalibratedData", {})
+        thickness = cd.get("thickness") if cd else None
+        if thickness is not None:
+            self._param_tabs.update_mu_thickness(technique, thickness)
 
     def _on_file_error(self, filepath: str, error: str):
         fname = os.path.basename(filepath)

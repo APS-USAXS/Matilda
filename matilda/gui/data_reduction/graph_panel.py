@@ -276,6 +276,13 @@ class GraphPanel(QWidget):
 
         self._btn_2d.setVisible(technique in ("SAXS", "WAXS"))
 
+        # Update left axis label based on intensity units
+        cal_units = result.get("CalibratedData", {}).get("units", "[cm2/cm3]")
+        if cal_units and "g" in cal_units:
+            self._plot.setLabel("left", "Intensity  (cm²/g)")
+        else:
+            self._plot.setLabel("left", "Intensity  (cm⁻¹)")
+
         raw_curves, calibrated = _extract_curves(result, technique)
 
         # Accumulate all Q arrays so we can set a shared X limit at the end.

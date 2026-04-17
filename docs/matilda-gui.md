@@ -3,7 +3,7 @@
 ## Overview
 
 The Matilda GUI (`matilda-gui`) is a desktop application for interactive
-reduction of USAXS, SAXS, and WAXS data collected at APS beamline 9-ID.
+reduction of USAXS, SAXS, and WAXS data collected at APS beamline 12-ID-E.
 It provides the same data reduction pipeline as the Matilda daemon but with
 user-controlled parameters, visual feedback, and the ability to re-reduce
 data with different settings.

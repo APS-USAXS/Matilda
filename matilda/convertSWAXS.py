@@ -428,7 +428,11 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
     solidAngle = pixel_size**2 / detector_distance**2
 
     if use_mu and mu is not None and mu > 0:
-        thickness_cm = -np.log(transmission) / mu
+        if transmission > 0 and transmission < 1:
+            thickness_cm = -np.log(transmission) / mu
+        else:
+            logging.warning(f"Transmission {transmission:.4f} out of range (0,1) for mu calculation. Falling back to sample thickness.")
+            thickness_cm = sampleThickness * 0.1
     else:
         thickness_cm = sampleThickness * 0.1  # mm to cm
     preFactor = corrFactor /I0s/thickness_cm/solidAngle

@@ -305,7 +305,11 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
     if use_mu and mu is not None and mu > 0:
         # Calculate thickness from measured transmission: t = -ln(T) / mu
-        thickness_cm = -np.log(MeasuredTransmission) / mu
+        if MeasuredTransmission > 0 and MeasuredTransmission < 1:
+            thickness_cm = -np.log(MeasuredTransmission) / mu
+        else:
+            logging.warning(f"MeasuredTransmission {MeasuredTransmission:.4f} out of range (0,1) for mu calculation. Falling back to sample thickness.")
+            thickness_cm = (thickness_override if thickness_override is not None else Sample["RawData"]["sample"]['thickness']) * 0.1
         thickness = thickness_cm * 10  # store as mm for consistency
     else:
         thickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]['thickness']

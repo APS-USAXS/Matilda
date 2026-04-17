@@ -76,7 +76,8 @@ def _get_integrator(my_poni):
 
 ## main code here
 def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
-                   npts=None, thickness_override=None):
+                   npts=None, thickness_override=None,
+                   use_mu=False, mu=None, per_gram=False, density=None):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
@@ -134,12 +135,12 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                                         # intensity = Sample["BlankData"]["Intensity"]
                                         # error = Sample["BlankData"]["Error"]
                                         # blankname = Sample["RawData"]["blankname"]
-                Sample["calib2DData"] = calibrateAD2DData(Sample, blank, thickness_override=thickness_override)
+                Sample["calib2DData"] = calibrateAD2DData(Sample, blank, thickness_override=thickness_override, use_mu=use_mu, mu=mu)
                                     #returns 2D calibrated data
                                         # result = {"data":calib2Ddata,
                                         #           "blankname":blankname,
                                         #           "transmission":transmission
-                Sample["CalibratedData"] = reduceADData(Sample, useRawData=False, npts=npts)  #this generates Calibrated 1D data.
+                Sample["CalibratedData"] = reduceADData(Sample, useRawData=False, npts=npts, per_gram=per_gram, density=density)  #this generates Calibrated 1D data.
                                         #returns :   
                                         # qcalib= Sample["CalibratedData"]["Q"]
                                         # dqcalib= Sample["CalibratedData"]["dQ"]
@@ -367,7 +368,7 @@ def importADData(path, filename):
             #logging.info(f"Read data")
             return Sample
 
-def calibrateAD2DData(Sample, Blank, thickness_override=None):
+def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=None):
     '''
         Here is how we are suppose to process the data:
         Int = Corrfactor / I0 / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
@@ -426,7 +427,11 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None):
     #			variable solidAngle = PixelSizeX / SampleToCCDDistance * PixelSizeY / SampleToCCDDistance
     solidAngle = pixel_size**2 / detector_distance**2
 
-    preFactor = corrFactor /I0s/(sampleThickness*0.1)/solidAngle          #includes mm to cm conversion
+    if use_mu and mu is not None and mu > 0:
+        thickness_cm = -np.log(transmission) / mu
+    else:
+        thickness_cm = sampleThickness * 0.1  # mm to cm
+    preFactor = corrFactor /I0s/thickness_cm/solidAngle
     #print(f"Sample Thickness: {sampleThickness}, CorrFactor: {corrFactor}, Sample I0: {I0s}, Blank I0: {I0b}")
     calib2Ddata =preFactor*((sample2Ddata/transmission) - (I0s/I0b)*blank2Ddata)
     #Int = Corrfactor / (sampleI0 / sampleI0gain) / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
@@ -438,7 +443,7 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None):
     return result
     
 
-def reduceADData(Sample, useRawData=True, npts=None):
+def reduceADData(Sample, useRawData=True, npts=None, per_gram=False, density=None):
         '''
         Here we take 2D data from Sample and reduce them to 1D 
         These 2D data in  Sample["RawData"]["data"] can be raw as in read only or normalized or even subtracted and calibrated. 
@@ -533,6 +538,11 @@ def reduceADData(Sample, useRawData=True, npts=None):
         result["Kfactor"]=None
         result["OmegaFactor"]=None
         result["thickness"] = Sample["RawData"]["sample"]["thickness"] if "thickness" in Sample["RawData"]["sample"] else None
+        # Per-gram normalization (calibrated data only)
+        if not useRawData and per_gram and density is not None and density > 0:
+            result["Intensity"] = result["Intensity"] / density
+            result["Error"] = result["Error"] / density
+            result["units"] = "[cm2/g]"
         return result
 
 # def reduceADToQR(path, filename):

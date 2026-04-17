@@ -56,7 +56,8 @@ from .plotData import plotUSAXSResults
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
                      desmear_iter=20, extrap_method='PowerLaw w flat',
-                     extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None):
+                     extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None,
+                     use_mu=False, mu=None, per_gram=False, density=None):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
 
     Structurally identical to processFlyscan() (convertFlyscan module) —
@@ -160,7 +161,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
             ):
                 Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
-                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override))
+                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
@@ -171,13 +172,12 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
                     DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod=extrap_method,ExtrapQstart=extrap_qstart, MaxNumIter=desmear_iter)
-                    desmearedData=list()
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,
                         "Error":DSM_Error,
                         "dQ":DSM_dQ,
-                        "units":"[cm2/cm3]",
+                        "units":Sample["CalibratedData"]["units"],
                         }
                     Sample["CalibratedData"].update(desmearedData)
                 else:

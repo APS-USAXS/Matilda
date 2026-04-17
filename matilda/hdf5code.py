@@ -431,13 +431,12 @@ def saveNXcanSAS(Sample,path, filename):
 
             # Y axis data
             ds = nxdata.create_dataset('I', data=Intensity)
-            ds.attrs['units'] = '1/cm'
+            ds.attrs['units'] = units
             ds.attrs['uncertainties'] = 'Idev'
-            ds.attrs['long_name'] = 'cm2/cm3'    # suggested X axis plot label
+            ds.attrs['long_name'] = 'Intensity'
             ds.attrs['blankname'] = blankname
             ds.attrs['thickness'] = thickness
             ds.attrs['label'] = label
-            ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
             if Kfactor is not None:
                 ds.attrs['Kfactor'] = Kfactor
             if OmegaFactor is not None:
@@ -446,16 +445,16 @@ def saveNXcanSAS(Sample,path, filename):
             # X axis data
             ds = nxdata.create_dataset('Q', data=Q)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['long_name'] = 'Q (A^-1)'
             ds.attrs['resolutions'] = 'Qdev'
-        
+
             # d X axis data
             ds = nxdata.create_dataset('Qdev', data=dQ)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'Q (A^-1)'   
+            ds.attrs['long_name'] = 'Q (A^-1)'
             # dI axis data
             ds = nxdata.create_dataset('Idev', data=Error)
-            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['units'] = units
             ds.attrs['long_name'] = 'Uncertainties'
 
             # NXcanSAS metadata groups for desmeared entry
@@ -495,9 +494,9 @@ def saveNXcanSAS(Sample,path, filename):
 
             # Y axis data
             ds = nxdata.create_dataset('I', data=SMR_Int)
-            ds.attrs['units'] = '1/cm'
+            ds.attrs['units'] = units
             ds.attrs['uncertainties'] = 'Idev'
-            ds.attrs['long_name'] = 'Intensity[cm2/cm3]'    # suggested X axis plot label
+            ds.attrs['long_name'] = f'Intensity{units}'
             ds.attrs['Kfactor'] = Kfactor
             ds.attrs['OmegaFactor'] = OmegaFactor
             ds.attrs['blankname'] = blankname
@@ -507,20 +506,20 @@ def saveNXcanSAS(Sample,path, filename):
             # X axis data
             ds = nxdata.create_dataset('Q', data=SMR_Qvec)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'Q (A^-1)'    # suggested Y axis plot label
+            ds.attrs['long_name'] = 'Q (A^-1)'
             ds.attrs['resolutions'] = 'dQw,dQl'
-        
+
             # d X axis data
             ds = nxdata.create_dataset('dQw', data=SMR_dQ)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'dQw (A^-1)'           
+            ds.attrs['long_name'] = 'dQw (A^-1)'
             # slitlength
             ds = nxdata.create_dataset('dQl', data=slitLength)
             ds.attrs['units'] = '1/angstrom'
-            ds.attrs['long_name'] = 'dQl (A^-1)'   
+            ds.attrs['long_name'] = 'dQl (A^-1)'
             # dI axis data
             ds = nxdata.create_dataset('Idev', data=SMR_Error)
-            ds.attrs['units'] = 'cm2/cm3'
+            ds.attrs['units'] = units
             ds.attrs['long_name'] = 'Uncertainties'
 
             # NXcanSAS metadata groups for SMR entry

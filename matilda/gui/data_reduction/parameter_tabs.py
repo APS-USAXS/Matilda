@@ -190,6 +190,66 @@ class _TechniqueTab(QWidget):
 
         form.addRow("Thickness:", thickness_outer)
 
+    def _setup_calibration_section(self, form: QFormLayout):
+        """Add μ-based thickness and per-gram calibration controls."""
+        self._use_mu = QCheckBox("Use μ for thickness")
+        self._use_mu.setToolTip(
+            "Calculate thickness from measured transmission and\n"
+            "linear absorption coefficient μ:  t = −ln(T) / μ"
+        )
+        form.addRow("", self._use_mu)
+
+        self._mu_spin = QDoubleSpinBox()
+        self._mu_spin.setRange(0.001, 1000.0)
+        self._mu_spin.setValue(12.5)
+        self._mu_spin.setDecimals(3)
+        self._mu_spin.setSuffix("  1/cm")
+        self._mu_spin.setEnabled(False)
+        self._mu_spin.setToolTip(
+            "Linear absorption coefficient from Scattering Contrast Calculator"
+        )
+        form.addRow("μ (1/cm):", self._mu_spin)
+
+        self._per_gram = QCheckBox("Normalize per gram")
+        self._per_gram.setToolTip(
+            "Divide intensity by solid-frame density to get [cm²/g].\n"
+            "Used for powder samples where thickness is not meaningful."
+        )
+        self._per_gram.setEnabled(False)
+        form.addRow("", self._per_gram)
+
+        self._density_spin = QDoubleSpinBox()
+        self._density_spin.setRange(0.001, 25.0)
+        self._density_spin.setValue(2.2)
+        self._density_spin.setDecimals(3)
+        self._density_spin.setSuffix("  g/cm³")
+        self._density_spin.setEnabled(False)
+        self._density_spin.setToolTip("Solid-frame density of the sample material")
+        form.addRow("Density:", self._density_spin)
+
+        # Wiring: use_mu toggles mu_spin and per_gram availability
+        def _on_use_mu_toggled(checked):
+            self._mu_spin.setEnabled(checked)
+            self._per_gram.setEnabled(checked)
+            if not checked:
+                self._per_gram.setChecked(False)
+            # Disable thickness override when using μ
+            self._thickness_override.setEnabled(not checked)
+            if checked:
+                self._thickness_override.setChecked(False)
+
+        self._use_mu.toggled.connect(_on_use_mu_toggled)
+        self._per_gram.toggled.connect(self._density_spin.setEnabled)
+
+    def _get_calibration_params(self) -> dict:
+        """Return calibration-mode parameters."""
+        return {
+            "use_mu":   self._use_mu.isChecked(),
+            "mu":       self._mu_spin.value(),
+            "per_gram": self._per_gram.isChecked(),
+            "density":  self._density_spin.value(),
+        }
+
 
 def _make_tab(technique: str, parent=None) -> _TechniqueTab:
     if technique in ("Flyscan", "StepScan"):
@@ -237,6 +297,7 @@ class _USAXSTab(_TechniqueTab):
 
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
+        self._setup_calibration_section(form)
 
         # ── Min Q ratio (MinQMinFindRatio) ───────────────────────────────────
         self._min_q_ratio = QDoubleSpinBox()
@@ -311,6 +372,7 @@ class _USAXSTab(_TechniqueTab):
             "extrap_method":      self._extrap_method.currentText(),
             "extrap_qstart":      self._extrap_qstart.value(),
             "recalculateAllData": True,
+            **self._get_calibration_params(),
         }
         if self._npts is not None:
             params["npts"] = self._npts.value()
@@ -347,6 +409,7 @@ class _SAXSTab(_TechniqueTab):
 
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
+        self._setup_calibration_section(form)
 
         # ── Output Q points ───────────────────────────────────────────────────
         self._max_pts = QCheckBox("Max number of points")
@@ -406,6 +469,7 @@ class _SAXSTab(_TechniqueTab):
             "az_min":             self._az_min.value(),
             "az_max":             self._az_max.value(),
             "recalculateAllData": True,
+            **self._get_calibration_params(),
         }
 
 
@@ -439,6 +503,7 @@ class _WAXSTab(_TechniqueTab):
 
         # ── Sample thickness (HDF5 default + override) ────────────────────────
         self._setup_thickness_section(form)
+        self._setup_calibration_section(form)
 
         # Placeholder for future parameters
         form.addRow(_separator())
@@ -470,4 +535,5 @@ class _WAXSTab(_TechniqueTab):
             "blank_mode":         self._blank_mode.currentText(),
             "thickness":          self._get_thickness(),
             "recalculateAllData": True,
+            **self._get_calibration_params(),
         }

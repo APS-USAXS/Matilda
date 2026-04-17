@@ -214,7 +214,8 @@ def normalizeByTransmission(Sample):
             }
     return result
     
-def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_override=None):
+def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_override=None,
+                                 use_mu=False, mu=None, per_gram=False, density=None):
     # This is a step where we subtract and calibrate the sample and Blank. 
     Intensity = Sample["reducedData"]["Intensity"]
     BL_Intensity = Sample["BlankData"]["Intensity"]
@@ -302,17 +303,30 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     # now calibration... 
     SDD = Sample["RawData"]["metadata"]['detector_distance']
     UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
-    thickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]['thickness']
+    if use_mu and mu is not None and mu > 0:
+        # Calculate thickness from measured transmission: t = -ln(T) / mu
+        thickness_cm = -np.log(MeasuredTransmission) / mu
+        thickness = thickness_cm * 10  # store as mm for consistency
+    else:
+        thickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]['thickness']
+        thickness_cm = thickness * 0.1  # mm to cm
     BLPeakMax = Sample["BlankData"]["Maximum"]
     blankname = Sample["BlankData"]["blankname"]
     #Igor:	variable SlitLength=0.5*((4*pi)/wavelength)*sin(PhotoDiodeSize/(2*SDDistance))
     slitLength = 0.5*((4*np.pi)/wavelength)*np.sin(UPDSize/(2*SDD))
     OmegaFactor= (UPDSize/SDD)*np.radians(FWHMBlank)
-    Kfactor=BLPeakMax*OmegaFactor*thickness * 0.1 
+    Kfactor=BLPeakMax*OmegaFactor*thickness_cm
     #apply calibration
     SMR_Int =  SMR_Int / (Kfactor*MSAXSCorrection) 
     SMR_Error = SMR_Error/ (Kfactor*MSAXSCorrection) 
-    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absorption well scattering samples. 
+    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absorption well scattering samples.
+    # Per-gram normalization for powder samples
+    if per_gram and density is not None and density > 0:
+        SMR_Int = SMR_Int / density
+        SMR_Error = SMR_Error / density
+        intensity_units = "[cm2/g]"
+    else:
+        intensity_units = "[cm2/cm3]"
     return {"SMR_Qvec":SMR_Qvec,
             "SMR_Int":SMR_Int,
             "SMR_Error":SMR_Error,
@@ -321,7 +335,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
             "blankname":blankname,
             "thickness":thickness,
             "slitLength":slitLength,
-            "units":"[cm2/cm3]",
+            "units":intensity_units,
             "MeasuredTransmission":MeasuredTransmission,
             "MSAXSCorrection":MSAXSCorrection,
             }

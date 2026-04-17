@@ -171,6 +171,10 @@ class ReductionWorker(QThread):
                 extrap_qstart=params.get("extrap_qstart", 0.1),
                 minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
                 thickness_override=params.get("thickness"),
+                use_mu=params.get("use_mu", False),
+                mu=params.get("mu"),
+                per_gram=params.get("per_gram", False),
+                density=params.get("density"),
             )
         elif technique == "StepScan":
             result = processStepscan(
@@ -183,6 +187,10 @@ class ReductionWorker(QThread):
                 extrap_qstart=params.get("extrap_qstart", 0.1),
                 minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
                 thickness_override=params.get("thickness"),
+                use_mu=params.get("use_mu", False),
+                mu=params.get("mu"),
+                per_gram=params.get("per_gram", False),
+                density=params.get("density"),
             )
         elif technique in ("SAXS", "WAXS"):
             result = process2Ddata(
@@ -192,6 +200,10 @@ class ReductionWorker(QThread):
                 recalculateAllData=recalc,
                 npts=params.get("npts"),
                 thickness_override=params.get("thickness"),
+                use_mu=params.get("use_mu", False),
+                mu=params.get("mu"),
+                per_gram=params.get("per_gram", False),
+                density=params.get("density"),
             )
         else:
             raise ValueError(

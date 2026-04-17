@@ -263,6 +263,7 @@ class MatildaReductionWindow(QMainWindow):
         self._worker.progress.connect(self._on_progress)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.file_error.connect(self._on_file_error)
+        self._worker.log_message.connect(self._on_log_message)
         self._worker.blank_auto.connect(self._on_blank_auto)
         self._worker.all_done.connect(self._on_all_done)
         self._worker.start()
@@ -282,6 +283,10 @@ class MatildaReductionWindow(QMainWindow):
         self._status_label.setText(f"Error processing: {fname}")
         # Append to persistent error log so errors are not lost
         self._error_log.appendPlainText(f"[{fname}]  {error}")
+
+    def _on_log_message(self, message: str):
+        """Show converter warnings/errors in the error log panel."""
+        self._error_log.appendPlainText(message)
 
     def _on_all_done(self):
         self._progress.setVisible(False)

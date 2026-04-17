@@ -27,6 +27,20 @@ from matilda.convertSWAXS import process2Ddata
 from matilda.supportFunctions import findProperBlankScan
 
 
+class _SignalHandler(logging.Handler):
+    """Logging handler that emits records via a Qt signal."""
+
+    def __init__(self, signal):
+        super().__init__(level=logging.WARNING)
+        self._signal = signal
+
+    def emit(self, record):
+        try:
+            self._signal.emit(self.format(record))
+        except RuntimeError:
+            pass  # worker already destroyed
+
+
 class ReductionWorker(QThread):
     """Background thread that processes a list of (path, filename) tuples.
 
@@ -42,11 +56,12 @@ class ReductionWorker(QThread):
         Emitted after the last file (or on cancellation).
     """
 
-    progress  = Signal(int, int)         # (current, total)
-    file_done = Signal(str, dict, str)   # (filepath, result, technique)
-    file_error = Signal(str, str)        # (filepath, error_message)
-    blank_auto = Signal(str, str)        # (technique, blank_filename)
-    all_done  = Signal()
+    progress    = Signal(int, int)         # (current, total)
+    file_done   = Signal(str, dict, str)   # (filepath, result, technique)
+    file_error  = Signal(str, str)        # (filepath, error_message)
+    log_message = Signal(str)             # (formatted log message)
+    blank_auto  = Signal(str, str)        # (technique, blank_filename)
+    all_done    = Signal()
 
     def __init__(
         self,
@@ -70,25 +85,34 @@ class ReductionWorker(QThread):
     # ── QThread entry point ───────────────────────────────────────────────────
 
     def run(self):
-        total = len(self._file_list)
-        for i, (path, filename) in enumerate(self._file_list):
-            if self._cancelled:
-                break
+        # Route warnings from converter code to the GUI error log
+        handler = _SignalHandler(self.log_message)
+        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
 
-            filepath  = os.path.join(path, filename)
-            technique = detect_technique(path, filename)
-            params    = self._params.get(technique, {})
-            blank     = self._resolve_blank(technique, path, filename, params)
+        try:
+            total = len(self._file_list)
+            for i, (path, filename) in enumerate(self._file_list):
+                if self._cancelled:
+                    break
 
-            try:
-                result = self._process_one(path, filename, technique, blank, params)
-                self.file_done.emit(filepath, result, technique)
-            except Exception as exc:
-                self.file_error.emit(filepath, str(exc))
+                filepath  = os.path.join(path, filename)
+                technique = detect_technique(path, filename)
+                params    = self._params.get(technique, {})
+                blank     = self._resolve_blank(technique, path, filename, params)
 
-            self.progress.emit(i + 1, total)
+                try:
+                    result = self._process_one(path, filename, technique, blank, params)
+                    self.file_done.emit(filepath, result, technique)
+                except Exception as exc:
+                    self.file_error.emit(filepath, str(exc))
 
-        self.all_done.emit()
+                self.progress.emit(i + 1, total)
+
+            self.all_done.emit()
+        finally:
+            root_logger.removeHandler(handler)
 
     # ── Private helpers ───────────────────────────────────────────────────────
 

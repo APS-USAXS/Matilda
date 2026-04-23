@@ -41,6 +41,7 @@ from .file_tree import FileTreeWidget
 from .parameter_tabs import ParameterTabWidget
 from .graph_panel import GraphPanel
 from .reduction_worker import ReductionWorker
+from .ascii_exporter import AsciiExportWorker
 from .technique_detector import detect_technique
 
 _SESSION_FILE = os.path.expanduser("~/.matilda_gui_session.json")
@@ -55,6 +56,7 @@ class MatildaReductionWindow(QMainWindow):
         self.setWindowTitle(_WINDOW_TITLE)
         self.resize(1400, 860)
         self._worker: ReductionWorker | None = None
+        self._export_worker: AsciiExportWorker | None = None
         self._last_folder: str = os.path.expanduser("~")
         self._build_ui()
         self._restore_session()
@@ -139,6 +141,14 @@ class MatildaReductionWindow(QMainWindow):
         )
         self._btn_process_all.clicked.connect(self._on_process_all)
         bl.addWidget(self._btn_process_all)
+
+        self._btn_export_ascii = QPushButton("📄  Export ASCII from All")
+        self._btn_export_ascii.setToolTip(
+            "Export processed I(Q) data from all HDF5 files to ASCII .dat files.\n"
+            "Files without NXcanSAS data are skipped."
+        )
+        self._btn_export_ascii.clicked.connect(self._on_export_ascii)
+        bl.addWidget(self._btn_export_ascii)
 
         bl.addStretch()
 
@@ -334,8 +344,82 @@ class MatildaReductionWindow(QMainWindow):
     def _on_cancel(self):
         if self._worker:
             self._worker.cancel()
+        if self._export_worker:
+            self._export_worker.cancel()
         self._btn_cancel.setEnabled(False)
         self._status_label.setText("Cancelling after current file…")
+
+    # ── ASCII export ──────────────────────────────────────────────────────────
+
+    def _on_export_ascii(self):
+        all_files = self._file_tree.get_all_files()
+        if not all_files:
+            QMessageBox.information(
+                self, "No files",
+                "No files are visible in the file tree.\n"
+                "Select a folder first (or clear the filter)."
+            )
+            return
+
+        if self._export_worker and self._export_worker.isRunning():
+            QMessageBox.warning(
+                self, "Busy",
+                "An export job is already running.\n"
+                "Please wait or click Cancel."
+            )
+            return
+
+        output_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Select output folder for ASCII files",
+            self._last_folder,
+        )
+        if not output_dir:
+            return
+
+        self._error_log.clear()
+        self._progress.setMaximum(len(all_files))
+        self._progress.setValue(0)
+        self._progress.setVisible(True)
+        self._btn_cancel.setEnabled(True)
+        self._btn_export_ascii.setEnabled(False)
+        self._btn_process_all.setEnabled(False)
+        self._status_label.setText(f"Exporting  0 / {len(all_files)}…")
+
+        self._export_worker = AsciiExportWorker(all_files, output_dir, parent=self)
+        self._export_worker.progress.connect(self._on_export_progress)
+        self._export_worker.file_done.connect(self._on_export_file_done)
+        self._export_worker.file_skipped.connect(self._on_export_file_skipped)
+        self._export_worker.file_error.connect(self._on_export_file_error)
+        self._export_worker.all_done.connect(self._on_export_all_done)
+        self._export_worker.start()
+
+    def _on_export_progress(self, current: int, total: int):
+        self._progress.setValue(current)
+        self._status_label.setText(f"Exporting  {current} / {total}…")
+
+    def _on_export_file_done(self, filename: str, n: int):
+        self._status_label.setText(f"Exported: {filename}  ({n} dataset(s))")
+
+    def _on_export_file_skipped(self, filename: str, reason: str):
+        pass  # silently skip files with no processed data
+
+    def _on_export_file_error(self, filename: str, error: str):
+        self._error_log.appendPlainText(f"[export] {filename}:  {error}")
+
+    def _on_export_all_done(self, n_exported: int, n_skipped: int, n_errored: int):
+        self._progress.setVisible(False)
+        self._btn_cancel.setEnabled(False)
+        self._btn_export_ascii.setEnabled(True)
+        self._btn_process_all.setEnabled(True)
+        if n_errored > 0:
+            self._status_label.setText(
+                f"Export done — {n_exported} file(s) exported, {n_errored} error(s)."
+            )
+        else:
+            self._status_label.setText(
+                f"Export done — {n_exported} file(s) exported."
+            )
 
     # ── HDF5 helpers ──────────────────────────────────────────────────────────
 

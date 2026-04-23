@@ -83,23 +83,69 @@ def _read_str_attr(ds, key: str, default: str = "") -> str:
         return default
 
 
-def _write_dat(output_path: str, Q, I, dI, header_lines: list[str]):
-    """Write Q/I/dI columns to *output_path* with comment header."""
+def _write_dat(output_path: str, Q, I, dI, header_lines: list[str], dQ=None):
+    """Write Q/I/dI[/dQ] columns to *output_path* with comment header."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    has_dI = dI is not None and len(dI) == len(Q)
+    has_dQ = dQ is not None and len(dQ) == len(Q)
     with open(output_path, "w") as f:
         for line in header_lines:
             f.write(f"# {line}\n")
-        f.write(f"# {'Q(1/A)':<18} {'I':>18} {'dI':>18}\n")
-        if dI is not None and len(dI) == len(Q):
-            for q, i, e in zip(Q, I, dI):
-                f.write(f"  {q:18.6e}   {i:18.6e}   {e:18.6e}\n")
+        if has_dQ:
+            f.write(f"# {'Q(1/A)':<18} {'I':>18} {'dI':>18} {'dQ(1/A)':>18}\n")
         else:
-            for q, i in zip(Q, I):
-                f.write(f"  {q:18.6e}   {i:18.6e}   {'0.0':>18}\n")
+            f.write(f"# {'Q(1/A)':<18} {'I':>18} {'dI':>18}\n")
+        for idx, (q, i) in enumerate(zip(Q, I)):
+            e = dI[idx] if has_dI else 0.0
+            if has_dQ:
+                f.write(f"  {q:18.6e}   {i:18.6e}   {e:18.6e}   {dQ[idx]:18.6e}\n")
+            else:
+                f.write(f"  {q:18.6e}   {i:18.6e}   {e:18.6e}\n")
+
+
+def _read_group_data(grp: h5py.Group) -> dict | None:
+    """Read Q, I, dI, dQ from a NXcanSAS group's sasdata subgroup.
+
+    Returns a dict with keys Q, I, dI, dQ, units, blankname, thickness,
+    slit_length, or None if the sasdata sub-group is missing or has no data.
+    dQ key name differs: desmeared uses 'Qdev', SMR uses 'dQw'.
+    slit_length is read from 'dQl' (present in SMR groups only).
+    """
+    sasdata = grp.get("sasdata")
+    if sasdata is None:
+        return None
+
+    Q  = _read_arr(sasdata.get("Q"))
+    I  = _read_arr(sasdata.get("I"))
+    if Q is None or I is None or len(Q) < 2:
+        return None
+
+    dI   = _read_arr(sasdata.get("Idev"))
+    # dQ: 'Qdev' for desmeared/calibrated, 'dQw' for slit-smeared
+    dQ   = _read_arr(sasdata.get("Qdev")) or _read_arr(sasdata.get("dQw"))
+    slit = _read_arr(sasdata.get("dQl"))   # scalar stored as 1-elem array for SMR
+
+    i_ds = sasdata.get("I")
+    return {
+        "Q":          Q,
+        "I":          I,
+        "dI":         dI,
+        "dQ":         dQ,
+        "units":      _read_str_attr(i_ds, "units", "[cm2/cm3]"),
+        "blankname":  _read_str_attr(i_ds, "blankname", ""),
+        "thickness":  i_ds.attrs.get("thickness", "") if i_ds is not None else "",
+        "slit_length": float(slit[0]) if slit is not None and len(slit) > 0 else None,
+    }
 
 
 def export_file(src_path: str, src_filename: str, output_dir: str) -> tuple[int, list[str]]:
     """Export NXcanSAS data from one HDF5 file.
+
+    Priority: desmeared/calibrated data is always exported when present.
+    Slit-smeared (SMR) data is exported only when no desmeared data exists,
+    because SMR data is not directly comparable without knowing the slit length.
+    When SMR is exported, the slit length is included in the header.
+    dQ (Q resolution) is written as a fourth column when available.
 
     Returns (n_exported, list_of_output_paths).
     Returns (0, []) if the file has no NXcanSAS data.
@@ -116,47 +162,57 @@ def export_file(src_path: str, src_filename: str, output_dir: str) -> tuple[int,
         if not groups:
             return 0, []
 
-        for grp_path in groups:
-            grp = f[grp_path]
-            is_smr = "_SMR" in grp_path
+        main_groups = [g for g in groups if "_SMR" not in g]
+        smr_groups  = [g for g in groups if "_SMR" in g]
 
-            # Locate sasdata sub-group
-            sasdata = grp.get("sasdata")
-            if sasdata is None:
+        # ── Export desmeared / calibrated (preferred) ─────────────────────
+        for grp_path in main_groups:
+            data = _read_group_data(f[grp_path])
+            if data is None:
                 continue
-
-            Q  = _read_arr(sasdata.get("Q"))
-            I  = _read_arr(sasdata.get("I"))
-            dI = _read_arr(sasdata.get("Idev"))
-
-            if Q is None or I is None or len(Q) < 2:
-                continue
-
-            # Build header
-            i_ds = sasdata.get("I")
-            units    = _read_str_attr(i_ds, "units", "[cm2/cm3]")
-            blankname = _read_str_attr(i_ds, "blankname", "")
-            thickness = i_ds.attrs.get("thickness", "") if i_ds is not None else ""
 
             header = [
-                f"Matilda ASCII export",
+                "Matilda ASCII export",
                 f"Source: {src_filename}",
                 f"NXcanSAS group: {grp_path}",
-                f"Q units: 1/angstrom",
-                f"I units: {units}",
+                "Q units: 1/angstrom",
+                f"I units: {data['units']}",
             ]
-            if thickness != "":
-                header.append(f"thickness: {float(thickness):.4f} mm")
-            if blankname:
-                header.append(f"blank: {blankname}")
+            if data["thickness"] != "":
+                header.append(f"thickness: {float(data['thickness']):.4f} mm")
+            if data["blankname"]:
+                header.append(f"blank: {data['blankname']}")
 
-            suffix = "_SMR" if is_smr else ""
-            out_name = f"{stem}{suffix}.dat"
-            out_path = os.path.join(output_dir, subfolder, out_name)
-
-            _write_dat(out_path, Q, I, dI, header)
+            out_path = os.path.join(output_dir, subfolder, f"{stem}.dat")
+            _write_dat(out_path, data["Q"], data["I"], data["dI"], header, dQ=data["dQ"])
             outputs.append(out_path)
             n_exported += 1
+
+        # ── Export slit-smeared only when no desmeared data was written ───
+        if n_exported == 0:
+            for grp_path in smr_groups:
+                data = _read_group_data(f[grp_path])
+                if data is None:
+                    continue
+
+                header = [
+                    "Matilda ASCII export (slit-smeared — desmeared data not available)",
+                    f"Source: {src_filename}",
+                    f"NXcanSAS group: {grp_path}",
+                    "Q units: 1/angstrom",
+                    f"I units: {data['units']}",
+                ]
+                if data["slit_length"] is not None:
+                    header.append(f"slit length: {data['slit_length']:.6f} 1/angstrom")
+                if data["thickness"] != "":
+                    header.append(f"thickness: {float(data['thickness']):.4f} mm")
+                if data["blankname"]:
+                    header.append(f"blank: {data['blankname']}")
+
+                out_path = os.path.join(output_dir, subfolder, f"{stem}_SMR.dat")
+                _write_dat(out_path, data["Q"], data["I"], data["dI"], header, dQ=data["dQ"])
+                outputs.append(out_path)
+                n_exported += 1
 
     return n_exported, outputs
 

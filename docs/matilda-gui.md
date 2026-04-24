@@ -157,6 +157,23 @@ Two checkboxes control alternative calibration methods:
 > certain samples), the system falls back to the standard thickness and
 > displays a warning in the error log.
 
+**Calculated μ (after processing):** Whenever data is processed (in any
+mode), the GUI computes μ = −ln(T) / thickness from the actual
+transmission and thickness used, and loads the result into the μ
+spinbox for reference. The spinbox stays disabled (read-only) until
+"Use μ for thickness" is checked. This is informational — useful when
+you want to know the absorption coefficient of the current sample.
+
+#### Transmission override
+
+- **Override transmission** (off by default): Replace the measured
+  diode transmission with a manual value (0–1, dimensionless). Rarely
+  needed — useful when the diode-measured transmission is bad or
+  outside the valid range. The label next to the spinbox shows the
+  transmission value actually used after processing (`used: 0.8523`).
+  An info message is logged to the error panel each time the override
+  is applied. The override persists across files until you uncheck it.
+
 ### Flyscan (USAXS) parameters
 
 | Parameter | Default | Description |
@@ -167,10 +184,29 @@ Two checkboxes control alternative calibration methods:
 | Extrap method | PowerLaw w flat | High-Q extrapolation method for desmearing. Options: PowerLaw w flat, PowerLaw, Flat, Linear. |
 | Extrap Q start | 0.1 Å⁻¹ | Q value above which the extrapolation is applied. |
 
+#### Qmin override (USAXS only)
+
+- **Override Qmin** (off by default): Manually truncate SMR data
+  below a user-specified Q value (in 1/Å). This bypasses the
+  auto-calculated Qmin (which uses Min Q ratio, instrument FWHM,
+  and other experimental factors) and just removes points below the
+  threshold. It is an emergency override for cases where blank
+  subtraction goes bad at low Q and you want to salvage data at
+  higher Q.
+
+  After each processing run, the auto-calculated Qmin from the current
+  dataset is displayed next to the spinbox in grey (`calc'd: 1.234e-04`).
+  When the override is OFF, the spinbox value is automatically seeded
+  with the calculated Qmin so you can see what the auto value is and
+  enable the override to tweak it. When the override is ON, your
+  entered value is preserved across processing runs (the spinbox is
+  not overwritten). The override is automatically unchecked on every
+  file selection because Qmin varies a lot between samples.
+
 ### StepScan (USAXS) parameters
 
-Same as Flyscan except no Output Points control — step scans retain all
-measured points.
+Same as Flyscan (including the Qmin override) except no Output Points
+control — step scans retain all measured points.
 
 ### SAXS parameters
 

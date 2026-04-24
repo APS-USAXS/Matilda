@@ -314,14 +314,18 @@ class _TechniqueTab(QWidget):
         self._mu_thickness_lbl.setText("t = −ln(T)/μ  (process to calculate)")
 
     def update_calculated_mu(self, mu: float | None):
-        """Show the μ value calculated from T and thickness during processing."""
+        """Show the μ value calculated from T and thickness during processing.
+
+        Only seeds the μ spinbox when μ-based mode is OFF (so the user's
+        entered μ in μ-based mode is not silently replaced by the value
+        the converter computed from it).
+        """
         if mu is None or not (0 < mu < 1e6):
             return
-        # Update the spinbox value to the calculated μ for user reference.
-        # Keep it disabled if the user hasn't enabled μ-based mode.
+        if self._use_mu.isChecked():
+            return  # preserve user-entered μ in μ-based mode
         try:
             self._mu_spin.blockSignals(True)
-            # Clamp to spinbox range for safety
             self._mu_spin.setValue(max(self._mu_spin.minimum(),
                                         min(self._mu_spin.maximum(), float(mu))))
         finally:
@@ -512,11 +516,14 @@ class _USAXSTab(_TechniqueTab):
         return params
 
     def update_calculated_qmin(self, qmin: float | None):
-        """Show the auto-calculated Qmin and seed the spinbox value."""
+        """Always show the auto-calculated Qmin; seed the spinbox only when
+        override is OFF so a user-entered value is not silently replaced."""
         if qmin is None or qmin <= 0:
             self._calculated_qmin_lbl.setText("")
             return
         self._calculated_qmin_lbl.setText(f"calc'd: {qmin:.4e}")
+        if self._override_qmin.isChecked():
+            return  # preserve user-entered override value
         try:
             self._qmin_spin.blockSignals(True)
             self._qmin_spin.setValue(max(self._qmin_spin.minimum(),
@@ -525,9 +532,12 @@ class _USAXSTab(_TechniqueTab):
             self._qmin_spin.blockSignals(False)
 
     def reset_per_file_state(self):
-        """Reset per-file display state (called when a new file is selected)."""
+        """Reset per-file display state (called when a new file is selected).
+        Qmin override is unchecked so the calculated Qmin from the new file
+        is what gets used by default (Qmin varies a lot between samples)."""
         super().reset_per_file_state()
         self._calculated_qmin_lbl.setText("")
+        self._override_qmin.setChecked(False)
 
 
 # ── SAXS tab ──────────────────────────────────────────────────────────────────

@@ -57,7 +57,8 @@ from .plotData import plotUSAXSResults
 def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
                      desmear_iter=20, extrap_method='PowerLaw w flat',
                      extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None,
-                     use_mu=False, mu=None, per_gram=False, density=None):
+                     use_mu=False, mu=None, per_gram=False, density=None,
+                     transmission_override=None, qmin_override=None):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
 
     Structurally identical to processFlyscan() (convertFlyscan module) —
@@ -161,7 +162,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
             ):
                 Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
-                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density))
+                Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density, transmission_override=transmission_override, qmin_override=qmin_override))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 

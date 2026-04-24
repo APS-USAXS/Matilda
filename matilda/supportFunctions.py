@@ -215,7 +215,8 @@ def normalizeByTransmission(Sample):
     return result
     
 def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_override=None,
-                                 use_mu=False, mu=None, per_gram=False, density=None):
+                                 use_mu=False, mu=None, per_gram=False, density=None,
+                                 transmission_override=None, qmin_override=None):
     # This is a step where we subtract and calibrate the sample and Blank. 
     Intensity = Sample["reducedData"]["Intensity"]
     BL_Intensity = Sample["BlankData"]["Intensity"]
@@ -257,6 +258,9 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
 
     MeasuredTransmission = ((SaTransCounts/SaTransGain)/(SaI0Counts/SaI0Gain))/((BlTransCounts /BlTransGain )/(BlI0Counts/BlI0Gain))
+    if transmission_override is not None and transmission_override > 0:
+        logging.info(f"Using transmission override {transmission_override:.4f} (measured: {MeasuredTransmission:.4f}).")
+        MeasuredTransmission = float(transmission_override)
     MSAXSCorrection = MeasuredTransmission / PeakToPeakTransmission
     QminSample = 4*np.pi*np.sin(np.radians(FWHMSample)/2)/wavelength
     QminBlank = 4*np.pi*np.sin(np.radians(FWHMBlank)/2)/wavelength
@@ -287,11 +291,24 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         indexRatio = len(IntRatio) # Default to end of array if no such point is found
         logging.warning(f"No points found where IntRatio > {minQMinFindRatio}. Defaulting indexRatio to end of array ({indexRatio}).")
         
-    largest_value = max(indexSample, indexBlank, indexRatio)
+    auto_largest_value = max(indexSample, indexBlank, indexRatio)
+    # Capture the auto-calculated Qmin for display purposes (before any override).
+    if auto_largest_value < len(SMR_Qvec):
+        calculated_qmin = float(SMR_Qvec[auto_largest_value])
+    else:
+        calculated_qmin = None
+
+    # Apply Qmin override (user-supplied truncation in 1/A) if provided.
+    if qmin_override is not None and qmin_override > 0:
+        override_idx = int(np.searchsorted(SMR_Qvec, float(qmin_override)))
+        largest_value = override_idx
+        logging.info(f"Using Qmin override {qmin_override:.4e} 1/A (auto Qmin was {calculated_qmin:.4e}).")
+    else:
+        largest_value = auto_largest_value
     # Ensure the start_index is within bounds and there's data to slice
     if largest_value < len(SMR_Qvec):
-        SMR_Qvec = SMR_Qvec[largest_value:]    
-        SMR_Int = SMR_Int[largest_value:]    
+        SMR_Qvec = SMR_Qvec[largest_value:]
+        SMR_Int = SMR_Int[largest_value:]
         SMR_Error = SMR_Error[largest_value:]
     else:
         # This case means the calculated start index is at or beyond the end of the array
@@ -331,6 +348,12 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         intensity_units = "[cm2/g]"
     else:
         intensity_units = "[cm2/cm3]"
+    # Compute mu from the (possibly overridden) transmission and the
+    # thickness actually used. Useful for display even when not in mu mode.
+    if 0 < MeasuredTransmission < 1 and thickness_cm > 0:
+        calculated_mu = float(-np.log(MeasuredTransmission) / thickness_cm)
+    else:
+        calculated_mu = None
     return {"SMR_Qvec":SMR_Qvec,
             "SMR_Int":SMR_Int,
             "SMR_Error":SMR_Error,
@@ -342,6 +365,8 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
             "units":intensity_units,
             "MeasuredTransmission":MeasuredTransmission,
             "MSAXSCorrection":MSAXSCorrection,
+            "calculated_mu":calculated_mu,
+            "calculated_qmin":calculated_qmin,
             }
 
 

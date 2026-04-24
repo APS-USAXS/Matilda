@@ -199,6 +199,8 @@ class ReductionWorker(QThread):
                 mu=params.get("mu"),
                 per_gram=params.get("per_gram", False),
                 density=params.get("density"),
+                transmission_override=params.get("transmission_override"),
+                qmin_override=params.get("qmin_override"),
             )
         elif technique == "StepScan":
             result = processStepscan(
@@ -215,6 +217,8 @@ class ReductionWorker(QThread):
                 mu=params.get("mu"),
                 per_gram=params.get("per_gram", False),
                 density=params.get("density"),
+                transmission_override=params.get("transmission_override"),
+                qmin_override=params.get("qmin_override"),
             )
         elif technique in ("SAXS", "WAXS"):
             result = process2Ddata(
@@ -228,6 +232,7 @@ class ReductionWorker(QThread):
                 mu=params.get("mu"),
                 per_gram=params.get("per_gram", False),
                 density=params.get("density"),
+                transmission_override=params.get("transmission_override"),
             )
         else:
             raise ValueError(

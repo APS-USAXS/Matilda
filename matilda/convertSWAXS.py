@@ -77,7 +77,8 @@ def _get_integrator(my_poni):
 ## main code here
 def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
                    npts=None, thickness_override=None,
-                   use_mu=False, mu=None, per_gram=False, density=None):
+                   use_mu=False, mu=None, per_gram=False, density=None,
+                   transmission_override=None):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
@@ -135,12 +136,15 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                                         # intensity = Sample["BlankData"]["Intensity"]
                                         # error = Sample["BlankData"]["Error"]
                                         # blankname = Sample["RawData"]["blankname"]
-                Sample["calib2DData"] = calibrateAD2DData(Sample, blank, thickness_override=thickness_override, use_mu=use_mu, mu=mu)
+                Sample["calib2DData"] = calibrateAD2DData(Sample, blank, thickness_override=thickness_override, use_mu=use_mu, mu=mu, transmission_override=transmission_override)
                                     #returns 2D calibrated data
                                         # result = {"data":calib2Ddata,
                                         #           "blankname":blankname,
                                         #           "transmission":transmission
                 Sample["CalibratedData"] = reduceADData(Sample, useRawData=False, npts=npts, per_gram=per_gram, density=density)  #this generates Calibrated 1D data.
+                # Propagate calculated_mu from 2D calibration into CalibratedData
+                # so the GUI can read it from a single, consistent place.
+                Sample["CalibratedData"]["calculated_mu"] = Sample["calib2DData"].get("calculated_mu")
                                         #returns :   
                                         # qcalib= Sample["CalibratedData"]["Q"]
                                         # dqcalib= Sample["CalibratedData"]["dQ"]
@@ -368,7 +372,8 @@ def importADData(path, filename):
             #logging.info(f"Read data")
             return Sample
 
-def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=None):
+def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=None,
+                       transmission_override=None):
     '''
         Here is how we are suppose to process the data:
         Int = Corrfactor / I0 / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
@@ -421,6 +426,9 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
 
     transmission = ((sampleTRDiode / sampleTRDiodeGain) / (sampleTRI0 / sampleTRI0gain)) / ((blankTRDiode / blankTRDiodeGain) / (blankTRI0 / blankTRI0gain))
     #print(f"Transmission: {transmission}")
+    if transmission_override is not None and transmission_override > 0:
+        logging.info(f"Using transmission override {transmission_override:.4f} (measured: {transmission:.4f}).")
+        transmission = float(transmission_override)
     I0s = sampleI0 / sampleI0gain
     I0b = blankI0 / blankI0gain
     #nika also divides by this as solid angle correction:
@@ -439,10 +447,17 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
     #print(f"Sample Thickness: {sampleThickness}, CorrFactor: {corrFactor}, Sample I0: {I0s}, Blank I0: {I0b}")
     calib2Ddata =preFactor*((sample2Ddata/transmission) - (I0s/I0b)*blank2Ddata)
     #Int = Corrfactor / (sampleI0 / sampleI0gain) / SampleThickness * (Sa2D/Transm * -  I0/I0Blank * Blank2D)
-    #Wreturn the calibrated data, Blank name and may be some parameters? 
+    # Compute mu from the (possibly overridden) transmission and the
+    # thickness actually used. Useful for display even when not in mu mode.
+    if 0 < transmission < 1 and thickness_cm > 0:
+        calculated_mu = float(-np.log(transmission) / thickness_cm)
+    else:
+        calculated_mu = None
+    #Wreturn the calibrated data, Blank name and may be some parameters?
     result = {"data":calib2Ddata,
             "blankname":blankname,
-            "transmission":transmission
+            "transmission":transmission,
+            "calculated_mu":calculated_mu,
             }
     return result
     

@@ -216,6 +216,8 @@ class MatildaReductionWindow(QMainWindow):
             self._param_tabs.activate_technique(technique)
             thickness = self._read_hdf5_thickness(path, fname, technique)
             self._param_tabs.update_hdf5_thickness(technique, thickness)
+            # Clear per-file display state (measured T, calculated Qmin)
+            self._param_tabs.reset_per_file_state(technique)
         n = len(selected)
         suffix = (f"  —  detected: {technique}") if n == 1 else ""
         self._status_label.setText(f"{n} file(s) selected{suffix}")
@@ -314,9 +316,24 @@ class MatildaReductionWindow(QMainWindow):
         self._graph.update_curves(result, technique, path=path, filename=fname)
         # Show calculated thickness in the mu label (if mu mode was used)
         cd = result.get("CalibratedData", {})
-        thickness = cd.get("thickness") if cd else None
-        if thickness is not None:
-            self._param_tabs.update_mu_thickness(technique, thickness)
+        if cd:
+            thickness = cd.get("thickness")
+            if thickness is not None:
+                self._param_tabs.update_mu_thickness(technique, thickness)
+            # Push calculated μ from T and thickness into the μ field for reference
+            calc_mu = cd.get("calculated_mu")
+            if calc_mu is not None:
+                self._param_tabs.update_calculated_mu(technique, calc_mu)
+            # Show measured/used transmission next to the override field
+            t_used = cd.get("MeasuredTransmission")
+            if t_used is None:
+                t_used = result.get("calib2DData", {}).get("transmission")
+            if t_used is not None:
+                self._param_tabs.update_measured_transmission(technique, t_used)
+            # USAXS only: show the auto-calculated Qmin
+            calc_qmin = cd.get("calculated_qmin")
+            if calc_qmin is not None:
+                self._param_tabs.update_calculated_qmin(technique, calc_qmin)
 
     def _on_file_error(self, filepath: str, error: str):
         fname = os.path.basename(filepath)

@@ -121,6 +121,30 @@ class ParameterTabWidget(QTabWidget):
             if tab._use_mu.isChecked():
                 tab._mu_thickness_lbl.setText(f"t = {thickness_mm:.4f} mm")
 
+    def update_calculated_mu(self, technique: str, mu: float | None):
+        """Set the μ field on the matching tab to the calculated μ value."""
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "update_calculated_mu"):
+            tab.update_calculated_mu(mu)
+
+    def update_measured_transmission(self, technique: str, t: float | None):
+        """Update the 'used: T' label on the matching tab."""
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "update_measured_transmission"):
+            tab.update_measured_transmission(t)
+
+    def update_calculated_qmin(self, technique: str, qmin: float | None):
+        """Update the 'calc'd: Qmin' label on the matching tab (USAXS only)."""
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "update_calculated_qmin"):
+            tab.update_calculated_qmin(qmin)
+
+    def reset_per_file_state(self, technique: str):
+        """Reset per-file display state when a new file is selected."""
+        tab = self._tabs.get(technique)
+        if tab is not None and hasattr(tab, "reset_per_file_state"):
+            tab.reset_per_file_state()
+
     def get_params(self, technique: str) -> dict:
         """Return reduction parameters for *technique* as a plain dict."""
         tab = self._tabs.get(technique)
@@ -215,7 +239,8 @@ class _TechniqueTab(QWidget):
         self._mu_spin.setSuffix("  1/cm")
         self._mu_spin.setEnabled(False)
         self._mu_spin.setToolTip(
-            "Linear absorption coefficient from Scattering Contrast Calculator"
+            "Linear absorption coefficient from Scattering Contrast Calculator.\n"
+            "Auto-populated after processing from T and thickness for reference."
         )
         mu_row.addWidget(self._mu_spin, 1)
         self._mu_thickness_lbl = QLabel("")
@@ -240,6 +265,27 @@ class _TechniqueTab(QWidget):
         self._density_spin.setToolTip("Solid-frame density of the sample material")
         form.addRow("Density:", self._density_spin)
 
+        # ── Transmission override ─────────────────────────────────────────
+        self._override_transmission = QCheckBox("Override transmission")
+        self._override_transmission.setToolTip(
+            "Replace the measured transmission with a manual value.\n"
+            "Rarely needed — useful when the diode-measured transmission is bad."
+        )
+        form.addRow("", self._override_transmission)
+
+        trans_row = QHBoxLayout()
+        self._transmission_spin = QDoubleSpinBox()
+        self._transmission_spin.setRange(0.0001, 1.0)
+        self._transmission_spin.setValue(0.5)
+        self._transmission_spin.setDecimals(4)
+        self._transmission_spin.setEnabled(False)
+        self._transmission_spin.setToolTip("Manual transmission value (0–1, dimensionless)")
+        trans_row.addWidget(self._transmission_spin, 1)
+        self._measured_t_lbl = QLabel("")
+        self._measured_t_lbl.setStyleSheet("color: grey; font-size: 11px;")
+        trans_row.addWidget(self._measured_t_lbl)
+        form.addRow("Transmission:", trans_row)
+
         form.addRow(_separator())
 
         # Wiring: use_mu toggles mu_spin and per_gram availability
@@ -258,6 +304,7 @@ class _TechniqueTab(QWidget):
         self._use_mu.toggled.connect(_on_use_mu_toggled)
         self._per_gram.toggled.connect(self._density_spin.setEnabled)
         self._mu_spin.valueChanged.connect(lambda _: self._update_mu_thickness())
+        self._override_transmission.toggled.connect(self._transmission_spin.setEnabled)
 
     def _update_mu_thickness(self):
         """Reset the thickness label when μ value changes (actual value shown after processing)."""
@@ -266,13 +313,42 @@ class _TechniqueTab(QWidget):
             return
         self._mu_thickness_lbl.setText("t = −ln(T)/μ  (process to calculate)")
 
+    def update_calculated_mu(self, mu: float | None):
+        """Show the μ value calculated from T and thickness during processing."""
+        if mu is None or not (0 < mu < 1e6):
+            return
+        # Update the spinbox value to the calculated μ for user reference.
+        # Keep it disabled if the user hasn't enabled μ-based mode.
+        try:
+            self._mu_spin.blockSignals(True)
+            # Clamp to spinbox range for safety
+            self._mu_spin.setValue(max(self._mu_spin.minimum(),
+                                        min(self._mu_spin.maximum(), float(mu))))
+        finally:
+            self._mu_spin.blockSignals(False)
+
+    def update_measured_transmission(self, t: float | None):
+        """Show the measured (or used) transmission next to the override field."""
+        if t is None:
+            self._measured_t_lbl.setText("")
+            return
+        self._measured_t_lbl.setText(f"used: {t:.4f}")
+
+    def reset_per_file_state(self):
+        """Reset per-file display state (called when a new file is selected)."""
+        self._measured_t_lbl.setText("")
+
     def _get_calibration_params(self) -> dict:
         """Return calibration-mode parameters."""
         return {
-            "use_mu":   self._use_mu.isChecked(),
-            "mu":       self._mu_spin.value(),
-            "per_gram": self._per_gram.isChecked(),
-            "density":  self._density_spin.value(),
+            "use_mu":              self._use_mu.isChecked(),
+            "mu":                  self._mu_spin.value(),
+            "per_gram":            self._per_gram.isChecked(),
+            "density":             self._density_spin.value(),
+            "transmission_override": (
+                self._transmission_spin.value()
+                if self._override_transmission.isChecked() else None
+            ),
         }
 
 
@@ -337,6 +413,34 @@ class _USAXSTab(_TechniqueTab):
         )
         form.addRow("Min Q ratio:", self._min_q_ratio)
 
+        # ── Manual Qmin override (truncates data below this Q value) ─────────
+        self._override_qmin = QCheckBox("Override Qmin (truncate from below)")
+        self._override_qmin.setToolTip(
+            "Emergency override of the auto-calculated Qmin.\n"
+            "Useful when blank subtraction goes bad at low Q and you want\n"
+            "to salvage data at higher Q values."
+        )
+        form.addRow("", self._override_qmin)
+
+        qmin_row = QHBoxLayout()
+        self._qmin_spin = QDoubleSpinBox()
+        self._qmin_spin.setRange(1e-6, 10.0)
+        self._qmin_spin.setValue(1e-4)
+        self._qmin_spin.setDecimals(6)
+        self._qmin_spin.setSingleStep(1e-5)
+        self._qmin_spin.setSuffix("  1/Å")
+        self._qmin_spin.setEnabled(False)
+        self._qmin_spin.setToolTip(
+            "Manual Qmin: data points with Q below this value are removed."
+        )
+        qmin_row.addWidget(self._qmin_spin, 1)
+        self._calculated_qmin_lbl = QLabel("")
+        self._calculated_qmin_lbl.setStyleSheet("color: grey; font-size: 11px;")
+        qmin_row.addWidget(self._calculated_qmin_lbl)
+        form.addRow("Qmin:", qmin_row)
+
+        self._override_qmin.toggled.connect(self._qmin_spin.setEnabled)
+
         # ── Output points (Flyscan only) ─────────────────────────────────────
         self._npts = None
         if technique == "Flyscan":
@@ -396,12 +500,34 @@ class _USAXSTab(_TechniqueTab):
             "desmear_iter":       self._desmear_iter.value(),
             "extrap_method":      self._extrap_method.currentText(),
             "extrap_qstart":      self._extrap_qstart.value(),
+            "qmin_override":      (
+                self._qmin_spin.value()
+                if self._override_qmin.isChecked() else None
+            ),
             "recalculateAllData": True,
             **self._get_calibration_params(),
         }
         if self._npts is not None:
             params["npts"] = self._npts.value()
         return params
+
+    def update_calculated_qmin(self, qmin: float | None):
+        """Show the auto-calculated Qmin and seed the spinbox value."""
+        if qmin is None or qmin <= 0:
+            self._calculated_qmin_lbl.setText("")
+            return
+        self._calculated_qmin_lbl.setText(f"calc'd: {qmin:.4e}")
+        try:
+            self._qmin_spin.blockSignals(True)
+            self._qmin_spin.setValue(max(self._qmin_spin.minimum(),
+                                         min(self._qmin_spin.maximum(), float(qmin))))
+        finally:
+            self._qmin_spin.blockSignals(False)
+
+    def reset_per_file_state(self):
+        """Reset per-file display state (called when a new file is selected)."""
+        super().reset_per_file_state()
+        self._calculated_qmin_lbl.setText("")
 
 
 # ── SAXS tab ──────────────────────────────────────────────────────────────────

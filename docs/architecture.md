@@ -134,7 +134,7 @@ Key functions: `plotUSAXSResults`, `plotSWAXSResults`
 ### GUI subpackage
 
 **`matilda/gui/sample_plate_setup.py`**
-PyQt6/pyqtgraph GUI tool replacing the Igor Pro "Setup Sample Plates" panel.
+Sample Plate Setup GUI — replaces Igor Pro "Setup Sample Plates".
 
 Launched via:
 ```bash
@@ -142,9 +142,22 @@ matilda-sample-plates        # installed console script
 python -m matilda.gui.sample_plate_setup
 ```
 
-Features: define sample positions, visualise on plate image, export
-Bluesky `.mac` command files, save/load state in HDF5.
-See the module docstring for full feature list.
+Features: plate geometry templates, sample table, clickable plate canvas,
+`.mac` export, EPICS motor survey, HDF5 save/load.
+Full user guide: [docs/sample-plate-setup.md](sample-plate-setup.md).
+
+**`matilda/gui/data_reduction/`**
+Interactive data reduction GUI (USAXS/SAXS/WAXS).
+
+Launched via:
+```bash
+matilda-gui                  # installed console script
+```
+
+Features: file tree with auto blank selection, per-technique parameter tabs
+(thickness, μ-based calibration, per-gram normalisation, Qmin override),
+pyqtgraph dual-axis log-log plot, batch processing, ASCII export.
+Full user guide: [docs/matilda-gui.md](matilda-gui.md).
 
 ---
 
@@ -217,13 +230,17 @@ Matilda/
 │   ├── plotData.py             # Headless JPEG plot export
 │   └── gui/
 │       ├── __init__.py
-│       └── sample_plate_setup.py   # Sample Plate Setup GUI
+│       ├── sample_plate_setup.py   # Sample Plate Setup GUI
+│       └── data_reduction/         # matilda-gui data reduction application
 ├── tests/
 │   ├── __init__.py
 │   └── manual_test.py
 ├── docs/
-│   ├── installation.md         # Environment setup
-│   ├── operations.md           # Service and CLI operations
+│   ├── installation.md         # Conda install for end users
+│   ├── matilda-gui.md          # Data reduction GUI user guide
+│   ├── sample-plate-setup.md   # Sample plate setup GUI user guide
+│   ├── service.md              # Beamline systemd service (staff only)
+│   ├── operations.md           # pynika / pyirena scripting integrations
 │   └── architecture.md         # This file
 ├── matilda_server.service      # systemd user unit file
 ├── serv_matilda.sh             # Service launch script

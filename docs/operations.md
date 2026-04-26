@@ -1,4 +1,11 @@
-# Matilda — Operations Guide
+# Matilda — Scripting Integrations Guide
+
+> **Audience:** Beamline staff who want to enable automatic detector
+> calibration, model fitting, and USAXS+SAXS merging in the daemon.
+>
+> For end-user GUI guides see [matilda-gui.md](matilda-gui.md) and
+> [sample-plate-setup.md](sample-plate-setup.md). For the service itself
+> see [service.md](service.md).
 
 ## Overview
 
@@ -6,126 +13,19 @@ Matilda runs as a 15-second polling loop on `usaxscontrol.xray.aps.anl.gov`.
 Every cycle it queries the Tiled server for new scan data, reduces any new files
 to calibrated I(Q) curves, and saves JPEG summary plots to a web-visible directory.
 
----
+Three optional scripting integrations extend the daemon without any code changes —
+they are activated by configuration files placed in the data folders:
 
-## Running from the command line
-
-All of the following must be run from the repo root with the `matilda` conda
-environment active.
-
-```bash
-cd /home/beams/USAXS/Apps/Matilda
-conda activate matilda
-
-# Option 1 — installed console script (preferred after pip install -e .)
-matilda
-
-# Option 2 — module invocation (equivalent, no install needed beyond pip install -e .)
-python -m matilda.matilda
-```
-
-> **Note:** The old direct-script launch (`python matilda/matilda.py`) no longer
-> works because module imports are now relative.  Use one of the two forms above.
-
-Stop with **Ctrl-C** (KeyboardInterrupt is caught and logged cleanly).
-
----
-
-## Running as a systemd user service
-
-The service is managed by systemd as a **per-user** service — no `sudo` required
-for day-to-day operations.
-
-### Install the service unit (one-time setup)
-
-```bash
-# Copy the unit file to the systemd user config directory
-cp /home/beams/USAXS/Apps/Matilda/matilda_server.service \
-   ~/.config/systemd/user/matilda_server.service
-
-# Tell systemd to read the new file
-systemctl --user daemon-reload
-
-# Enable the service to start automatically at login / after reboot
-systemctl --user enable matilda_server
-```
-
-### Allow the service to survive logout (one-time, requires admin)
-
-By default a user service stops when the user logs out.
-To keep Matilda running continuously:
-
-```bash
-# An administrator must run this once for the USAXS user
-sudo loginctl enable-linger USAXS
-
-# Verify linger is active
-loginctl show-user $USER --property=Linger
-```
-
-### Daily operations
-
-| Action | Command |
-|---|---|
-| Start | `systemctl --user start matilda_server` |
-| Stop | `systemctl --user stop matilda_server` |
-| Restart | `systemctl --user restart matilda_server` |
-| Status | `systemctl --user status matilda_server` |
-| Follow live logs | `journalctl --user -q -f -u matilda_server` |
-| Reload unit file after editing | `systemctl --user daemon-reload` |
-| Enable auto-start | `systemctl --user enable matilda_server` |
-| Disable auto-start | `systemctl --user disable matilda_server` |
-
----
-
-## Log files
-
-Matilda writes a rotating log file.  The location is controlled by the
-`MATILDA_LOG_DIR` environment variable.
-
-| Environment | Log path |
-|---|---|
-| Beamline service | `/share1/log/matilda/matilda.log` |
-| Dev machine (default) | `~/.local/share/matilda/log/matilda.log` |
-| Custom | Set `export MATILDA_LOG_DIR=/your/path` before launching |
-
-The rotating log keeps **4 files × 1 MB = 4 MB maximum** on disk.
-Older entries are automatically discarded when the active log reaches 1 MB.
-
-```bash
-# Tail the live log on the beamline server
-tail -f /share1/log/matilda/matilda.log
-
-# Or via journalctl (also captures stdout/stderr from the service)
-journalctl --user -q -f -u matilda_server
-```
-
-To override the log directory without editing any file, set the environment
-variable before starting Matilda:
-
-```bash
-export MATILDA_LOG_DIR=/my/custom/log
-matilda
-```
-
-For the service, the variable is set in [serv_matilda.sh](../serv_matilda.sh).
-
----
-
-## Configuration
-
-Runtime parameters are constants near the top of `matilda/matilda.py`.
-Edit them and restart the service for changes to take effect.
-
-| Variable | Default | Description |
+| Integration | Trigger | What it does |
 |---|---|---|
-| `imagePath` | `/home/joule/WEBUSAXS/www_live/` | Directory where JPEG summary plots are saved. Set to `None` to disable plotting. |
-| `NumberOfDaysToLookBack` | `1` | How far back (days) to search for new scans. |
-| `NumberOfDaysToLookBackBlanks` | `5` | How far back (days) to search for blank scans. |
-| `NumberOfImagesInGraphs` | `10` | Maximum number of data sets shown in each summary plot. |
-| `CONDA_EXECUTABLE` | `/APSshare/miniconda/x86_64/bin/conda` | Full path to conda — used when invoking pynika and pyirena. |
-| `PYNIKA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pynika` | pynika conda environment used for auto-calibration. |
-| `PYIRENA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pyirena` | pyirena conda environment used for auto-analysis and merging. |
+| **pynika** auto-calibration | Filename contains `AgBehenateLaB6` | Fits detector geometry from the calibrant scan and pushes PONI parameters to EPICS PVs before reducing the file |
+| **pyirena** auto-analysis | `pyirena_config.json` present in a technique folder | Runs model fitting on each newly reduced non-blank file |
+| **pyirena** USAXS+SAXS merge | `merge_config.json` present in the parent data folder | Merges matching USAXS and SAXS I(Q) curves into a single dataset |
+
+---
+
+> For starting / stopping the service, log files, and configuration constants,
+> see [service.md](service.md).
 
 ---
 

@@ -1,5 +1,9 @@
 # Matilda GUI — User Guide
 
+> Other guides: [sample-plate-setup.md](sample-plate-setup.md) |
+> [installation.md](installation.md) | [operations.md](operations.md) |
+> [service.md](service.md)
+
 ## Overview
 
 The Matilda GUI (`matilda-gui`) is a desktop application for interactive
@@ -415,3 +419,12 @@ sessions. This state is stored in `~/.matilda_gui_session.json`.
 - **Comparing results**: Process a file, note the graph, then change
   parameters and process again. The graph clears and redraws with each
   new result.
+
+---
+
+## See also
+
+- [sample-plate-setup.md](sample-plate-setup.md) — prepare sample positions and export Bluesky `.mac` command files
+- [installation.md](installation.md) — conda install instructions
+- [operations.md](operations.md) — pynika auto-calibration, pyirena auto-analysis and merging (daemon only)
+- [service.md](service.md) — beamline systemd service (staff only)

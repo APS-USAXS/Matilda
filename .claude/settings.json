@@ -4,7 +4,13 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(C:/Users/ilavsky/.conda/envs/matilda/python.exe -c \"import ast; [ast.parse\\(open\\(f, encoding='utf-8'\\).read\\(\\)\\) for f in ['c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/ascii_exporter.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/main_window.py']]; print\\('OK'\\)\")",
+      "Bash(C:/Users/ilavsky/.conda/envs/matilda/python.exe -c \"import ast; ast.parse\\(open\\('c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/ascii_exporter.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(C:/Users/ilavsky/.conda/envs/matilda/python.exe -c \"import ast; [ast.parse\\(open\\(f, encoding='utf-8'\\).read\\(\\)\\) for f in ['c:/Users/ilavsky/Documents/Github/Matilda/matilda/supportFunctions.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/convertFlyscan.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/convertUSAXS.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/convertSWAXS.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/reduction_worker.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/parameter_tabs.py', 'c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/main_window.py']]; print\\('All files parse OK'\\)\")",
+      "Bash(C:/Users/ilavsky/.conda/envs/matilda/python.exe -c \"import ast; ast.parse\\(open\\('c:/Users/ilavsky/Documents/Github/Matilda/matilda/gui/data_reduction/parameter_tabs.py', encoding='utf-8'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(git merge *)",
+      "Bash(git branch *)"
     ]
   }
 }

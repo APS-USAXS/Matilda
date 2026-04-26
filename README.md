@@ -17,13 +17,25 @@ beamline staff. End users normally only need the GUIs.
 
 ## Install
 
+**Prerequisites:** [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+and [Git](https://git-scm.com/downloads) must be installed first.
+
 ```bash
-conda create -n matilda python=3.12
+# 1. Clone the repository
+git clone https://github.com/APS-USAXS/Matilda.git
+cd Matilda
+
+# 2. Create the conda environment
+conda env create -f environment.yml
 conda activate matilda
-pip install "matilda[gui] @ git+https://github.com/jilavsky/Matilda.git"
+
+# 3. Install Matilda with GUI dependencies
+pip install -e .[gui]
 ```
 
-Full instructions, including platform notes and developer install, are in
+> **macOS / Linux zsh:** quote the brackets: `pip install -e '.[gui]'`
+
+Full step-by-step instructions (including platform notes) are in
 [docs/installation.md](docs/installation.md).
 
 ---

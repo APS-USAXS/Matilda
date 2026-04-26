@@ -5,161 +5,187 @@ Matilda ships as a Python package with two GUI tools:
 - **matilda-gui** — interactive USAXS/SAXS/WAXS data reduction
 - **matilda-sample-plates** — sample-plate position editor and Bluesky command-file generator
 
-This guide installs both for end users using conda.
+Follow the steps below from the top. Each step builds on the previous one.
 
 ---
 
-## Requirements
+## Step 1 — Install conda
 
-- **Python:** 3.11 or 3.12
-- **conda:** Miniconda or Anaconda
-  ([download Miniconda](https://docs.conda.io/en/latest/miniconda.html))
-- **Operating system:** Linux, macOS, or Windows
-- **Internet access** for downloading dependencies
+Matilda uses conda to manage its Python environment and dependencies. If you
+already have Miniconda or Anaconda installed, skip to Step 2.
 
-You do **not** need beamline access, EPICS, or pyirena/pynika to use the
-GUI tools on your own data.
+**Download Miniconda** (the small, recommended installer):
+https://docs.conda.io/en/latest/miniconda.html
 
----
+Choose the installer for your operating system (Windows, macOS, or Linux)
+and run it. Accept the defaults — there is no need to add conda to PATH
+system-wide; the installer creates a "Miniconda" shortcut / terminal that
+has conda ready to use.
 
-## Quick install (recommended)
-
-```bash
-# 1. Create a fresh conda environment for matilda
-conda create -n matilda python=3.12
-conda activate matilda
-
-# 2. Install matilda with all GUI dependencies, straight from GitHub
-pip install "matilda[gui] @ git+https://github.com/jilavsky/Matilda.git"
-```
-
-That installs the package and the two console scripts:
-
-```bash
-matilda-gui              # data reduction GUI
-matilda-sample-plates    # sample plate setup GUI
-```
-
-> **zsh users (macOS):** quote the bracket expression so the shell does not
-> try to expand it: `pip install "matilda[gui] @ git+https://github.com/jilavsky/Matilda.git"`
+> **Windows users:** after installation, open the
+> **Anaconda Prompt (Miniconda)** from the Start menu for all commands below.
+>
+> **macOS / Linux users:** open a regular terminal. After installation run
+> `conda init` once to enable the `conda activate` command in your shell,
+> then restart the terminal.
 
 ---
 
-## Install from a local clone (developers and beamline staff)
+## Step 2 — Install Git
+
+Git is used to download the Matilda source code. If `git --version` works in
+your terminal, skip to Step 3.
+
+- **Windows:** download from https://git-scm.com/download/win and install
+  with default options.
+- **macOS:** run `xcode-select --install` in a terminal (installs the Xcode
+  command-line tools which include Git), or install via Homebrew: `brew install git`.
+- **Linux:** `sudo apt install git` (Debian/Ubuntu) or
+  `sudo dnf install git` (RHEL/Rocky/Fedora).
+
+---
+
+## Step 3 — Clone the repository
+
+Open a terminal (or Anaconda Prompt on Windows) and choose a folder where
+you want to keep the Matilda source. Then run:
 
 ```bash
-git clone https://github.com/jilavsky/Matilda.git
+git clone https://github.com/APS-USAXS/Matilda.git
 cd Matilda
+```
 
-# Build the conda environment from the pinned spec
+This creates a `Matilda/` folder containing the source code. All remaining
+steps must be run from inside that folder.
+
+---
+
+## Step 4 — Create the conda environment
+
+The repository includes an `environment.yml` file that lists all required
+packages. Create the environment with:
+
+```bash
 conda env create -f environment.yml
-conda activate matilda
-
-# Install matilda in editable mode — pick the right extras:
-pip install -e .[gui]    # GUI tools (data reduction + sample plates)
-pip install -e .         # headless / server only (no GUI)
-pip install -e .[dev]    # adds pytest, pytest-cov
-pip install -e .[all]    # everything
 ```
 
-`environment.yml` pins the conda dependencies (numpy, scipy, h5py, pyFAI,
-matplotlib, requests, tifffile). The `pip install -e .[gui]` step adds
-PySide6, pyqtgraph, and pyepics on top.
+This takes a few minutes on first run (it downloads numpy, scipy, h5py,
+pyFAI, and other packages). You only need to do this once.
 
-> **zsh users (macOS):** quote the bracket expression: `pip install -e '.[gui]'`
-
----
-
-## Updating an existing install
+Activate the new environment:
 
 ```bash
 conda activate matilda
+```
 
-# From a clone:
-git pull
-conda env update -f environment.yml --prune
+Your terminal prompt should now show `(matilda)` at the start.
+
+---
+
+## Step 5 — Install Matilda
+
+With the environment active and the terminal still inside the `Matilda/`
+folder, run:
+
+```bash
 pip install -e .[gui]
-
-# From the GitHub install (no clone):
-pip install --upgrade --force-reinstall \
-    "matilda[gui] @ git+https://github.com/jilavsky/Matilda.git"
 ```
+
+The `-e` flag installs Matilda in **editable mode** — the source folder
+you cloned is the live package, so any future `git pull` updates take
+effect immediately without reinstalling.
+
+The `[gui]` part adds the GUI-specific packages (PySide6 and pyqtgraph).
+
+> **macOS / Linux (zsh shell):** quote the bracket so the shell does not
+> try to interpret it: `pip install -e '.[gui]'`
 
 ---
 
-## Verifying the installation
+## Step 6 — Verify and launch
 
 ```bash
-conda activate matilda
-
-# Print the installed version
+# Confirm the install
 python -c "from importlib.metadata import version; print(version('Matilda'))"
 
-# Quick import check (no network)
-python -c "import matilda; print('OK')"
-
-# Launch the GUIs (close the window when done)
+# Launch the data reduction GUI
 matilda-gui
+
+# Launch the sample plate setup GUI
 matilda-sample-plates
 ```
 
-If the GUIs open, the install is complete.
+If both windows open, the installation is complete.
+
+---
+
+## Updating to a newer version
+
+When a new version of Matilda is released, update your local copy:
+
+```bash
+conda activate matilda
+cd /path/to/Matilda       # the folder you cloned in Step 3
+
+git pull                  # download the latest changes
+conda env update -f environment.yml --prune   # update packages if needed
+pip install -e .[gui]     # reinstall (picks up any new entry points)
+```
+
+> **macOS / Linux (zsh):** `pip install -e '.[gui]'`
 
 ---
 
 ## Console scripts reference
 
-After `pip install`, the following commands are available in the active
-conda environment:
+After Step 5, the following commands are available whenever the `matilda`
+environment is active:
 
-| Command                  | Requires    | Description                                           |
-|--------------------------|-------------|-------------------------------------------------------|
-| `matilda-gui`            | `[gui]`     | Interactive data reduction GUI                        |
-| `matilda-sample-plates`  | `[gui]`     | Sample plate setup GUI (Bluesky `.mac` generator)     |
-| `matilda`                | core        | Headless polling daemon (beamline service only)       |
+| Command | Description |
+|---|---|
+| `matilda-gui` | Interactive data reduction GUI |
+| `matilda-sample-plates` | Sample plate position editor and `.mac` file generator |
+| `matilda` | Headless polling daemon (beamline service only — not needed by end users) |
 
 ---
 
-## Optional: scripting integrations
+## Optional: automatic data analysis integrations
 
-The GUI tools work standalone. If you also want **automatic data analysis
-and merging**, install pyirena and pynika in their own conda environments
-and configure the per-folder `pyirena_config.json` / `merge_config.json`
-files. See [operations.md](operations.md) for details.
+The GUI tools work completely standalone. If you also want **automatic model
+fitting and USAXS+SAXS data merging** (daemon mode only), install pyirena
+and pynika in their own conda environments. See [operations.md](operations.md)
+for details.
 
-| Tool      | Purpose                                                      | Repo                                          |
-|-----------|--------------------------------------------------------------|-----------------------------------------------|
-| pyirena   | Model fitting and USAXS+SAXS data merging                    | https://github.com/jilavsky/pyirena           |
-| pynika    | Detector geometry calibration from AgBehenate / LaB6 standards | https://github.com/jilavsky/pynika           |
-
-These are only used by the **headless daemon** today; the GUIs do not call
-them directly.
+| Tool | Purpose | Repository |
+|---|---|---|
+| pyirena | Model fitting and USAXS+SAXS merging | https://github.com/jilavsky/pyirena |
+| pynika | Detector geometry calibration from calibrant scans | https://github.com/jilavsky/pynika |
 
 ---
 
 ## Beamline server install (USAXS staff only)
 
-For installing the headless daemon on `usaxscontrol.xray.aps.anl.gov`,
-see [service.md](service.md).
+For the headless daemon on `usaxscontrol.xray.aps.anl.gov`, see
+[service.md](service.md).
 
 ---
 
 ## Platform notes
 
-### Linux (RHEL 8 / Rocky 8 / CentOS Stream 8)
+### Windows
 
-PySide6 6.8+ requires GLIBC 2.32; RHEL 8 ships GLIBC 2.28. The pin in
-`pyproject.toml` (`PySide6>=6.4,<6.8`) handles this automatically.
+Use the **Anaconda Prompt (Miniconda)** from the Start menu for all commands.
+PowerShell and regular Command Prompt work too once conda is initialised, but
+the Anaconda Prompt is the easiest starting point.
 
 ### macOS
 
 Do **not** install both PySide6 and PyQt6 in the same environment — they
-conflict ("cocoa platform plugin not found"). The `[gui]` extra installs
-PySide6 only.
+conflict at runtime ("cocoa platform plugin not found"). The `[gui]` extra
+installs PySide6 only, so this is handled automatically.
 
-### Windows
+### Linux (RHEL 8 / Rocky 8 / CentOS Stream 8)
 
-The default conda installation works; no extra steps required. Install
-Miniconda for Windows from
-[docs.conda.io](https://docs.conda.io/en/latest/miniconda.html) if you do
-not already have conda.
+PySide6 6.8+ requires GLIBC 2.32; RHEL 8 ships GLIBC 2.28. The version
+pin in `pyproject.toml` (`PySide6>=6.4,<6.8`) handles this automatically —
+no manual action needed.

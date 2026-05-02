@@ -383,15 +383,20 @@ class GraphPanel(QWidget):
             q_all   = np.concatenate(all_q)
             q_valid = q_all[q_all > 0]
             if len(q_valid) >= 2:
-                xlo_lim = np.log10(float(q_valid.min())) - 1
-                xhi_lim = np.log10(float(q_valid.max())) + 1
+                # Clamp the displayed Qmin to 1e-5 — instrument resolution
+                # cannot reach below ~3e-5, so anything lower is empty space.
+                # SAXS/WAXS natural Qmin is well above this floor.
+                q_lo_view = max(float(q_valid.min()), 1e-5)
+                q_hi_view = float(q_valid.max())
+                xlo_lim = np.log10(q_lo_view) - 1
+                xhi_lim = np.log10(q_hi_view) + 1
                 self._plot.getViewBox().setLimits(xMin=xlo_lim, xMax=xhi_lim)
                 # Also limit the right ViewBox x range
                 self._right_vb.setLimits(xMin=xlo_lim, xMax=xhi_lim)
                 # Set initial X view range
                 self._plot.setXRange(
-                    np.log10(float(q_valid.min())),
-                    np.log10(float(q_valid.max())),
+                    np.log10(q_lo_view),
+                    np.log10(q_hi_view),
                     padding=0.05,
                 )
 

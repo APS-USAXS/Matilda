@@ -210,9 +210,10 @@ class _TechniqueTab(QWidget):
 
         # Row 2: spinbox (disabled until Override is checked)
         self._thickness_spin = QDoubleSpinBox()
-        self._thickness_spin.setRange(0.001, 100.0)
+        self._thickness_spin.setRange(0.0, 50.0)
         self._thickness_spin.setValue(1.0)
         self._thickness_spin.setDecimals(3)
+        self._thickness_spin.setSingleStep(0.02)
         self._thickness_spin.setSuffix("  mm")
         self._thickness_spin.setEnabled(False)
         self._thickness_spin.setToolTip("Custom sample thickness in mm")
@@ -257,9 +258,10 @@ class _TechniqueTab(QWidget):
         form.addRow("", self._per_gram)
 
         self._density_spin = QDoubleSpinBox()
-        self._density_spin.setRange(0.001, 25.0)
+        self._density_spin.setRange(0.0, 30.0)
         self._density_spin.setValue(2.2)
         self._density_spin.setDecimals(3)
+        self._density_spin.setSingleStep(0.02)
         self._density_spin.setSuffix("  g/cm³")
         self._density_spin.setEnabled(False)
         self._density_spin.setToolTip("Solid-frame density of the sample material")
@@ -275,11 +277,12 @@ class _TechniqueTab(QWidget):
 
         trans_row = QHBoxLayout()
         self._transmission_spin = QDoubleSpinBox()
-        self._transmission_spin.setRange(0.0001, 1.0)
+        self._transmission_spin.setRange(0.0, float('inf'))
         self._transmission_spin.setValue(0.5)
         self._transmission_spin.setDecimals(4)
+        self._transmission_spin.setSingleStep(0.05)
         self._transmission_spin.setEnabled(False)
-        self._transmission_spin.setToolTip("Manual transmission value (0–1, dimensionless)")
+        self._transmission_spin.setToolTip("Manual transmission value (0–1, dimensionless; rarely >1 due to amplifier failure)")
         trans_row.addWidget(self._transmission_spin, 1)
         self._measured_t_lbl = QLabel("")
         self._measured_t_lbl.setStyleSheet("color: grey; font-size: 11px;")
@@ -312,6 +315,12 @@ class _TechniqueTab(QWidget):
             self._mu_thickness_lbl.setText("")
             return
         self._mu_thickness_lbl.setText("t = −ln(T)/μ  (process to calculate)")
+
+    def _update_qmin_step(self):
+        """Set Qmin step to 10% of current value."""
+        current = self._qmin_spin.value()
+        if current > 0:
+            self._qmin_spin.setSingleStep(max(current * 0.1, 1e-6))
 
     def update_calculated_mu(self, mu: float | None):
         """Show the μ value calculated from T and thickness during processing.
@@ -406,7 +415,7 @@ class _USAXSTab(_TechniqueTab):
 
         # ── Min Q ratio (MinQMinFindRatio) ───────────────────────────────────
         self._min_q_ratio = QDoubleSpinBox()
-        self._min_q_ratio.setRange(1.00, 2.00)
+        self._min_q_ratio.setRange(0.9, 10.0)
         self._min_q_ratio.setValue(1.05)
         self._min_q_ratio.setDecimals(2)
         self._min_q_ratio.setSingleStep(0.01)
@@ -428,14 +437,14 @@ class _USAXSTab(_TechniqueTab):
 
         qmin_row = QHBoxLayout()
         self._qmin_spin = QDoubleSpinBox()
-        self._qmin_spin.setRange(1e-6, 10.0)
+        self._qmin_spin.setRange(1e-5, 1.0)
         self._qmin_spin.setValue(1e-4)
         self._qmin_spin.setDecimals(6)
-        self._qmin_spin.setSingleStep(1e-5)
         self._qmin_spin.setSuffix("  1/Å")
         self._qmin_spin.setEnabled(False)
         self._qmin_spin.setToolTip(
-            "Manual Qmin: data points with Q below this value are removed."
+            "Manual Qmin: data points with Q below this value are removed.\n"
+            "Step size is 10% of the current value."
         )
         qmin_row.addWidget(self._qmin_spin, 1)
         self._calculated_qmin_lbl = QLabel("")
@@ -444,13 +453,15 @@ class _USAXSTab(_TechniqueTab):
         form.addRow("Qmin:", qmin_row)
 
         self._override_qmin.toggled.connect(self._qmin_spin.setEnabled)
+        self._qmin_spin.valueChanged.connect(self._update_qmin_step)
 
         # ── Output points (Flyscan only) ─────────────────────────────────────
         self._npts = None
         if technique == "Flyscan":
             self._npts = QSpinBox()
-            self._npts.setRange(50, 5000)
+            self._npts.setRange(200, 8000)
             self._npts.setValue(500)
+            self._npts.setSingleStep(100)
             self._npts.setToolTip("Number of output points after rebinning")
             form.addRow("Output points:", self._npts)
 
@@ -459,8 +470,9 @@ class _USAXSTab(_TechniqueTab):
 
         # ── Max iterations ────────────────────────────────────────────────────
         self._desmear_iter = QSpinBox()
-        self._desmear_iter.setRange(1, 500)
+        self._desmear_iter.setRange(10, 100)
         self._desmear_iter.setValue(20)
+        self._desmear_iter.setSingleStep(5)
         self._desmear_iter.setToolTip("Maximum Lake/Strobl desmearing iterations")
         form.addRow("Max iterations:", self._desmear_iter)
 
@@ -472,9 +484,10 @@ class _USAXSTab(_TechniqueTab):
 
         # ── Extrap Q start ────────────────────────────────────────────────────
         self._extrap_qstart = QDoubleSpinBox()
-        self._extrap_qstart.setRange(0.0001, 10.0)
+        self._extrap_qstart.setRange(0.01, 1.0)
         self._extrap_qstart.setValue(0.1)
         self._extrap_qstart.setDecimals(4)
+        self._extrap_qstart.setSingleStep(0.05)
         self._extrap_qstart.setSuffix("  Å⁻¹")
         self._extrap_qstart.setToolTip("Q value above which the extrapolation is applied")
         form.addRow("Extrap Q start:", self._extrap_qstart)
@@ -581,8 +594,9 @@ class _SAXSTab(_TechniqueTab):
         form.addRow("", self._max_pts)
 
         self._npts = QSpinBox()
-        self._npts.setRange(10, 5000)
+        self._npts.setRange(200, 8000)
         self._npts.setValue(200)
+        self._npts.setSingleStep(100)
         self._npts.setToolTip("Number of output Q points for azimuthal integration")
         form.addRow("Output Q points:", self._npts)
 

@@ -94,6 +94,10 @@ class FileTreeWidget(QWidget):
         """Return all visible file items (recursively, respecting filter)."""
         return self._collect_visible_files(self._tree.invisibleRootItem())
 
+    def get_all_files_unfiltered(self) -> list[tuple[str, str]]:
+        """Return ALL file items regardless of filter (for blank detection)."""
+        return self._collect_all_files(self._tree.invisibleRootItem())
+
     def get_blanks(self) -> dict[str, tuple[str, str] | None]:
         """Return current blank assignments."""
         return dict(self._blanks)
@@ -413,4 +417,20 @@ class FileTreeWidget(QWidget):
                 ))
             else:
                 result.extend(self._collect_visible_files(child))
+        return result
+
+    def _collect_all_files(
+        self, parent: QTreeWidgetItem
+    ) -> list[tuple[str, str]]:
+        """Collect all file items regardless of visibility (ignores filter)."""
+        result = []
+        for i in range(parent.childCount()):
+            child = parent.child(i)
+            if child.data(0, _ROLE_IS_FILE):
+                result.append((
+                    child.data(0, _ROLE_PATH),
+                    child.data(0, _ROLE_FILENAME),
+                ))
+            else:
+                result.extend(self._collect_all_files(child))
         return result

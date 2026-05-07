@@ -286,7 +286,8 @@ class MatildaReductionWindow(QMainWindow):
         self._error_log.clear()
         blanks = self._file_tree.get_blanks()
         params = self._param_tabs.get_all_params()
-        all_files = self._file_tree.get_all_files()
+        # Use unfiltered file list for blank detection (filter is only for UI display)
+        all_files = self._file_tree.get_all_files_unfiltered()
 
         self._progress.setMaximum(len(file_list))
         self._progress.setValue(0)

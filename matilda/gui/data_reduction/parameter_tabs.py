@@ -8,10 +8,13 @@ Tabs are always visible; technique detection auto-activates the matching tab.
 
 Thickness handling
 ------------------
-Each tab shows the HDF5 thickness by default (read by main_window.py on
-file selection and pushed via ``update_hdf5_thickness``).  When the
-"Override" checkbox is checked the spinbox becomes enabled and the manually
-entered value is used instead.
+Each tab shows the HDF5 thickness of the last single-clicked file (read
+by main_window.py and pushed via ``update_hdf5_thickness``).  This label
+is for display only.  ``get_params()`` returns the thickness override
+ONLY when the "Override" checkbox is checked — otherwise it returns
+None so the converter reads each file's own /entry/sample/thickness
+during batch processing.  Same pattern is used for transmission and Qmin
+overrides.
 
 Adding new parameters later
 ---------------------------
@@ -178,13 +181,20 @@ class _TechniqueTab(QWidget):
         else:
             self._thickness_hdf5_lbl.setText("HDF5: (not found)")
 
-    def _get_thickness(self) -> float:
-        """Return the effective thickness value."""
+    def _get_thickness(self) -> float | None:
+        """Return the thickness override to pass to the converter.
+
+        Returns None when the user has NOT enabled override — this signals
+        the converter to read each file's own /entry/sample/thickness.
+        Returning the cached _hdf5_thickness here would force every file
+        in a batch to use the thickness of the last single-clicked file
+        (or zero, if that file had no thickness recorded), causing
+        divide-by-zero downstream in calibrateAD2DData / calibrateAndSubtractFlyscan.
+        The cached _hdf5_thickness is used only for the on-screen label.
+        """
         if self._thickness_override.isChecked():
             return self._thickness_spin.value()
-        if self._hdf5_thickness is not None:
-            return self._hdf5_thickness
-        return 1.0   # safe fallback
+        return None
 
     def _setup_thickness_section(self, form: QFormLayout):
         """Add the thickness row (HDF5 label + override checkbox + spinbox)."""

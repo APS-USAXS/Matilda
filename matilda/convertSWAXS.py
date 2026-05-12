@@ -507,23 +507,64 @@ def reduceADData(Sample, useRawData=True, npts=None, per_gram=False, density=Non
         # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
         my_poni = convert_Nika_to_Fit2D(SSD=detector_distance, pix_size=pixel_size1, BCX=BCX, BCY=BCY, HorTilt=HorTilt, VertTilt=VertTilt, wavelength=wavelength)
         #create mask here. Duplicate the my2DData and set all values above 1e7 to NaN for WAXS or for SAXS mask all negative intensities
-        # the differecne is due to Pilatus vs Eiger handing bad pixels differently. Dectris issue... 
+        # the differecne is due to Pilatus vs Eiger handing bad pixels differently. Dectris issue...
+        # Detector geometry has changed over time, so masks branch by detector size (WAXS) or acquisition year (SAXS).
+        # numpy 2-D shape is (rows, cols) — for these detectors rows is the short axis, cols is the long axis.
         if usingWAXS:
-            mask = np.copy(my2DRAWdata)
-            mask = 0*mask   # set all values to zero
-            mask[my2DRAWdata > 1e7] = 1
-            mask[:, 511:516] = 1
-            mask[:, 1026:1041] = 1
-            mask[:, 1551:1556] = 1
+            # WAXS: pick mask by detector size.
+            #   current detector: 512 x 2068 pixels (4-tile, gaps at cols 512/1024/1536)
+            #   old detector:     195 x 981 pixels
+            if my2DRAWdata.shape[0] >= 256:
+                # current WAXS detector
+                mask = np.copy(my2DRAWdata)
+                mask = 0*mask   # set all values to zero
+                mask[my2DRAWdata > 1e7] = 1
+                mask[:, 511:516] = 1
+                mask[:, 1026:1041] = 1
+                mask[:, 1551:1556] = 1
+            else:
+                # old WAXS detector (195 x 981) — TODO: fill in mask values
+                mask = np.copy(my2DRAWdata)
+                mask = 0*mask   # set all values to zero
+                mask[my2DRAWdata > 1e7] = 1
+                mask[my2DRAWdata < 0]   = 1
+                mask[:, 486:494] = 1
+                mask[:, 979:980] = 1
+                mask[0:3, :]     = 1                
+                mask[193:194, :] = 1                
         else:
-            mask = np.copy(my2DRAWdata)
-            mask = 0*mask   # set all values to zero
-            mask[my2DRAWdata < 0] = 1
-            # Set the first 4 rows to 1
-            mask[:, :4] = 1
-            # Set rows 192 to 195 to 1
-            mask[:, 242:245] = 1
+            # SAXS: pick mask by acquisition year.
+            # StartTime format: "2022-12-15 10:48:51.230765" (string from /entry/Metadata).
+            start_time_raw = metadata_dict.get("StartTime", "")
+            if isinstance(start_time_raw, bytes):
+                start_time_raw = start_time_raw.decode("utf-8", errors="replace")
+            try:
+                acquisition_year = int(str(start_time_raw).strip()[:4])
+            except (ValueError, TypeError):
+                acquisition_year = 9999   # unknown → treat as current
 
+            if acquisition_year >= 2023:
+                # current SAXS detector
+                mask = np.copy(my2DRAWdata)
+                mask = 0*mask   # set all values to zero
+                mask[my2DRAWdata < 0]   = 1
+                mask[my2DRAWdata > 1e7] = 1
+                # Set the first 4 rows to 1
+                mask[:, :4] = 1
+                # Set rows 192 to 195 to 1
+                mask[:, 242:245] = 1
+            else:
+                # pre-2023 SAXS detector — TODO: fill in mask values
+                mask = np.copy(my2DRAWdata)
+                mask = 0*mask   # set all values to zero
+                mask[my2DRAWdata < 0]   = 1
+                mask[my2DRAWdata > 1e7] = 1
+                # Set the first 4 rows to 1
+                mask[:, 0:7] = 1
+                # mask few bad points
+                mask[86,17 ] = 1
+                mask[58,112 ] = 1
+                
         #logging.info(f"Finished creating mask")
         
         ai = _get_integrator(my_poni)

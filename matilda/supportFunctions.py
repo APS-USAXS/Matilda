@@ -29,20 +29,29 @@ def importFlyscan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     with h5py.File(path+"/"+filename, 'r') as file:
         #read various data sets
-        #figure out how many points are in AR angles, this has 1 more point that mca data, usually
-        dataset = file['/entry/flyScan/AR_PulsePositions'] 
-        ARangles =  np.ravel(np.array(dataset))
-        num_elements = ARangles.size - 1 
-        ARangles= ARangles[-num_elements:]
-        #time per point
-        dataset = file['/entry/flyScan/mca1'] 
-        TimePerPoint = np.ravel(np.array(dataset))  [-num_elements:]
-        #I0 - Monitor
-        dataset = file['/entry/flyScan/mca2'] 
-        Monitor = np.ravel(np.array(dataset))   [-num_elements:]
-        #UPD
-        dataset = file['/entry/flyScan/mca3'] 
-        UPD_array = np.ravel(np.array(dataset)) [-num_elements:]
+        # mca1/2/3 always contain exactly the number of collected data points — no padding.
+        # Use mca1 length as ground truth, then align ARangles to it.
+        dataset = file['/entry/flyScan/mca1']
+        TimePerPoint = np.ravel(np.array(dataset))
+        dataset = file['/entry/flyScan/mca2']
+        Monitor = np.ravel(np.array(dataset))
+        dataset = file['/entry/flyScan/mca3']
+        UPD_array = np.ravel(np.array(dataset))
+        num_elements = min(len(TimePerPoint), len(Monitor), len(UPD_array))
+
+        # AR_PulsePositions is always 8k-padded with zeros and has one extra leading point.
+        # Strip the leading extra point and trailing zero-padding, then clip to num_elements.
+        dataset = file['/entry/flyScan/AR_PulsePositions']
+        ARangles = np.ravel(np.array(dataset))
+        ARangles = ARangles[1:]                      # skip leading extra point
+        ARangles = np.trim_zeros(ARangles, 'b')      # strip trailing zero-padding
+        num_elements = min(num_elements, len(ARangles))
+
+        # Trim all arrays to the agreed-upon length
+        ARangles     = ARangles[:num_elements]
+        TimePerPoint = TimePerPoint[:num_elements]
+        Monitor      = Monitor[:num_elements]
+        UPD_array    = UPD_array[:num_elements]
         #Arrays for UPD gain changes
         dataset = file['/entry/flyScan/changes_DDPCA300_ampGain'] 
         AmpGain = np.ravel(np.array(dataset))
@@ -77,10 +86,6 @@ def importFlyscan(path, filename):
         sample_group = file['/entry/sample']
         sample_dict = read_group_to_dict(sample_group)
 
-    # Handle known edge case where ARangles has one extra point vs mca arrays
-    if len(ARangles) == len(TimePerPoint) + 1:
-        logging.warning(f"ARangles has one extra point ({len(ARangles)}) vs mca arrays ({len(TimePerPoint)}), removing first point.")
-        ARangles = ARangles[1:]
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
     #Package these results into dictionary
@@ -505,17 +510,18 @@ def calculatePD_Fly(data_dict):
     TimeInSec = TimePerPoint/Frequency
     Totaltime= sum(TimeInSec)
     print(f"{Totaltime}")
+    n_pts = len(TimeInSec)
     for i in range(0, len(Channel)-1, 1):
-        startPnt=Channel[i]
+        startPnt = int(Channel[i])
+        if startPnt >= n_pts:
+            break   # Channel index beyond trimmed data; no more gain changes to mask
         deadtimeName = 'upd_amp_change_mask_time'+str(int(AmpReqGain[i]))
         deadtime = metadata_dict[deadtimeName]
         elapsed = 0
-        indx = int(startPnt)
-        while elapsed < deadtime:
-            elapsed+=TimeInSec[indx]
-            Gains[indx]=np.nan
-            #print("Index is:", indx)
-            #print("elapsed time is:",elapsed) 
+        indx = startPnt
+        while elapsed < deadtime and indx < n_pts:
+            elapsed += TimeInSec[indx]
+            Gains[indx] = np.nan
             indx += 1
 
         #Correct UPD for gains and monitor counts and amplifier gain. 

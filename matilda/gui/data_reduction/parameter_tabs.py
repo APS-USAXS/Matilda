@@ -495,7 +495,7 @@ class _USAXSTab(_TechniqueTab):
         # ── Extrap Q start ────────────────────────────────────────────────────
         self._extrap_qstart = QDoubleSpinBox()
         self._extrap_qstart.setRange(0.01, 1.0)
-        self._extrap_qstart.setValue(0.1)
+        self._extrap_qstart.setValue(0.15)
         self._extrap_qstart.setDecimals(4)
         self._extrap_qstart.setSingleStep(0.05)
         self._extrap_qstart.setSuffix("  Å⁻¹")

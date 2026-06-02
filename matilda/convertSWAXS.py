@@ -117,6 +117,15 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
         
         else:
             Sample = dict()
+            if thickness_override is not None:
+                thick_path = '/entry/sample/thickness'
+                orig_path  = '/entry/sample/thickness_original'
+                if thick_path in hdf_file:
+                    if orig_path not in hdf_file:
+                        hdf_file[orig_path] = hdf_file[thick_path][()]
+                    del hdf_file[thick_path]
+                hdf_file[thick_path] = float(thickness_override)
+                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
             Sample = importADData(path, filename)   #this is for sample path and blank
             if "saxs" in path:
                 plan_name="SAXS"

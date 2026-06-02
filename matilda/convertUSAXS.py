@@ -56,7 +56,7 @@ from .plotData import plotUSAXSResults
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
                      desmear_iter=20, extrap_method='PowerLaw w flat',
-                     extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None,
+                     extrap_qstart=0.15, minQMinFindRatio=1.05, thickness_override=None,
                      use_mu=False, mu=None, per_gram=False, density=None,
                      transmission_override=None, qmin_override=None):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
@@ -142,6 +142,15 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
         
         else:
             Sample = dict()
+            if thickness_override is not None:
+                thick_path = '/entry/instrument/bluesky/metadata/sample_thickness_mm'
+                orig_path  = '/entry/instrument/bluesky/metadata/sample_thickness_mm_original'
+                if thick_path in hdf_file:
+                    if orig_path not in hdf_file:
+                        hdf_file[orig_path] = hdf_file[thick_path][()]
+                    del hdf_file[thick_path]
+                hdf_file[thick_path] = float(thickness_override)
+                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
             Sample["RawData"]=importStepScan(path, filename)                #import data
             Sample["reducedData"]=(createUPDGainsAndBkgErrArrays(Sample))
             Sample["reducedData"].update(CorrectUPDGainsStep(Sample))    # Correct UPD gains=CorrectUPDGainsStep(Sample)    # Correct UPD gains, this is the first step in data reduction

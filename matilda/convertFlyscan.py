@@ -74,7 +74,7 @@ from .desmearing import desmearData
 # If exist and recalculateAllData is False, it will reuse old ones. This is done for plotting.
 def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False,
                     num_points=500, desmear_iter=20, extrap_method='PowerLaw w flat',
-                    extrap_qstart=0.1, minQMinFindRatio=1.05, thickness_override=None,
+                    extrap_qstart=0.15, minQMinFindRatio=1.05, thickness_override=None,
                     use_mu=False, mu=None, per_gram=False, density=None,
                     transmission_override=None, qmin_override=None):
     """Reduce a single USAXS flyscan HDF5 file to calibrated 1-D I(Q).
@@ -166,6 +166,15 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
         
         else:
             Sample = dict()
+            if thickness_override is not None:
+                thick_path = '/entry/sample/thickness'
+                orig_path  = '/entry/sample/thickness_original'
+                if thick_path in hdf_file:
+                    if orig_path not in hdf_file:
+                        hdf_file[orig_path] = hdf_file[thick_path][()]
+                    del hdf_file[thick_path]
+                hdf_file[thick_path] = float(thickness_override)
+                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
             Sample["RawData"]=importFlyscan(path, filename)                         # import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
             Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                

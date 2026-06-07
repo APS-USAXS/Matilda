@@ -128,7 +128,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
 
         NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
         location = None
-        if blankFilename is not None and blankPath is not None:
+        if blankFilename is not None and blankPath is not None and "blank" not in filename.lower():
             location = NXcanSASentry        # require we have desmeared data
         else:
             location = 'entry/QRS_data/'            # all we want here are QRS data

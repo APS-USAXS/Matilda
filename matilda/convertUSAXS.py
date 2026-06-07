@@ -136,7 +136,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
         if location is not None and location in hdf_file:
             # exists, so lets reuse the data from the file
             Sample = dict()
-            Sample = readMyNXcanSAS(path, filename)
+            Sample = readMyNXcanSAS(path, filename, isUSAXS=True)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
         

@@ -748,8 +748,8 @@ def main():
                 logging.info('No new Step scans data found')
             else:
                 #path, filename = ListOfScans[-1]
-                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
-                #listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
+                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                #listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
                 logging.info(f'Got list : {ListOfScans}')
                 logging.info(f'Got blank list : {listOfBlanks}')
                 results = processStepscans(ListOfScans, listOfBlanks)

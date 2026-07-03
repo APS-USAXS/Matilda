@@ -15,6 +15,7 @@ saxs.jpg                          — raw SAXS I vs Q (log-log)
 saxs_cal.jpg                      — calibrated SAXS I vs Q (log-log)
 waxs.jpg                          — raw WAXS I vs Q (linear)
 waxs_cal.jpg                      — calibrated WAXS I vs Q (linear)
+tune_ar.jpg / tune_mr.jpg / tune_a2rp.jpg — live tuning curves (detector vs motor)
 
 GUI transition note
 -------------------
@@ -29,6 +30,7 @@ TODO: plotUSAXSResults has an off-by-one indentation on the second plot
 import matplotlib.pyplot as plt
 import logging
 import os
+import datetime
 
 
 
@@ -331,3 +333,64 @@ def get_usaxs_cal_plot_style():
         "grid": True,
         "font_size": default_plt_font_size  # Assumes default_plt_font_size is defined globally
     }
+
+
+def plotTuneResults(ListOfTuneResults, imagePath, plan_name):
+    """Save a live tuning-curve plot (detector counts vs motor position) to JPEG.
+
+    Overlays the last N tune scans of a single tuning plan on one linear plot,
+    newest-first, using the same tab10 colors and cycling line styles as the
+    other Matilda plots.  Written as ``<plan_name>.jpg`` (tune_ar.jpg,
+    tune_mr.jpg, tune_a2rp.jpg) into *imagePath*.
+
+    Parameters
+    ----------
+    ListOfTuneResults : list of dict
+        Result dicts from convertTune.getTuneResults(). Required keys:
+        'x', 'y' (numpy arrays), 'motor', 'detector', 'scan_id', 'time'.
+    imagePath : str or None
+        Directory to write the JPEG into.  If None, plotting is skipped.
+    plan_name : str
+        Tuning plan name; also the output filename stem (e.g. 'tune_ar').
+    """
+    if imagePath is None:
+        logging.warning("Image path is None, skipping tune plotting.")
+        return
+
+    if not ListOfTuneResults:
+        logging.info(f"No tune data to plot for {plan_name}")
+        return
+
+    logging.info(f"Got {len(ListOfTuneResults)} {plan_name} tune curves to plot")
+
+    # Set the font size to specific size
+    plt.rcParams['font.size'] = default_plt_font_size
+
+    plt.figure(figsize=(6, 6))
+    motor_label = plan_name          # sensible fallbacks if metadata is sparse
+    detector_label = 'Counts'
+    for i, data_dict in enumerate(ListOfTuneResults):
+        x = data_dict["x"]
+        y = data_dict["y"]
+        motor_label = data_dict.get("motor") or motor_label
+        detector_label = data_dict.get("detector") or detector_label
+        # Legend label: scan_id + local HH:MM:SS when available.
+        scan_id = data_dict.get("scan_id")
+        tstamp = data_dict.get("time")
+        if tstamp is not None:
+            timestr = datetime.datetime.fromtimestamp(tstamp).strftime('%H:%M:%S')
+        else:
+            timestr = ""
+        label = f"#{scan_id} {timestr}".strip()
+        plt.plot(x, y, color=PLOT_COLORS[i % 10], linestyle=PLOT_LINESTYLES[i % 4], label=label)
+
+    plt.title(f'Tune: {plan_name}')
+    plt.xlabel(motor_label)
+    plt.ylabel(detector_label)
+    plt.xscale('linear')
+    plt.yscale('linear')
+    plt.grid(True)
+    plt.legend()
+    # Save the plot as a JPEG image named after the plan.
+    plt.savefig(os.path.join(imagePath, f'{plan_name}.jpg'), format='jpg', dpi=300)
+    plt.close()

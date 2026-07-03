@@ -63,12 +63,13 @@ import os
 import subprocess
 
 
-from .readfromtiled import FindLastScanData, FindLastBlankScan
+from .readfromtiled import FindLastScanData, FindLastBlankScan, FindLastTuneScans
 from .convertFlyscan import processFlyscan
 from .convertUSAXS import processStepscan
 from .convertSWAXS import process2Ddata
+from .convertTune import getTuneResults, TUNE_PLAN_NAMES, NumberOfTunesToShow, NumberOfDaysToLookBackTunes
 from .supportFunctions import findProperBlankScan
-from .plotData import plotUSAXSResults, plotSWAXSResults
+from .plotData import plotUSAXSResults, plotSWAXSResults, plotTuneResults
 
 
 #set ImagePath to None to prevent saving images
@@ -720,6 +721,9 @@ def main():
         # analyzed this session.  Bounded like the sets above.
         mergedUSAXSSAXSFiles = set()
         analyzedMergedFiles = set()
+        # Track the uid list of the last-plotted tune scans per plan type so we
+        # only re-download and re-plot when a new tune scan appears.
+        listOfTunesOld = {pn: [] for pn in TUNE_PLAN_NAMES}
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
@@ -790,6 +794,20 @@ def main():
                 plotSWAXSResults(results, imagePath, isSAXS=False)
                 _checkAndRunPyirenaAnalysis(ListOfScans, analyzedWAXSFiles)
                 listOfWAXSOld = ListOfScans
+
+            # Process live tuning scans (tune_ar, tune_mr, tune_a2rp).
+            # These have no HDF5 file; data comes from Tiled only.  Safe against
+            # a missing/offline server: FindLastTuneScans returns [] and we skip.
+            logging.info("Processing the Tune scans")
+            for pn in TUNE_PLAN_NAMES:
+                tuneMeta = FindLastTuneScans(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                uidList = [m["uid"] for m in tuneMeta]
+                if uidList == listOfTunesOld[pn] or len(uidList) == 0:
+                    logging.info(f'No new {pn} tune data found')
+                    continue
+                results = getTuneResults(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                plotTuneResults(results, imagePath, pn)
+                listOfTunesOld[pn] = uidList
 
             logging.info('Sleeping for 15 seconds')
             time.sleep(15)

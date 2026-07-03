@@ -21,9 +21,20 @@ FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1)
     Return the most-recent blank/background scans for a given plan type,
     optionally restricted to a specific file-system path.
 
-All three functions return a list of [hdf5_path, hdf5_file] pairs suitable
+The three functions above return a list of [hdf5_path, hdf5_file] pairs suitable
 for passing to the processXxx() functions in matilda.py.  On network failure
 they return an empty list rather than raising an exception.
+
+FindLastTuneScans(plan_name, NumScans=5, LastNdays=1)
+    Return metadata dicts for the most-recent tuning scans (tune_ar/tune_mr/
+    tune_a2rp).  These carry no HDF5 file; the measured arrays are fetched
+    separately via tiled_get_primary_data().
+
+tiled_get_primary_data(uid)
+    Download the primary data stream (flat dict of column arrays) for one run.
+
+Both tune helpers return empty/None on network failure so the service loop and
+offline installations never crash.
 
 Tiled server
 ------------
@@ -559,6 +570,157 @@ def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
         return []
+
+
+def FindLastTuneScans(plan_name, NumScans=5, LastNdays=1):
+    """Return metadata for the most-recent tuning scans of a given plan type.
+
+    Used by the Matilda service to plot live tuning curves (tune_ar, tune_mr,
+    tune_a2rp).  Unlike FindLastScanData, tune scans do not write HDF5 files;
+    their data lives only in the Tiled/DataBroker catalog and is downloaded
+    separately via tiled_get_primary_data().
+
+    Parameters
+    ----------
+    plan_name : str
+        Tuning plan name, e.g. 'tune_ar', 'tune_mr', 'tune_a2rp'.
+    NumScans : int, optional
+        Maximum number of scans to return (Tiled page[limit]).  Default 5.
+    LastNdays : int, optional
+        Restrict search to the last N days.  0 means all time.  Default 1.
+
+    Returns
+    -------
+    list of dict
+        One dict per scan, newest-first, with keys:
+            'uid'      : str   — run uid (== Tiled id), used to fetch arrays
+            'scan_id'  : int   — Bluesky scan_id (may be None)
+            'time'     : float — POSIX start time (may be None)
+            'motor'    : str   — x-axis motor name (motors[0], may be None)
+            'detector' : str   — y-axis detector name (first non-scaler0, may be None)
+        Returns an empty list on network failure or if the server is absent
+        (offline installations), so the caller never crashes.
+    """
+    # Tune scans carry no hdf5 file; we need scan_id, time, motors and detectors
+    # so the downloader can derive the x-axis (motor) and y-axis (detector) keys.
+    tune_select_metadata = ",".join([
+        "plan_name:start.plan_name",
+        "time:start.time",
+        "scan_id:start.scan_id",
+        "uid:start.uid",
+        "motors:start.motors",
+        "detectors:start.detectors",
+    ])
+
+    end_time = time.time()
+    tz = "US/Central"
+    if LastNdays > 0:
+        start_time = end_time - (LastNdays * 86400)
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"                                          # 0: all matching, must be >0
+            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
+            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
+            f"&filter[time_range][condition][since]={start_time}"               # time range start
+            f"&filter[time_range][condition][until]={end_time}"                 # time range end
+            f"&filter[time_range][condition][timezone]={tz}"                    # time zone
+            "&sort=-time"                                                       # newest first
+            "&fields=metadata"                                                  # return metadata
+            "&omit_links=true"                                                  # no links
+            f"&select_metadata={{{tune_select_metadata}}}"                      # scope metadata
+            )
+    else:
+        uri = (
+            f"http://{server}:{port}"
+            "/api/v1/search"
+            f"/{catalog}"
+            f"?page[limit]={NumScans}"
+            "&filter[eq][condition][key]=plan_name"
+            f'&filter[eq][condition][value]="{plan_name}"'
+            "&sort=-time"
+            "&fields=metadata"
+            "&omit_links=true"
+            f"&select_metadata={{{tune_select_metadata}}}"
+            )
+
+    logging.debug(f"{uri=}")
+    try:
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
+        results = []
+        for v in range(len(r["data"])):
+            uid = r["data"][v]["id"]
+            raw_md = r["data"][v]["attributes"]["metadata"]
+            # usaxscontrol/VM may wrap in ["selected"]; OTZ/current does not.
+            md = raw_md.get("selected", raw_md)
+            motors = md.get("motors") or []
+            detectors = md.get("detectors") or []
+            motor = motors[0] if motors else None
+            # y-axis is the first detector that is not the scaler channel.
+            detector = None
+            for det in detectors:
+                if det and not det.startswith("scaler0"):
+                    detector = det
+                    break
+            results.append({
+                "uid": md.get("uid", uid),
+                "scan_id": md.get("scan_id"),
+                "time": md.get("time"),
+                "motor": motor,
+                "detector": detector,
+            })
+        logging.info(f"Plan name: {plan_name}, found {len(results)} tune scans")
+        return results
+    except Exception:
+        # url communication failed; must not crash the service loop.
+        logging.error(f'Could not get tune data from tiled server at {server}')
+        logging.error(f"Failed {uri=}")
+        return []
+
+
+def tiled_get_primary_data(uid, timeout=TILED_TIMEOUT):
+    """Download the primary data stream (flat dict of arrays) for one run.
+
+    Hits the Tiled 'node/full' endpoint, which returns the actual measured
+    arrays as JSON:
+
+        GET /api/v1/node/full/{catalog}/{uid}/primary/data?format=json
+
+    For a tune scan this returns keys such as
+    {'UPD': [...], 'scaler0_time': [...], 'a_stage_r': [...],
+     'a_stage_r_user_setpoint': [...]}.
+
+    Parameters
+    ----------
+    uid : str
+        Run uid (Tiled id) of the scan.
+    timeout : float, optional
+        Request timeout in seconds.  Default TILED_TIMEOUT.
+
+    Returns
+    -------
+    dict or None
+        Mapping of column name to list of values, or None on failure.  Never
+        raises, so callers on the service loop are safe against a dead server.
+    """
+    uri = (
+        f"http://{server}:{port}"
+        f"/api/v1/node/full/{catalog}/{uid}/primary/data?format=json"
+    )
+    logging.debug(f"{uri=}")
+    try:
+        r = requests.get(uri, timeout=timeout)
+        r.raise_for_status()
+        data = r.json()
+        if isinstance(data, dict):
+            return data
+        logging.error(f"Unexpected primary-data payload for {uid}: not a dict")
+        return None
+    except Exception:
+        logging.error(f'Could not get primary data for {uid} from tiled at {server}')
+        logging.error(f"Failed {uri=}")
+        return None
 
 
 # Example usage of the functions

@@ -809,8 +809,8 @@ def main():
                 plotTuneResults(results, imagePath, pn)
                 listOfTunesOld[pn] = uidList
 
-            logging.info('Sleeping for 15 seconds')
-            time.sleep(15)
+            logging.info('Sleeping for 5 seconds')
+            time.sleep(5)                   #delay between tries to prevent overload 
     except KeyboardInterrupt:
             logging.info('Keyboard interrupt')
 

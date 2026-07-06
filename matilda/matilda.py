@@ -89,8 +89,9 @@ PYIRENA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pyirena'
 _PYIRENA_CONFIG_FILENAME = 'pyirena_config.json'
 # Name of the per-experiment JSON config that triggers USAXS+SAXS merging.
 _MERGE_CONFIG_FILENAME = 'merge_config.json'
-# Subfolder name for merged USAXS+SAXS output files.
-_MERGED_FOLDER_NAME = 'data_usaxs_merged'
+# Suffix appended to the USAXS folder name to form the merged output folder
+# (e.g. OPC_usaxs → OPC_usaxs_merged), matching GUI behaviour.
+_MERGED_FOLDER_SUFFIX = '_merged'
 # Maximum number of (path, filename) entries kept in each per-technique
 # analyzed-files set.  Large enough to cover user transitions without growing
 # without bound.
@@ -366,7 +367,9 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
     merge_key = (usaxs_file, saxs_file)
 
     parent_dir = os.path.dirname(usaxs_path)
-    output_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+    output_folder = os.path.join(
+        parent_dir, os.path.basename(usaxs_path) + _MERGED_FOLDER_SUFFIX
+    )
     os.makedirs(output_folder, exist_ok=True)
 
     logging.info(f"Merging USAXS+SAXS: {usaxs_filename} + {saxs_filename}")
@@ -469,7 +472,9 @@ def _checkAndRunMerge(ListOfScans, technique, merged_set, analyzed_merged_set):
 
         if success:
             # Run pyirena analysis on the merged output if config exists.
-            merged_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+            merged_folder = os.path.join(
+                parent_dir, os.path.basename(usaxs_path) + _MERGED_FOLDER_SUFFIX
+            )
             # The merged file is named after the USAXS (file1) input.
             merged_filename = usaxs_filename
             _runPyirenaAnalysis(merged_folder, merged_filename,

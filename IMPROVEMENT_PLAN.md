@@ -45,9 +45,14 @@ Verification: `py_compile` clean on all modules; functional sanity tests passed 
 - ✅ 1.3 Step-scan transmission pin↔I0 swap fixed in `importStepScan`: diode stream → `trans_pin_*`, I0 stream → `trans_I0_*`. Previously `MeasuredTransmission` was the reciprocal of the intended value. **Validate step-scan transmission & absolute calibration vs Igor.**
 - ✅ 1.4 `getBlankStepscan` now receives the caller's `recalculateAllData` (was hardcoded False) — forced reprocessing invalidates cached blank data.
 
+**2026-07-08 — Phase 2 validation against Igor (JIL):**
+- ✅ Transmissions agree (validates 1.3)
+- ✅ Reduced calibrated data agree (validates the calibration chain end-to-end)
+- ✅ Error estimates agree and error bars match measurement noise (also validates the `/5` factor — same scaling as Igor; item closed)
+- ⚠️ Blank R intensity in Igor is one decade HIGHER than Matilda — consistent with the two programs using different V-to-F frequency constants in the R prefactor. This cancels in calibrated data (Kfactor is anchored to the blank peak maximum measured in the same units), so calibrated results are unaffected. See open frequency item below: the frequency does NOT cancel in the dark-current subtraction term, error background term, or smoothing time windows.
+
 Open Phase 2 items (deliberately NOT changed):
-- ⏳ **Frequency 1e6 vs 1e7**: scaler is 1e7, but the clock signal source must be physically traced at the instrument before unifying (flyscan code uses 1e6). TODO comments added at all three 1e7 sites in convertUSAXS.py. Do not change blindly.
-- ⏳ **`Error = SigmaRwave / 5`** factor in both error calculators — author-intentional approximation, left as is pending review.
+- ⏳ **Frequency 1e6 vs 1e7**: scaler is 1e7, but the clock signal source must be physically traced at the instrument before unifying (flyscan code uses 1e6). TODO comments added at all three 1e7 sites in convertUSAXS.py. Do not change blindly. Data-only cross-check available: sum(TimePerPoint)/candidate_frequency must equal the known wall-clock scan duration — only one candidate will give a sensible time.
 
 Verification: compile clean; `smooth_r_data` exercised with a proper 0-4 index array (incl. NaN masked points) through both the no-smoothing and averaging/fit branches; source-level assertions confirm all four fixes are in place. Full pipeline validation against real HDF5 data still required (⚗️).
 

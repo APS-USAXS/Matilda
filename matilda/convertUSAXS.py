@@ -171,7 +171,9 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                 and blankFilename != filename
                 and "blank" not in filename.lower()
             ):
-                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
+                # pass recalculateAllData through so a forced reprocess also
+                # invalidates the cached blank (was hardcoded False before)
+                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density, transmission_override=transmission_override, qmin_override=qmin_override))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
@@ -290,7 +292,9 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
 def createUPDGainsAndBkgErrArrays(Sample):
     # Create UPD_gains and UPD_bkgErr arrays based on the AmpGain values
     AmpGain = Sample["RawData"]["AmpGain"]
-    Bkg_map = Sample["RawData"]["Bkg_map"]  
+    Bkg_map = Sample["RawData"]["Bkg_map"]
+    # TODO (open, 2026-07-08): 1e7 assumed here (see calculatePDErrorStep note);
+    # verify clock source at the instrument.
     TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # Convert to seconds if needed
     UPD_gains = np.zeros_like(AmpGain, dtype=float)
     UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
@@ -346,6 +350,9 @@ def calculatePDErrorStep(Sample, isBlank=False):
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
+    # TODO (open, 2026-07-08): scaler frequency is 1e7 here, but flyscan code
+    # uses 1e6.  Needs physical trace of the clock signal source at the
+    # instrument before changing anything — do NOT unify blindly.
     Frequency=1e7   #this is frequency of clock fed into mca1
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
@@ -417,10 +424,15 @@ def importStepScan(path, filename):
         USAXSPinT_pinGain = data[0]
         data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_count_time/value']
         USAXSPinT_Time = data[0]
-        metadata_dict['trans_pin_counts'] = USAXSPinT_I0Counts
-        metadata_dict['trans_pin_gain'] = USAXSPinT_I0Gain
-        metadata_dict['trans_I0_counts'] = USAXSPinT_pinCounts
-        metadata_dict['trans_I0_gain'] = USAXSPinT_pinGain
+        # Fix for former pin<->I0 swap: the diode stream goes to trans_pin_*,
+        # the I0 stream to trans_I0_*.  With the old swapped assignment
+        # MeasuredTransmission in calibrateAndSubtractFlyscan computed the
+        # RECIPROCAL of the intended value for step scans.
+        # ⚗️ validate step-scan transmission/calibration against Igor.
+        metadata_dict['trans_pin_counts'] = USAXSPinT_pinCounts
+        metadata_dict['trans_pin_gain'] = USAXSPinT_pinGain
+        metadata_dict['trans_I0_counts'] = USAXSPinT_I0Counts
+        metadata_dict['trans_I0_gain'] = USAXSPinT_I0Gain
         metadata_dict['trans_I0_time'] = USAXSPinT_Time
         data = file['/entry/start_time']
         timeStamp = data[()]
@@ -531,7 +543,7 @@ def CorrectUPDGainsStep(data_dict):
         if background_value is None:
             background_value = 0    # unknown gain: no background subtraction
             unknown_gains.add(float(gain))
-        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # Convert to seconds if needed, here we assume TimePerPoint is in microseconds
+        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # TODO (open): verify 1e7 clock, see calculatePDErrorStep note
     if unknown_gains:
         logging.warning(f"CorrectUPDGainsStep: unknown UPD amplifier gain values "
                         f"{sorted(unknown_gains)}; background set to 0 for those points.")

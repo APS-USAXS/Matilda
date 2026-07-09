@@ -38,7 +38,20 @@ Phase 3 (robustness) — all complete:
 
 Verification: `py_compile` clean on all modules; functional sanity tests passed for `desmearData` (early return + full synthetic run), `find_crossing_index`, `subtract_data` (Y2_min==0), `rebin_QRSdata` (guard + normal path), `extract_number_from_filename`, `_remember_file` FIFO, `save_dict_to_hdf5` (None + overwrite), `readMyNXcanSAS` (SMR keys are None, not tuples), `saveNXcanSAS` (None attrs), `readGenericNXcanSAS` (malformed file); full package imports cleanly with no import-time side effects.
 
-**NEXT: Phase 2 (science fixes ⚗️ — items 1.1, 1.2, 1.3, 1.4, Frequency 1e6/1e7, `/5` error factor) — to be done item by item with access to validation data.** Then Phase 4 (tests + lint), Phase 5 (refactor), Phase 6 (GUI deep review).
+**2026-07-08 — Phase 2 (science fixes ⚗️) DONE**, same branch, except two open items below. ⚗️ **These fixes change numerical results and MUST be validated against Igor/known-good data before deploying:**
+
+- ✅ 1.1 Duplicate `"UPD_gains"` key fixed: `calculatePD_Fly` now returns both `UPD_gainsIndx` (range index 0-4) and `UPD_gains` (gain values); `smooth_r_data` receives the index array (both call sites updated). Additionally the index mapping in `smooth_r_data` was corrected from 1-based to 0-based (ranges are 0-4 in this code base: `DDPCA300_gain0..4`). Behavioral impact: previously every point was smoothed with `times[4]=0.4 s` because gain values never equaled 1-4; now each range gets its intended smoothing time. **Validate flyscan smoothing vs Igor.**
+- ✅ 1.2 `AmpGainReq_array` now filled from `AmpReqGain` (was `AmpGain`) — affects the gain-change/deadtime mask tail.
+- ✅ 1.3 Step-scan transmission pin↔I0 swap fixed in `importStepScan`: diode stream → `trans_pin_*`, I0 stream → `trans_I0_*`. Previously `MeasuredTransmission` was the reciprocal of the intended value. **Validate step-scan transmission & absolute calibration vs Igor.**
+- ✅ 1.4 `getBlankStepscan` now receives the caller's `recalculateAllData` (was hardcoded False) — forced reprocessing invalidates cached blank data.
+
+Open Phase 2 items (deliberately NOT changed):
+- ⏳ **Frequency 1e6 vs 1e7**: scaler is 1e7, but the clock signal source must be physically traced at the instrument before unifying (flyscan code uses 1e6). TODO comments added at all three 1e7 sites in convertUSAXS.py. Do not change blindly.
+- ⏳ **`Error = SigmaRwave / 5`** factor in both error calculators — author-intentional approximation, left as is pending review.
+
+Verification: compile clean; `smooth_r_data` exercised with a proper 0-4 index array (incl. NaN masked points) through both the no-smoothing and averaging/fit branches; source-level assertions confirm all four fixes are in place. Full pipeline validation against real HDF5 data still required (⚗️).
+
+**NEXT: validate Phase 2 against beamline data, resolve frequency question on-site.** Then Phase 4 (tests + lint), Phase 5 (refactor), Phase 6 (GUI deep review).
 
 ---
 

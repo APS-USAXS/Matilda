@@ -189,11 +189,11 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                 Blank["BlankData"].update(calculatePDErrorFly(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
                 Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
                 Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
-                                                        Blank["BlankData"]["Q"], 
-                                                        Blank["BlankData"]["UPD_gains"], 
-                                                        Blank["BlankData"]["Error"], 
+                                                        Blank["BlankData"]["Q"],
+                                                        Blank["BlankData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
+                                                        Blank["BlankData"]["Error"],
                                                         Blank["RawData"]["TimePerPoint"],
-                                                        replaceNans=True )) 
+                                                        replaceNans=True ))
                 # we need to return just the BlankData part 
                 BlankData=dict()
                 BlankData=Blank["BlankData"]
@@ -452,9 +452,12 @@ def calculatePD_Fly(data_dict):
     
         # Create Gains arrays - one for requested and one for real
     I0Gain = metadata_dict["I0Gain"]
-    num_elements = UPD_array.size 
+    num_elements = UPD_array.size
+    # Fill defaults with the LAST recorded change of each array.
+    # (Former bug: AmpGainReq_array was filled from AmpGain, corrupting the
+    # AmpGain == AmpReqGain mask used for gain-change/deadtime masking.)
     AmpGain_array = np.full(num_elements, AmpGain[len(AmpGain)-1])
-    AmpGainReq_array = np.full(num_elements,AmpGain[len(AmpReqGain)-1])
+    AmpGainReq_array = np.full(num_elements, AmpReqGain[len(AmpReqGain)-1])
 
         # Iterate over the Channel array to get index pairs
     for i in range(0, len(Channel)-2, 1):
@@ -558,9 +561,16 @@ def calculatePD_Fly(data_dict):
     # Igor has code to avoid 0 uncertainties. Not needed here, this is recalculated anyway. 
     
     
+    # NOTE (fix for former duplicate-key bug): the dict used to list
+    # "UPD_gains" twice, so GainsIndx was silently dropped and downstream
+    # smoothing received gain VALUES where it expected the range INDEX.
+    #   UPD_gainsIndx — amplifier range index (0-4, from changes_DDPCA300_ampGain),
+    #                   NaN at masked points; used by smooth_r_data.
+    #   UPD_gains     — actual amplifier gain values (V/A, ~1e4-1e12) looked up
+    #                   from DDPCA300_gainN; used by calculatePDErrorFly.
     result = {"Intensity":PD_Intensity,
               "Error":PD_error,
-              "UPD_gains":GainsIndx,
+              "UPD_gainsIndx":GainsIndx,
               "UPD_gains":Gains,
               "UPD_bkgErr":updBkgErr}
     return result
@@ -741,8 +751,14 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     return results
 
 
-def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans=True):
-    # Smoothing times for different ranges
+def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time, replaceNans=True):
+    """Smooth flyscan R data per amplifier range.
+
+    UPD_gainsIndx is the amplifier RANGE INDEX (0-4, from
+    changes_DDPCA300_ampGain; NaN at masked points) — NOT the gain value.
+    Each range has its own minimum smoothing time in rwave_smooth_times.
+    """
+    # Smoothing times for different ranges, indexed by range 0-4
     rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
 
     # Logarithm of intensity
@@ -772,15 +788,21 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
     startIndex = find_crossing_index(qvector, 0.0003)
 
     for i in range(startIndex, len(intensity)):
-        if UPD_gains[i] == 1:
+        # 0-based range index mapping (ranges are 0-4 in this code base:
+        # DDPCA300_gain0..gain4, upd_bkg0..4).  The previous 1-based mapping
+        # never matched because the array held gain VALUES (duplicate-key
+        # bug in calculatePD_Fly) — every point got times[4] = 0.4 s.
+        # ⚗️ validate smoothing against Igor after this change.
+        if UPD_gainsIndx[i] == 0:
             tmp_time = rwave_smooth_times[0]
-        elif UPD_gains[i] == 2:
+        elif UPD_gainsIndx[i] == 1:
             tmp_time = rwave_smooth_times[1]
-        elif UPD_gains[i] == 3:
+        elif UPD_gainsIndx[i] == 2:
             tmp_time = rwave_smooth_times[2]
-        elif UPD_gains[i] == 4:
+        elif UPD_gainsIndx[i] == 3:
             tmp_time = rwave_smooth_times[3]
         else:
+            # range 4, or NaN (masked point)
             tmp_time = rwave_smooth_times[4]
 
         if meas_time_sec[i] > tmp_time:
@@ -795,7 +817,7 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
             if i + end_points > len(intensity) - 1:
                 end_points = len(intensity) - 1 - i
 
-            if (UPD_gains[i - start_points] != UPD_gains[i]) or (UPD_gains[i + end_points] != UPD_gains[i]):
+            if (UPD_gainsIndx[i - start_points] != UPD_gainsIndx[i]) or (UPD_gainsIndx[i + end_points] != UPD_gainsIndx[i]):
                 temp_r = temp_int_log[i - start_points:i + end_points]
                 temp_q = qvector[i - start_points:i + end_points]
 

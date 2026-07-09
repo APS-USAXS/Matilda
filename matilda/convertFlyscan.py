@@ -182,11 +182,11 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
             Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   # Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
-                                                    Sample["reducedData"]["Q"], 
-                                                    Sample["reducedData"]["UPD_gains"], 
-                                                    Sample["reducedData"]["Error"], 
+                                                    Sample["reducedData"]["Q"],
+                                                    Sample["reducedData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
+                                                    Sample["reducedData"]["Error"],
                                                     Sample["RawData"]["TimePerPoint"],
-                                                    replaceNans=True))                 
+                                                    replaceNans=True))
 
             if (
                 blankPath is not None

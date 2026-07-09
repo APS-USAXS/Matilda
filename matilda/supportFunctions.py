@@ -381,7 +381,10 @@ def calculatePDErrorFly(Sample, isBlank=False):
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    Frequency=1e6   #this is frequency of clock fed into mca1
+    # CONFIRMED 2026-07-08 (JIL): flyscan MCA gets a dedicated 1e6 Hz clock;
+    # step scans use the Joerger scaler internal 1e7 Hz clock (convertUSAXS).
+    # Both are correct for their geometry — do not unify.
+    Frequency=1e6   # flyscan MCA clock (mca1 time base)
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
@@ -443,11 +446,9 @@ def calculatePD_Fly(data_dict):
     AmpReqGain = data_dict["RawData"]["AmpReqGain"]
     Channel = data_dict["RawData"]["Channel"]
     metadata_dict = data_dict["RawData"]["metadata"]
-    instrument_dict = data_dict["RawData"]["instrument"]
     UPD_array = data_dict["RawData"]["UPD_array"]
     TimePerPoint = data_dict["RawData"]["TimePerPoint"]
     Monitor = data_dict["RawData"]["Monitor"]
-    VToFFactor = data_dict["RawData"]["VToFFactor"]
 
     
         # Create Gains arrays - one for requested and one for real
@@ -510,7 +511,7 @@ def calculatePD_Fly(data_dict):
             updBkgErr[i] =  metadata_dict[updBkgErrName]
 
         #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
-    Frequency= 1e6      #VToFFactor[0]/10   #this is frequency of clock fed into mca1/10 for HDF5 writer 1.3 and higher
+    Frequency= 1e6      # flyscan MCA clock, confirmed 2026-07-08 (JIL); step scans use 1e7 Joerger clock instead
     TimeInSec = TimePerPoint/Frequency
     Totaltime= sum(TimeInSec)
     logging.debug(f"Total measurement time: {Totaltime} s")
@@ -779,7 +780,7 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time, replace
 
 
     smooth_intensity = np.copy(temp_int_log)
-    meas_time_sec = meas_time/1e6       # meas_time is still frequency, need time in seconds. 
+    meas_time_sec = meas_time/1e6       # convert mca1 counts to seconds; 1e6 Hz flyscan MCA clock (confirmed 2026-07-08)
 
     def linear_fit(x, a, b):
         return a + b * x

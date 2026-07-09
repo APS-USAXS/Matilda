@@ -22,14 +22,14 @@ try:
         QPushButton, QLabel, QLineEdit, QComboBox, QMenu,
     )
     from PySide6.QtCore import Qt, Signal
-    from PySide6.QtGui import QColor, QFont, QBrush
+    from PySide6.QtGui import QColor, QBrush
 except ImportError:
     from PyQt6.QtWidgets import (
         QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
         QPushButton, QLabel, QLineEdit, QComboBox, QMenu,
     )
     from PyQt6.QtCore import Qt, pyqtSignal as Signal
-    from PyQt6.QtGui import QColor, QFont, QBrush
+    from PyQt6.QtGui import QColor, QBrush
 
 from .technique_detector import detect_technique
 

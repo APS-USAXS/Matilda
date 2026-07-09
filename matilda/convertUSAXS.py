@@ -37,16 +37,12 @@ TODO: reduceStepScanToQR and reduceFlyscanToQR mentioned in original header
 import os
 import h5py
 import numpy as np
-from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-import pprint as pp
 import logging
 from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
-from .supportFunctions import beamCenterCorrection, rebinData
+from .supportFunctions import beamCenterCorrection
 from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
-from .supportFunctions import subtract_data
 from .hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from .supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
+from .supportFunctions import normalizeByTransmission
 from .desmearing import desmearData
 from .plotData import plotUSAXSResults
 
@@ -293,9 +289,9 @@ def createUPDGainsAndBkgErrArrays(Sample):
     # Create UPD_gains and UPD_bkgErr arrays based on the AmpGain values
     AmpGain = Sample["RawData"]["AmpGain"]
     Bkg_map = Sample["RawData"]["Bkg_map"]
-    # TODO (open, 2026-07-08): 1e7 assumed here (see calculatePDErrorStep note);
-    # verify clock source at the instrument.
-    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # Convert to seconds if needed
+    # CONFIRMED 2026-07-08 (JIL): 1e7 Hz = Joerger scaler internal clock,
+    # correct for step scans (flyscans use a 1e6 Hz MCA clock instead).
+    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # convert scaler counts to seconds
     UPD_gains = np.zeros_like(AmpGain, dtype=float)
     UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
 
@@ -350,10 +346,11 @@ def calculatePDErrorStep(Sample, isBlank=False):
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    # TODO (open, 2026-07-08): scaler frequency is 1e7 here, but flyscan code
-    # uses 1e6.  Needs physical trace of the clock signal source at the
-    # instrument before changing anything — do NOT unify blindly.
-    Frequency=1e7   #this is frequency of clock fed into mca1
+    # CONFIRMED 2026-07-08 (JIL): the time-base clock differs by geometry.
+    # Step scans count time with the Joerger scaler INTERNAL 1e7 Hz clock;
+    # flyscans use the MCA with a dedicated 1e6 Hz clock source.
+    # 1e7 here and 1e6 in calculatePDErrorFly are BOTH correct — do not unify.
+    Frequency=1e7   # Joerger scaler internal clock (step scans)
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
@@ -543,11 +540,12 @@ def CorrectUPDGainsStep(data_dict):
         if background_value is None:
             background_value = 0    # unknown gain: no background subtraction
             unknown_gains.add(float(gain))
-        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # TODO (open): verify 1e7 clock, see calculatePDErrorStep note
+        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # 1e7 Hz Joerger scaler clock (confirmed, see calculatePDErrorStep)
     if unknown_gains:
         logging.warning(f"CorrectUPDGainsStep: unknown UPD amplifier gain values "
                         f"{sorted(unknown_gains)}; background set to 0 for those points.")
-    #TODO: check 1e7 is correct, elsewhere we use 1e6. 
+    # 1e7 confirmed correct for step scans (Joerger scaler internal clock);
+    # the 1e6 used elsewhere is the flyscan MCA clock — different hardware.
     # Now we can correct UPD_array for background
     # Remove background from UPD_array
     UPD_array_corr = UPD_array - Bckg_corr       

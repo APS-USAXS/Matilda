@@ -27,10 +27,8 @@ import pyqtgraph as pg
 
 try:
     from PySide6.QtWidgets import QFileDialog, QMessageBox
-    from PySide6.QtCore import Qt
 except ImportError:
     from PyQt6.QtWidgets import QFileDialog, QMessageBox
-    from PyQt6.QtCore import Qt
 
 
 # ===========================================================================

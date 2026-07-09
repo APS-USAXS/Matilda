@@ -21,7 +21,6 @@ A "View 2D Image" button appears for SAXS/WAXS files only.
 """
 
 import csv
-import os
 
 import numpy as np
 import pyqtgraph as pg
@@ -31,13 +30,11 @@ try:
         QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     )
     from PySide6.QtCore import Qt, Signal
-    from PySide6.QtGui import QPen
 except ImportError:
     from PyQt6.QtWidgets import (
         QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     )
     from PyQt6.QtCore import Qt, pyqtSignal as Signal
-    from PyQt6.QtGui import QPen
 
 from .sas_plot import make_sas_plot, draw_error_bars
 

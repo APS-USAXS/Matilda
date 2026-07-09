@@ -37,7 +37,6 @@ Notes
 import h5py
 import os
 import numpy as np
-import datetime
 import logging
 from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
 

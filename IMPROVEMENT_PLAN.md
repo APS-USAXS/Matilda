@@ -51,12 +51,23 @@ Verification: `py_compile` clean on all modules; functional sanity tests passed 
 - ✅ Error estimates agree and error bars match measurement noise (also validates the `/5` factor — same scaling as Igor; item closed)
 - ⚠️ Blank R intensity in Igor is one decade HIGHER than Matilda — consistent with the two programs using different V-to-F frequency constants in the R prefactor. This cancels in calibrated data (Kfactor is anchored to the blank peak maximum measured in the same units), so calibrated results are unaffected. See open frequency item below: the frequency does NOT cancel in the dark-current subtraction term, error background term, or smoothing time windows.
 
-Open Phase 2 items (deliberately NOT changed):
-- ⏳ **Frequency 1e6 vs 1e7**: scaler is 1e7, but the clock signal source must be physically traced at the instrument before unifying (flyscan code uses 1e6). TODO comments added at all three 1e7 sites in convertUSAXS.py. Do not change blindly. Data-only cross-check available: sum(TimePerPoint)/candidate_frequency must equal the known wall-clock scan duration — only one candidate will give a sensible time.
+Phase 2 items — RESOLVED:
+- ✅ **Frequency 1e6 vs 1e7 — CONFIRMED CORRECT AS-IS (2026-07-08, JIL)**: the time base differs by geometry. Flyscans use the MCA analyzer with a dedicated 1e6 Hz clock source; step scans use the Joerger scaler internal 1e7 Hz clock. Both constants are right for their geometry and must NOT be unified. Code comments updated at all sites (supportFunctions.py, convertUSAXS.py). The decade offset between Igor and Matilda blank R intensities is a prefactor-convention difference that cancels in calibration. Diagnostic `check_clock_frequency.py` in the project root can re-verify from data.
+- ✅ **`Error = SigmaRwave / 5`** — validated by comparison: error estimates agree with Igor and match measurement noise. Item closed.
 
 Verification: compile clean; `smooth_r_data` exercised with a proper 0-4 index array (incl. NaN masked points) through both the no-smoothing and averaging/fit branches; source-level assertions confirm all four fixes are in place. Full pipeline validation against real HDF5 data still required (⚗️).
 
-**NEXT: validate Phase 2 against beamline data, resolve frequency question on-site.** Then Phase 4 (tests + lint), Phase 5 (refactor), Phase 6 (GUI deep review).
+**2026-07-08 — Phase 4 (tests + lint + CI) DONE**, same branch:
+
+- ✅ **pytest suite** (`tests/`): 50 tests.
+  - Unit tests: `test_support_functions.py` (blank matching, subtraction, rebinning, smoothing with range indices, filename parsing — regression guards for 1.1/1.2/2.3/2.9), `test_desmearing.py` (return signatures 2.1/2.2, synthetic desmear run, all 4 extrapolation methods), `test_hdf5code.py` (None handling 2.8/2.9, tuple bug 1.5, NXcanSAS round trip, malformed files), `test_matilda_helpers.py` (filename regex 1.6, FIFO tracker, partner matching; skips without pyFAI), `test_technique_detector.py` (2.10 metadata path, folder fallbacks).
+  - End-to-end smoke tests (`test_smoke_reduction.py`): full flyscan and step-scan reduction on copies of `TestData/TestSet` files, asserting finite calibrated I(Q) and physically sensible transmission (0 < T < 1 guards against 1.3-class regressions); SAXS test runs where pyFAI is installed. **Result: 48 passed, 2 skipped (pyFAI-dependent, will run in CI).**
+  - `tests/manual_test.py` excluded from collection via `python_files` config.
+- ✅ **ruff** configured in `pyproject.toml` (pyflakes + correctness rules; the ruleset catches the duplicate-dict-key and unused-import classes of bugs from this review). All findings fixed: ~50 unused imports removed (incl. GUI Qt imports in both PySide6/PyQt6 branches), duplicate `beamCenterCorrection` import, 12 unused variables, `rebinData` import moved to its real home (supportFunctions) removing a fragile re-export. E701/E702 (compact one-liner style) deliberately ignored for now. **ruff check: clean.**
+- ✅ `tifffile` removed from dependencies (only referenced from commented-out debug code).
+- ✅ **GitHub Actions CI** (`.github/workflows/ci.yml`): ruff + pytest on Python 3.11/3.12 for pushes and PRs.
+
+**NEXT: Phase 5 (refactor/dedup — safe now that tests exist), Phase 6 (GUI deep review).**
 
 ---
 

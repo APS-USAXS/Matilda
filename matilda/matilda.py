@@ -51,9 +51,6 @@ TODO: add to each processXYZ option to force Blank if Blanks is only one and avo
 '''
 
 import glob as _glob
-import pprint as pp
-import numpy as np
-import socket
 import re
 import time
 import logging

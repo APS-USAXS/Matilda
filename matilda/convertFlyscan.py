@@ -54,15 +54,13 @@ Notes
 * pprint is imported twice (as pprint and as pp); one import is redundant.
 """
 import h5py
-import numpy as np
 import os
-import pprint as pp
 import logging
 #from scipy.optimize import curve_fit
 
 
-from .supportFunctions import subtract_data
-from .convertUSAXS import rebinData
+# rebinData lives in supportFunctions (was imported via convertUSAXS re-export)
+from .supportFunctions import rebinData
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
@@ -292,7 +290,6 @@ def reduceFlyscanToQR(path, filename, recalculateAllData=False):
 
 def test_matildaLocal():
 
-    Sample = dict()
     #does the file exists?
     # e = os.path.isfile("C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/USAXS.h5")
     # if not e:
@@ -307,7 +304,8 @@ def test_matildaLocal():
     samplename="hematite_48C_98min_0050.h5"
     blankPath=samplePath 
     blankFilename="CapillaryBlank_0006.h5"
-    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    
+    # assign to `Sample` if you re-enable the debug plotting below
+    processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)
     #Sample = processFlyscan(samplePath,blankFilename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
     
     # # this is for testing save/restore from Nexus file... 
@@ -350,8 +348,8 @@ def test_matildaLocal():
     # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"] 
     # SMR_Int =Sample["CalibratedData"]["SMR_Int"] 
     # #SMR_Error =Sample["CalibratedData"]["SMR_Error"] 
-    DSM_Qvec =Sample["CalibratedData"]["Q"]
-    DSM_Int =Sample["CalibratedData"]["Intensity"]
+    # DSM_Qvec =Sample["CalibratedData"]["Q"]        # used by debug plot below
+    # DSM_Int =Sample["CalibratedData"]["Intensity"]
     #DSM_Error =Sample["CalibratedData"]["Error"]
     # Debug plot (requires matplotlib; commented out for production):
     # import matplotlib.pyplot as plt

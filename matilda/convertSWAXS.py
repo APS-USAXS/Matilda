@@ -24,15 +24,11 @@
 import numpy as np
 from pyFAI.integrator.azimuthal import AzimuthalIntegrator
 import h5py
-import pprint as pp
-import socket
 import os
-import tifffile as tiff
 import logging
 
-from .supportFunctions import read_group_to_dict, filter_nested_dict, subtract_data
+from .supportFunctions import read_group_to_dict, filter_nested_dict
 from .supportNikaFunctions import convert_Nika_to_Fit2D
-from .readfromtiled import FindLastBlankScan
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 
 # ── Integrator cache ──────────────────────────────────────────────────────────
@@ -129,11 +125,6 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                 hdf_file[thick_path] = float(thickness_override)
                 logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
             Sample = importADData(path, filename)   #this is for sample path and blank
-            if "saxs" in path:
-                plan_name="SAXS"
-            else:
-                plan_name="WAXS"
-
             Sample["reducedData"] = reduceADData(Sample, useRawData=True, npts=npts)   #this generates Int vs Q for raw data plot
                                         # q = Sample["reducedData"]["Q"]
                                         # intensity = Sample["reducedData"]["Intensity"]
@@ -636,10 +627,11 @@ def PlotResults(data_dict):
     #           "Q":np.ravel(qcalib),
     #           "Error":np.ravel(errcalib),
     #           }  
-    Q_red = data_dict["reducedData"]["Q"]
-    Int_red = data_dict["reducedData"]["Intensity"]
-    Q = data_dict["CalibratedData"]["Q"]
-    Intensity = data_dict["CalibratedData"]["Intensity"]
+    pass    # debug-only function; body is fully commented out below
+    # Q_red = data_dict["reducedData"]["Q"]              # used by debug plot below
+    # Int_red = data_dict["reducedData"]["Intensity"]
+    # Q = data_dict["CalibratedData"]["Q"]
+    # Intensity = data_dict["CalibratedData"]["Intensity"]
     # Debug plot (requires matplotlib; commented out for production):
     # import matplotlib.pyplot as plt
     # plt.figure(figsize=(6, 12))

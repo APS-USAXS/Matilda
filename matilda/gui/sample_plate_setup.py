@@ -30,7 +30,6 @@ import re
 import math
 import datetime
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import h5py
@@ -42,12 +41,12 @@ try:
         QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
         QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
         QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
-        QDialogButtonBox, QGroupBox, QSplitter, QStatusBar,
+        QDialogButtonBox, QGroupBox,
         QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
-        QTextEdit, QSizePolicy, QScrollArea,
+        QTextEdit, QScrollArea,
     )
-    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QThread, QObject, QSettings
-    from PySide6.QtGui import QAction, QFont, QColor, QIcon
+    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QSettings
+    from PySide6.QtGui import QFont, QColor
 except ImportError:
     from PyQt6.QtWidgets import (
         QApplication, QMainWindow, QWidget, QTabWidget,
@@ -55,12 +54,11 @@ except ImportError:
         QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
         QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
         QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
-        QDialogButtonBox, QGroupBox, QSplitter, QStatusBar,
-        QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
-        QTextEdit, QSizePolicy, QScrollArea,
+        QDialogButtonBox, QGroupBox, QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
+        QTextEdit, QScrollArea,
     )
-    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QSettings
-    from PyQt6.QtGui import QAction, QFont, QColor, QIcon
+    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSettings
+    from PyQt6.QtGui import QFont, QColor
 
 import pyqtgraph as pg
 
@@ -887,7 +885,6 @@ class SampleTable(QTableWidget):
     def insert_row_above(self):
         r = self._current_row()
         self.insertRow(r)
-        row = SampleRow()
         self.setItem(r, COL_NAME, QTableWidgetItem(""))
         self.setItem(r, COL_SX, QTableWidgetItem(""))
         self.setItem(r, COL_SY, QTableWidgetItem(""))
@@ -2756,7 +2753,6 @@ class SamplePlateSetupWindow(QMainWindow):
             usaxs_retune_time=self._usaxs_retune_spin.value(),
             swaxs_retune_time=self._swaxs_retune_spin.value(),
         )
-        total = max(n_u, n_s, n_w)
         self._runtime_lbl.setText(
             f"USAXS:{n_u} SAXS:{n_s} WAXS:{n_w} | "
             f"Est. time: {t_min} min")

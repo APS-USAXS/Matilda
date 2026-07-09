@@ -35,7 +35,7 @@ dependencies = [
     "pyFAI",
     "requests",
     "scipy",
-    "tifffile",
+    # tifffile removed 2026-07: only referenced from commented-out debug code
 ]
 
 [project.optional-dependencies]
@@ -64,6 +64,7 @@ all = [
     "pyepics",
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [project.scripts]
@@ -84,4 +85,32 @@ packages = ["matilda"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Only collect test_*.py — tests/manual_test.py is a hand-run integration
+# script with hardcoded local paths, not a pytest module.
+python_files = ["test_*.py"]
+
+[tool.ruff]
+# Scratch/example folders are not linted.
+extend-exclude = ["CodeFragments", "IgorExample", "docs"]
+line-length = 200          # legacy code has long lines; do not fight it yet
+
+[tool.ruff.lint]
+# Start with correctness-focused rules (pyflakes + syntax-level pycodestyle).
+# F-rules would have caught the duplicate-dict-key and unused-import issues
+# found in the 2026-07 review.  Style rules can be enabled later.
+select = ["E4", "E7", "E9", "F", "B006"]
+ignore = [
+    "E731",   # lambda assignment — used intentionally in a few places
+    "E741",   # ambiguous variable names (l, I) — common in scattering code (I = intensity)
+    "E701",   # compact one-line if statements — pervasive legacy style; revisit later
+    "E702",   # semicolon-separated statements — pervasive legacy style; revisit later
+]
+
+[tool.ruff.lint.per-file-ignores]
+# supportFunctions re-exports HDF5 helpers for convertUSAXS et al.
+"matilda/supportFunctions.py" = ["F401"]
+# tests import after pytest.importorskip() by design
+"tests/*" = ["E402"]
+# manual_test.py is a template; imports are meant to be used by hand-edits
+"tests/manual_test.py" = ["F401", "E402"]
 

@@ -35,7 +35,6 @@ Notes
 """
 
 from pyFAI.geometry.fit2d import Fit2dGeometry, convert_from_Fit2d
-from pprint import pprint as pp
 import numpy as np
 
 # Fit2D parameter definitions/example

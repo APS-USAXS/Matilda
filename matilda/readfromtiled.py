@@ -57,7 +57,6 @@ the second condition is applied client-side after the response arrives.
 
 # import necessary libraries
 import requests
-import json
 import datetime
 import re
 import time
@@ -168,7 +167,6 @@ def print_results_summary(r):
     Helper used during interactive debugging / development; not called by the
     main processing loop.
     """
-    xref = dict(First=0, Last=-1)
     for k, v in dict(First=0, Last=-1).items():
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled
         #print(md)

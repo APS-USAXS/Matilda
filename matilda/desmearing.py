@@ -19,8 +19,7 @@
 import numpy as np
 import logging
 from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-from scipy.integrate import simpson, trapezoid
+from scipy.integrate import trapezoid
 
 
 

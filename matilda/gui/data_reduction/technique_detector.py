@@ -54,12 +54,15 @@ def _detect_area_detector(full_path: str, folder: str) -> str:
     """Distinguish SAXS vs WAXS by looking for SAXS-specific metadata keys."""
     try:
         with h5py.File(full_path, "r") as f:
-            meta = f.get("/entry/instrument/bluesky/metadata")
-            if meta is not None:
-                if "pin_ccd_tilt_x" in meta or "pin_ccd_center_x_pixel" in meta:
-                    return "SAXS"
-                if "waxs_ccd_center_x" in meta or "waxs_ccd_center_x_pixel" in meta:
-                    return "WAXS"
+            # SAXS/WAXS area-detector files store metadata under /entry/Metadata
+            # (see convertSWAXS.py); check the Bluesky location as fallback.
+            for md_path in ("/entry/Metadata", "/entry/instrument/bluesky/metadata"):
+                meta = f.get(md_path)
+                if meta is not None:
+                    if "pin_ccd_tilt_x" in meta or "pin_ccd_center_x_pixel" in meta:
+                        return "SAXS"
+                    if "waxs_ccd_center_x" in meta or "waxs_ccd_center_x_pixel" in meta:
+                        return "WAXS"
     except Exception:
         pass
 

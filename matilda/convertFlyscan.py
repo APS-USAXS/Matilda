@@ -104,7 +104,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
     extrap_method : str, optional
         High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
     extrap_qstart : float, optional
-        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+        Q value above which extrapolation is applied.  Default 0.15 Å⁻¹.
     minQMinFindRatio : float, optional
         Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
     thickness_override : float or None, optional
@@ -167,6 +167,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
         else:
             Sample = dict()
             if thickness_override is not None:
+                # NOTE: this permanently modifies the raw data file; the
+                # original value is preserved once in *_original.
                 thick_path = '/entry/sample/thickness'
                 orig_path  = '/entry/sample/thickness_original'
                 if thick_path in hdf_file:
@@ -261,12 +263,13 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
 def reduceFlyscanToQR(path, filename, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     location = 'entry/displayData/'
-    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+    with h5py.File(os.path.join(path, filename), 'r+') as hdf_file:
             # Check if the group 'displayData' exists
             if recalculateAllData:
-                # Delete the group
-                del hdf_file[location]
-                logging.info("Deleted existing group 'entry/displayData'.")
+                if location in hdf_file:
+                    # Delete the group only if it exists (first run has none)
+                    del hdf_file[location]
+                    logging.info("Deleted existing group 'entry/displayData'.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file

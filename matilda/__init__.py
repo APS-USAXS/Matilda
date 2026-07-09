@@ -5,7 +5,7 @@ Live data-processing package for the APS USAXS/SAXS/WAXS instrument at
 sector 12-ID-E, Argonne National Laboratory.
 
 Matilda runs as a systemd user service on ``usaxscontrol.xray.aps.anl.gov``.
-Every 15 seconds it polls the Tiled server for new scan data, reduces any
+Every few seconds (5 s sleep between cycles) it polls the Tiled server for new scan data, reduces any
 new files to calibrated 1-D I(Q) curves, optionally runs pynika for
 detector-geometry recalibration, and saves summary JPEG plots to a
 web-visible directory for live monitoring.
@@ -24,7 +24,7 @@ Architecture overview
 Orchestrator
 ~~~~~~~~~~~~
 matilda/matilda.py
-    Main 15-second polling loop.  Queries Tiled, compares lists, dispatches
+    Main polling loop (5 s sleep between cycles).  Queries Tiled, compares lists, dispatches
     to pynika calibration if AgBehenateLaB6 calibrant is detected, then
     calls the processXxx() batch functions and plotXxx() for display.
 

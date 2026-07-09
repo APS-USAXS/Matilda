@@ -47,15 +47,19 @@ Method based on:
     https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
 and mirrors the Igor macro logic for scan selection.
 
-TODO: bare except clauses (lines ~226, ~346, ~425) should be narrowed to
-      'except Exception' to avoid silently swallowing KeyboardInterrupt.
-TODO: debug print() calls should be replaced with logging.debug().
+Note on duplicate filter keys
+-----------------------------
+Tiled accepts only ONE condition per filter type (filter[eq], filter[regex])
+in a query string; a second block with the same key is ignored.  Where two
+conditions of the same type are needed (plan_name + title, or title + path),
+the second condition is applied client-side after the response arrives.
 """
 
 # import necessary libraries
 import requests
 import json
 import datetime
+import re
 import time
 import socket
 import logging
@@ -87,6 +91,9 @@ select_metadata = ",".join([
     "scan_title:start.plan_args.scan_title",
     "hdf5_file:start.hdf5_file",
     "hdf5_path:start.hdf5_path",
+    # exit_status lets convert_results() check run success without an extra
+    # per-uid metadata request (was an N+1 HTTP pattern before).
+    "exit_status:stop.exit_status",
 ])
 
 def tiled_get(
@@ -194,7 +201,13 @@ def convert_results(r):
         uid = r["data"][v]["id"]
         raw_md = r["data"][v]["attributes"]["metadata"]
         md = raw_md.get("selected", raw_md)   # usaxscontrol/VM has ["selected"]; OTZ does not
-        success = successful_run(uid)
+        # Prefer exit_status delivered with the search results (via
+        # select_metadata); fall back to a per-uid request only when absent.
+        exit_status = md.get("exit_status")
+        if exit_status is not None:
+            success = (exit_status == "success")
+        else:
+            success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
             tempPlanName=md["plan_name"]
@@ -233,10 +246,13 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
     list of [str, str]
         [hdf5_path, hdf5_file] pairs, empty list on network failure.
 
-    TODO: the two filter[eq] blocks for plan_name and title share the same
-          Tiled filter key — the second silently overwrites the first.
-          This is a known Tiled API quirk; the title filter may not work.
-    TODO: debug print(uri) on line ~217 should be logging.debug().
+    Notes
+    -----
+    The title match is applied CLIENT-SIDE: Tiled ignores a second
+    filter[eq] block with the same condition key, so only the plan_name
+    filter is sent to the server and the title is matched here.  Because
+    page[limit] applies before the client-side filter, fewer than NumScans
+    results may be returned when many scans share the plan but not the title.
     """
     #this filters for specific time AND for specific plan_name
     # select_metadata = ",".join([
@@ -262,8 +278,6 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&filter[eq][condition][key]=title"                                 # filter by title
-            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
             f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
             f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
             f"&filter[time_range][condition][timezone]={tz}"                    # time range
@@ -283,8 +297,6 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
             f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
             "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
             f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&filter[eq][condition][key]=title"                                 # filter by title
-            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
             "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
             "&fields=metadata"                                                  # return metadata
             "&omit_links=true"                                                  # no links
@@ -308,9 +320,16 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
     logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
-        #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
+        # Client-side title filter (see Notes in docstring): keep only runs
+        # whose scan_title matches exactly.
+        filtered = []
+        for entry in r.get("data", []):
+            raw_md = entry["attributes"]["metadata"]
+            md = raw_md.get("selected", raw_md)
+            if md.get("scan_title") == scan_title:
+                filtered.append(entry)
+        r["data"] = filtered
         ScanList = convert_results(r)
-        #ScanList=[]
         logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
@@ -334,7 +353,11 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
         Bluesky plan name (e.g. 'Flyscan', 'SAXS', 'WAXS', 'uascan').
     path : str or None, optional
         If provided, additionally filter by hdf5_path matching this string
-        (regex-matched by Tiled).  Default None (no path restriction).
+        (regex, applied CLIENT-SIDE — Tiled ignores a second filter[regex]
+        block with the same condition key, so the title regex is sent to the
+        server and the path is matched here).  Default None (no restriction).
+        Note: page[limit] applies before the client-side filter, so fewer
+        than NumScans results may be returned.
     NumScans : int, optional
         Maximum number of blank scans to return.  Default 1.
     lastNdays : int, optional
@@ -345,8 +368,6 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
     -------
     list of [str, str]
         [hdf5_path, hdf5_file] pairs, empty list on network failure.
-
-    TODO: debug print(uri) should be logging.debug().
     """
     #this filters for last collected Blank for specific plan_name
     if path is None:
@@ -417,8 +438,6 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
                 #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
-                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
                 f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
                 f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
                 f"&filter[time_range][condition][timezone]={tz}"                    # time range
@@ -442,8 +461,6 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
                 #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
                 "&filter[regex][condition][key]=title"                              # filter by title
                 f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
-                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
                 "&sort=-time"                                                       # sort by time, -time gives last scans first
                 #"&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
                 "&fields=metadata"                                                  # return metadata
@@ -454,6 +471,16 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
     logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
+        if path is not None:
+            # Client-side hdf5_path filter (see docstring): Tiled cannot take
+            # two filter[regex] blocks in one query.
+            filtered = []
+            for entry in r.get("data", []):
+                raw_md = entry["attributes"]["metadata"]
+                md = raw_md.get("selected", raw_md)
+                if re.search(path, md.get("hdf5_path") or ""):
+                    filtered.append(entry)
+            r["data"] = filtered
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
@@ -493,7 +520,6 @@ def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
       latency has been removed (see commented-out offsetTime code).
     * The filter[contains][condition][exit_status] clause is a Tiled-specific
       filter that checks whether the 'exit_status' key exists in the stop doc.
-    TODO: debug print(f"{uri=}") should be logging.debug().
     """
     #print (FindLastScanData("Flyscan",10,LastNdays=1))
     #print (FindLastScanData("uascan",10,LastNdays=1))

@@ -27,7 +27,7 @@ MinQMinFindRatio = 1.05
 ## importFlyscan loads data from flyscan NX file. It should be same for QR pass as well as for calibrated data processing. 
 def importFlyscan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    with h5py.File(path+"/"+filename, 'r') as file:
+    with h5py.File(os.path.join(path, filename), 'r') as file:
         #read various data sets
         # mca1/2/3 always contain exactly the number of collected data points — no padding.
         # Use mca1 length as ground truth, then align ARangles to it.
@@ -248,9 +248,10 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     #Intensity and Error are corrected for transmission in normalize by transmission above. 
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
     # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
-    MaxSMR_Int = np.max(SMR_Int)
+    # use NaN-safe variants: SMR_Int may contain NaNs from masked gain changes
+    MaxSMR_Int = np.nanmax(SMR_Int)
     #find min value in SMR_Int for points from half to end
-    MinSMR_Int = np.min(SMR_Int[int(len(SMR_Int)/2):])
+    MinSMR_Int = np.nanmin(SMR_Int[int(len(SMR_Int)/2):])
     #if MinSMR_Int < 0, then we need add to SMR_Int enough to lift it above zero
     ScaleByBackground = 1.1         #this is from Igor code IN3_FixNegativeIntensities
     ScaleByIntMax = 3e-11           #this is from Igor code IN3_FixNegativeIntensities
@@ -509,7 +510,7 @@ def calculatePD_Fly(data_dict):
     Frequency= 1e6      #VToFFactor[0]/10   #this is frequency of clock fed into mca1/10 for HDF5 writer 1.3 and higher
     TimeInSec = TimePerPoint/Frequency
     Totaltime= sum(TimeInSec)
-    print(f"{Totaltime}")
+    logging.debug(f"Total measurement time: {Totaltime} s")
     n_pts = len(TimeInSec)
     for i in range(0, len(Channel)-1, 1):
         startPnt = int(Channel[i])
@@ -826,7 +827,9 @@ def find_crossing_index(array, target_value):
     for index, value in enumerate(array):
         if value >= target_value:
             return index
-    return 0.1*len(array)  # Return None if the target value is not crossed
+    # Fallback: target never crossed — return an int (used as a range() start)
+    # at 10% of the array length.
+    return int(0.1 * len(array))
 
 # subtract QRS data
 def subtract_data(X1, Y1, E1, X2, Y2, E2):
@@ -856,7 +859,9 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
     #if Y2_min<1e-30, offset whole Y2 by 3*abs(Y2_min)
     offset=0
     if Y2_min<1e-30:
-        offset =  3*abs(Y2_min)
+        # +1e-30 also covers Y2_min == 0 exactly, where 3*abs(0) would leave
+        # log(0) = -inf below.
+        offset =  3*abs(Y2_min) + 1e-30
     
     Y2 = Y2 + offset
     logY2 = np.log(Y2)
@@ -939,6 +944,8 @@ def read_group_to_dict(group):
 
 
 # this should not fail if keys on the list are not present
+# NOTE: nested dicts are kept only if their own key is in keys_to_keep;
+# wanted keys deeper inside unlisted parent groups are dropped.
 def filter_nested_dict(d, keys_to_keep):
     if isinstance(d, dict):
         return {k: filter_nested_dict(v, keys_to_keep) for k, v in d.items() if k in keys_to_keep and k in d}
@@ -1017,12 +1024,19 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints):
     Ws_less = Ws[mask_less]
     Wdx_less = Wdx[mask_less]
 
-    # Split arrays based on the condition Q > 0.0002
-    mask_greater = Wx > 0.0002
+    # Split arrays based on the condition Q >= 0.0002
+    # (>= so a point exactly at the threshold is not silently dropped)
+    mask_greater = Wx >= 0.0002
     Wx_greater = Wx[mask_greater]
     Wy_greater = Wy[mask_greater]
     Ws_greater = Ws[mask_greater]
     Wdx_greater = Wdx[mask_greater]
+
+    if len(Wx_greater) < 2:
+        # Not enough high-Q points to rebin — return the data unchanged.
+        logging.warning(f"rebin_QRSdata: only {len(Wx_greater)} points above Q=0.0002; "
+                        "skipping rebinning and returning data unchanged.")
+        return Wx, Wy, Ws, Wdx
 
     MinStep = Wx_greater[1] - Wx_greater[0]
 

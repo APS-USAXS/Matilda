@@ -118,6 +118,8 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
         else:
             Sample = dict()
             if thickness_override is not None:
+                # NOTE: this permanently modifies the raw data file; the
+                # original value is preserved once in *_original.
                 thick_path = '/entry/sample/thickness'
                 orig_path  = '/entry/sample/thickness_original'
                 if thick_path in hdf_file:
@@ -204,7 +206,7 @@ def reduceADToQR(path, filename):
 def ImportAndReduceAD(path, filename, recalculateAllData=False):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
     location = 'entry/displayData/'
-    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+    with h5py.File(os.path.join(path, filename), 'r+') as hdf_file:
         # Check if the group 'displayData' exists
         if recalculateAllData:
             # Delete the group

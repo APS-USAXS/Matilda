@@ -11,7 +11,7 @@ beamline staff. End users normally only need the GUIs.
 |---|---|
 | **matilda-gui** | Interactive USAXS/SAXS/WAXS data reduction. Open an HDF5 file, tune parameters, see calibrated I(Q) immediately, save back to NXcanSAS. |
 | **matilda-sample-plates** | Sample-plate position editor. Place samples on a plate image, fill in names/thicknesses, export a Bluesky `.mac` command file for the beamline. |
-| **matilda** (daemon) | Beamline service that polls the Tiled server every 15 s and reduces new data automatically. Runs only on `usaxscontrol.xray.aps.anl.gov`. |
+| **matilda** (daemon) | Beamline service that polls the Tiled server every few seconds and reduces new data automatically. Runs only on `usaxscontrol.xray.aps.anl.gov`. |
 
 ---
 
@@ -130,7 +130,7 @@ Calibrated absolute intensity from each technique:
 ## Beamline service (USAXS staff only)
 
 When run as a service on `usaxscontrol.xray.aps.anl.gov`, Matilda polls
-the Tiled server every 15 seconds, reduces new data automatically, runs
+the Tiled server every few seconds (5 s between cycles), reduces new data automatically, runs
 pynika to recalibrate detector geometry from `AgBehenateLaB6` standards,
 and (when configured per folder) calls pyirena to fit models and merge
 USAXS+SAXS curves.

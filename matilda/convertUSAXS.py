@@ -84,7 +84,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
     extrap_method : str, optional
         High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
     extrap_qstart : float, optional
-        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+        Q value above which extrapolation is applied.  Default 0.15 Å⁻¹.
     minQMinFindRatio : float, optional
         Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
     thickness_override : float or None, optional
@@ -143,6 +143,8 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
         else:
             Sample = dict()
             if thickness_override is not None:
+                # NOTE: this permanently modifies the raw data file; the
+                # original value is preserved once in *_original.
                 thick_path = '/entry/instrument/bluesky/metadata/sample_thickness_mm'
                 orig_path  = '/entry/instrument/bluesky/metadata/sample_thickness_mm_original'
                 if thick_path in hdf_file:
@@ -292,25 +294,27 @@ def createUPDGainsAndBkgErrArrays(Sample):
     TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # Convert to seconds if needed
     UPD_gains = np.zeros_like(AmpGain, dtype=float)
     UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
-    
-    # Assign values based on AmpGain
+
+    # Assign values based on AmpGain.  Match with tolerance (EPICS-sourced
+    # floats may not be bit-exact) and warn on unknown gains, which would
+    # otherwise silently leave UPD_gains 0 (division by zero downstream).
+    known_gains = {1e4: "1e4", 1e6: "1e6", 1e8: "1e8", 1e10: "1e10", 1e12: "1e12"}
+    unknown_gains = set()
     for i, gain in enumerate(AmpGain):
-        if gain == 1e4:
-            UPD_gains[i] = 1e4
-            UPD_bkgErr[i] = Bkg_map["1e4"] * TimePerPoint[i] 
-        elif gain == 1e6:
-            UPD_gains[i] = 1e6
-            UPD_bkgErr[i] = Bkg_map["1e6"] * TimePerPoint[i] 
-        elif gain == 1e8:
-            UPD_gains[i] = 1e8
-            UPD_bkgErr[i] = Bkg_map["1e8"] * TimePerPoint[i] 
-        elif gain == 1e10:
-            UPD_gains[i] = 1e10
-            UPD_bkgErr[i] = Bkg_map["1e10"] * TimePerPoint[i] 
-        elif gain == 1e12:
-            UPD_gains[i] = 1e12
-            UPD_bkgErr[i] = Bkg_map["1e12"] * TimePerPoint[i] 
-    
+        matched_key = None
+        for gval, gkey in known_gains.items():
+            if np.isclose(gain, gval, rtol=1e-3):
+                matched_key = gkey
+                UPD_gains[i] = gval
+                break
+        if matched_key is not None:
+            UPD_bkgErr[i] = Bkg_map[matched_key] * TimePerPoint[i]
+        else:
+            unknown_gains.add(float(gain))
+    if unknown_gains:
+        logging.warning(f"Unknown UPD amplifier gain values {sorted(unknown_gains)}; "
+                        "gain/background left at 0 for those points.")
+
     result = dict()
     result["UPD_gains"] = UPD_gains
     result["UPD_bkgErr"] = UPD_bkgErr
@@ -375,7 +379,7 @@ def calculatePDErrorStep(Sample, isBlank=False):
 ## Stepscan main code here
 def importStepScan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    with h5py.File(path+"/"+filename, 'r') as file:
+    with h5py.File(os.path.join(path, filename), 'r') as file:
         #read various data sets
         #AR angle
         dataset = file['/entry/data/a_stage_r'] 
@@ -515,9 +519,22 @@ def CorrectUPDGainsStep(data_dict):
     # Convert keys to floats in Bkg_map for matching with AmpGain
     Bkg_map_float_keys = {float(k): v for k, v in Bkg_map.items()}
 
+    unknown_gains = set()
     for i, gain in enumerate(AmpGain):
-        background_value = Bkg_map_float_keys.get(gain, 0) # Default to 0 if not found
+        background_value = Bkg_map_float_keys.get(gain)
+        if background_value is None:
+            # tolerant match — EPICS-sourced floats may not be bit-exact
+            for gval, bval in Bkg_map_float_keys.items():
+                if np.isclose(gain, gval, rtol=1e-3):
+                    background_value = bval
+                    break
+        if background_value is None:
+            background_value = 0    # unknown gain: no background subtraction
+            unknown_gains.add(float(gain))
         Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # Convert to seconds if needed, here we assume TimePerPoint is in microseconds
+    if unknown_gains:
+        logging.warning(f"CorrectUPDGainsStep: unknown UPD amplifier gain values "
+                        f"{sorted(unknown_gains)}; background set to 0 for those points.")
     #TODO: check 1e7 is correct, elsewhere we use 1e6. 
     # Now we can correct UPD_array for background
     # Remove background from UPD_array

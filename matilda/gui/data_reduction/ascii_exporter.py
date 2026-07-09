@@ -38,6 +38,19 @@ _NXCANSAS_ATTRS = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
 _NXCANSAS_ITEMS = {'definition': 'NXcanSAS'}
 
 
+def _hdf5_str(val) -> str:
+    """Convert an HDF5 attribute/dataset value to a plain Python string.
+
+    HDF5 values can come back as np.ndarray, np.bytes_, bytes, or str
+    depending on how the file was written and the h5py version.
+    """
+    if isinstance(val, np.ndarray):
+        val = val.flat[0] if val.size > 0 else ""
+    if isinstance(val, (bytes, bytearray, np.bytes_)):
+        return val.decode("utf-8", errors="replace")
+    return str(val)
+
+
 def _find_nxcansas_groups(hdf_file: h5py.File) -> list[str]:
     """Return all NXcanSAS group paths in *hdf_file*."""
     result: list[str] = []
@@ -45,16 +58,13 @@ def _find_nxcansas_groups(hdf_file: h5py.File) -> list[str]:
     def _visit(name, obj):
         if not isinstance(obj, h5py.Group):
             return
-        if not all(attr in obj.attrs and obj.attrs[attr] == v
+        if not all(attr in obj.attrs and _hdf5_str(obj.attrs[attr]) == v
                    for attr, v in _NXCANSAS_ATTRS.items()):
             return
         for item, expected in _NXCANSAS_ITEMS.items():
             if item not in obj:
                 return
-            val = obj[item][()]
-            if isinstance(val, (bytes, bytearray)):
-                val = val.decode()
-            if val != expected:
+            if _hdf5_str(obj[item][()]) != expected:
                 return
         result.append(name)
 
@@ -122,10 +132,17 @@ def _read_group_data(grp: h5py.Group) -> dict | None:
 
     dI   = _read_arr(sasdata.get("Idev"))
     # dQ: 'Qdev' for desmeared/calibrated, 'dQw' for slit-smeared
-    dQ   = _read_arr(sasdata.get("Qdev")) or _read_arr(sasdata.get("dQw"))
+    dQ   = _read_arr(sasdata.get("Qdev"))
+    if dQ is None:
+        dQ = _read_arr(sasdata.get("dQw"))
     slit = _read_arr(sasdata.get("dQl"))   # scalar stored as 1-elem array for SMR
 
     i_ds = sasdata.get("I")
+    raw_thick = i_ds.attrs.get("thickness", "") if i_ds is not None else ""
+    try:
+        thickness = float(np.asarray(raw_thick).flat[0]) if raw_thick != "" else ""
+    except Exception:
+        thickness = ""
     return {
         "Q":          Q,
         "I":          I,
@@ -133,7 +150,7 @@ def _read_group_data(grp: h5py.Group) -> dict | None:
         "dQ":         dQ,
         "units":      _read_str_attr(i_ds, "units", "[cm2/cm3]"),
         "blankname":  _read_str_attr(i_ds, "blankname", ""),
-        "thickness":  i_ds.attrs.get("thickness", "") if i_ds is not None else "",
+        "thickness":  thickness,
         "slit_length": float(slit[0]) if slit is not None and len(slit) > 0 else None,
     }
 
@@ -267,7 +284,7 @@ class AsciiExportWorker(QThread):
             except Exception as exc:
                 self.file_error.emit(filename, str(exc))
                 n_errored += 1
-                logging.warning(f"ASCII export failed for {filename}: {exc}")
+                logging.exception(f"ASCII export failed for {filename}: {exc}")
 
             self.progress.emit(i + 1, total)
 

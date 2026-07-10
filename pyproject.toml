@@ -14,13 +14,29 @@ readme = "README.md"
 authors = [
     { name = "Jan Ilavsky", email = "ilavsky@anl.gov" },
 ]
-# license = { file = "LICENSE" }
+license = { file = "LICENSE.txt" }
 requires-python = ">=3.11"
+keywords = [
+    "SAXS", "USAXS", "WAXS", "small-angle X-ray scattering",
+    "synchrotron", "data reduction", "NXcanSAS", "HDF5", "Tiled",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Chemistry",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: Other/Proprietary License",
 ]
+
+[project.urls]
+Homepage = "https://github.com/APS-USAXS/Matilda"
+Repository = "https://github.com/APS-USAXS/Matilda"
+"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
+Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
 
 # Core runtime dependencies (verified used in source code).
 # GUI dependencies (PyQt6, pyqtgraph) are listed separately below so the

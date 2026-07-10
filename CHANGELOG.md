@@ -1,144 +1,171 @@
 # Matilda Changelog
 
 All notable changes to this project are documented here.
-Branch `fix/phase1-phase3-robustness` (2026-07-08 →).
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — branch `fix/phase1-phase3-robustness`
+## [0.2.0] — 2026-07-10
 
-### Fixed — 2026-07-09
-- **ASCII export crash** (`ascii_exporter.py`): `_read_group_data` used Python `or`
-  between two `_read_arr()` calls to pick the dQ array (`Qdev` or `dQw`). When
-  `_read_arr` returns a multi-element numpy array, Python's `or` operator calls
-  `bool(array)`, raising *"The truth value of an array with more than one element
-  is ambiguous."* Fixed by replacing the `or` with an explicit `None` check.
-  Also added `_hdf5_str()` helper to safely convert HDF5 attributes (which can
-  return `np.ndarray`, `np.bytes_`, `bytes`, or `str` depending on file vintage
-  and h5py version) to plain Python strings before comparison, preventing the
-  same class of error in `_find_nxcansas_groups`. Thickness attribute is now
-  normalised to `float` or `""` at read time.
-  Worker now logs full tracebacks via `logging.exception` instead of bare
-  `logging.warning` so future failures are easier to diagnose.
-
----
-
-### 2026-07-08 — Phase 4: test suite, ruff lint, CI
-
-- **pytest suite** (`tests/`, 50 tests, 48 pass / 2 skipped pending pyFAI):
+### Added
+- **Live tune plots** (`convertTune.py`): new module with `getTuneResults()` that
+  searches Tiled/DataBroker for the last N tune scans and derives axes from
+  metadata (no per-plan hardcoding). `FindLastTuneScans()` and
+  `tiled_get_primary_data()` added to `readfromtiled.py`; `plotTuneResults()`
+  added to `plotData.py`. The service loop now publishes `tune_ar.jpg`,
+  `tune_mr.jpg`, and `tune_a2rp.jpg` alongside SAXS/WAXS/USAXS images.
+  Failure-tolerant: offline or dead-server installations never crash the loop.
+- **pytest suite** (54 tests, all pass):
   - `test_support_functions.py` — blank matching, subtraction, rebinning,
     smoothing with range indices, filename parsing.
   - `test_desmearing.py` — return signatures, synthetic desmear run, all four
     extrapolation methods.
   - `test_hdf5code.py` — None handling, tuple bug regression, NXcanSAS
     round-trip, malformed files.
-  - `test_matilda_helpers.py` — filename regex, FIFO tracker, partner matching
-    (skips without pyFAI).
+  - `test_matilda_helpers.py` — filename regex, FIFO tracker, partner matching.
   - `test_technique_detector.py` — `/entry/Metadata` path, folder fallbacks.
-  - `test_smoke_reduction.py` — full flyscan and step-scan end-to-end on
-    `TestData/TestSet` copies; asserts finite calibrated I(Q) and physically
-    sensible transmission (0 < T < 1).
-- **ruff** added to `pyproject.toml`; ~50 unused imports removed (incl. Qt
-  imports in both PySide6/PyQt6 branches), duplicate `beamCenterCorrection`
-  import, 12 unused variables. `rebinData` import moved to its real home in
-  `supportFunctions.py`.
-- `tifffile` removed from dependencies.
+  - `test_smoke_reduction.py` — full flyscan and step-scan end-to-end;
+    asserts finite calibrated I(Q) and physically sensible transmission (0 < T < 1).
+  - `test_readfromtiled.py` — URI construction and one-condition-per-filter-type
+    constraint.
 - **GitHub Actions CI** (`.github/workflows/ci.yml`): ruff + pytest on Python
-  3.11 and 3.12 for pushes and PRs.
-
----
-
-### 2026-07-08 — Phase 2: science fixes (validated against Igor)
-
-> ⚗️ These fixes change numerical results. Validated against Igor
-> Pro reference data by JIL on 2026-07-08.
-
-- **1.1 Duplicate `"UPD_gains"` key** (`supportFunctions.py`): `calculatePD_Fly`
-  now returns both `UPD_gainsIndx` (range index 0–4) and `UPD_gains` (gain
-  values). `smooth_r_data` receives the index array. Previously the duplicate key
-  silently dropped the index array and every point was smoothed with the 0.4 s
-  time constant (range 4). Index mapping corrected from 1-based to 0-based.
-- **1.2 Wrong array for requested-gain tail** (`supportFunctions.py`): tail of
-  `AmpGainReq_array` now filled from `AmpReqGain` (was `AmpGain`).
-- **1.3 Step-scan transmission pin ↔ I0 swap** (`convertUSAXS.py`):
-  `importStepScan` now correctly maps `trans_pin_*` ← diode stream and
-  `trans_I0_*` ← I0 stream. Previously `MeasuredTransmission` was the
-  reciprocal of the intended value.
-- **1.4 Blank cache never invalidated for step scans** (`convertUSAXS.py`):
-  `getBlankStepscan` now receives the caller's `recalculateAllData` flag
-  (was hardcoded `False`).
-
-**Validation results (2026-07-08, JIL):**
-- Transmissions agree with Igor (validates 1.3).
-- Reduced calibrated data agree with Igor end-to-end.
-- Error estimates agree; error bars match measurement noise.
-- Blank R intensity is one decade higher in Igor than Matilda — confirmed to be
-  a prefactor-convention difference (different V-to-F clock constants for MCA vs
-  Joerger scaler geometry; see below). This difference cancels in calibrated
-  data because Kfactor is anchored to the blank peak. No action required.
-
-**Frequency constants confirmed correct (2026-07-08, JIL):**
-Flyscans use the MCA analyser with a dedicated 1 MHz clock; step scans use the
-Joerger scaler internal 10 MHz clock. Both constants are correct for their
-geometry and must not be unified. Code comments updated at all sites
-(`supportFunctions.py`, `convertUSAXS.py`). Diagnostic script
-`TestData/check_clock_frequency.py` can re-verify from data.
-
----
-
-### 2026-07-08 — Phase 1: crash fixes
-
-- **2.1** `desmearData` failure path now returns 4 values (was 5, callers unpack 4).
-- **2.2** `oneDesmearIteration` no longer returns bare `1`; `ExtensionFailed` flag
-  now truthful (True only when the flat fallback is also impossible).
-- **2.3** `find_crossing_index` returns `int` (was `float`, broke `range()` call).
-- **2.4** `reduceFlyscanToQR` guards group deletion with existence check.
-- **2.5** `processUSAXSFolder` skips missing technique folders with a warning
-  instead of raising `IndexError`; helper `_list_sorted_files` added.
-- **2.6** `forceFirstBlank` with empty blank list now logs one clear error and
-  returns early instead of silently failing per-scan.
-- **2.8** `save_dict_to_hdf5` skips `None` values, uses `require_group`,
-  overwrites existing datasets.
-- **2.9** Multiple edge-case guards:
-  - `subtract_data`: `Y2_min == 0` guard (avoids `log(0)`).
-  - `calibrateAndSubtractFlyscan`: `nanmax`/`nanmin` (NaN-safe).
-  - `rebin_QRSdata`: `< 2`-point guard; threshold changed to `>=`.
-  - `desmearData`: guard for `endme == 0` / NaN.
-  - `readGenericNXcanSAS`: defensive rewrite — returns `None` on malformed files.
-  - `saveNXcanSAS` / `readMyNXcanSAS`: `None`-attribute guards.
-- **1.5** `readMyNXcanSAS` trailing-comma `(None,)` tuple bug fixed.
-- **1.6** `extract_number_from_filename` regex now matches `.h5`, `.hdf`, `.hdf5`,
-  `.nxs` extensions.
-
----
-
-### 2026-07-08 — Phase 3: robustness
-
-- **2.7** Duplicate Tiled filter keys removed; `title` (FindScanDataByName) and
-  `hdf5_path` (FindLastBlankScan) now matched client-side; module docstring
-  documents the one-condition-per-filter-type limitation.
-- **N+1 HTTP** fixed: `exit_status:stop.exit_status` added to `select_metadata`;
-  `convert_results` falls back to per-uid request only if absent.
-- **2.10** `technique_detector` now checks `/entry/Metadata` (with Bluesky path
-  as fallback).
-- **FIFO eviction**: `_remember_file()` helper + ordered dicts replace
-  `set.pop()` (which removed an arbitrary element). Single bound
-  `_MAX_TRACKED_FILES = 100`.
-- **Logging**: setup moved into `_setup_logging()` called from `main()` —
-  importing `matilda.matilda` no longer creates directories or reconfigures the
+  3.11 and 3.12 for all pushes and pull requests.
+- **ruff** linting added to `pyproject.toml`; ~50 unused imports cleaned;
+  `rebinData` import moved to its correct home in `supportFunctions.py`.
+- `MATILDA_IMAGE_PATH` environment variable: overrides default image-output
+  directory; set to `"none"` to disable image saving entirely.
+- `_setup_logging()` helper: logging setup moved out of module-level code so
+  `import matilda.matilda` no longer creates directories or reconfigures the
   root logger.
-- **`imagePath`** overridable via `MATILDA_IMAGE_PATH` env var (`"none"` disables
-  image saving).
-- **Docstring drift** fixed: 15 s → 5 s polling; `extrap_qstart` 0.15
-  everywhere; desmear `MaxNumIter` doc 50 → 20.
-- **`_find_matching_partner`** disambiguates multiple matches by full stem and
-  warns on ambiguity.
-- **`Bkg_map`/gain matching** now uses `np.isclose` (rtol 1e-3) with warnings
-  on unknown gains (both `createUPDGainsAndBkgErrArrays` and
-  `CorrectUPDGainsStep`).
-- **Path handling**: `os.path.join` replaces `path + "/" + filename` in
-  `importFlyscan`, `importStepScan`, `ImportAndReduceAD`, `reduceFlyscanToQR`.
-- **`thickness_override`** file mutation documented with NOTE comments in all
-  three converters.
-- Stray `print(Totaltime)` → `logging.debug`; stale TODOs in `readfromtiled`
-  removed.
+- `_list_sorted_files()` helper in `matilda.py` for sorted folder listings.
+- Diagnostic script `TestData/check_clock_frequency.py` to verify V-to-F clock
+  constants from real data.
+
+### Fixed
+
+**Service / data-access**
+- Retry interval between live-page attempts shortened.
+- pyIrena merging script path was hardcoded, forcing the wrong directory for all
+  data; now resolved correctly at runtime.
+
+**Science fixes (Phase 2, validated against Igor Pro reference data by JIL 2026-07-08)**
+- Duplicate `"UPD_gains"` key in `calculatePD_Fly` silently dropped the range-index
+  array; `smooth_r_data` smoothed every point with the 4 s time constant (range 4).
+  Return dict now uses `UPD_gainsIndx` (index 0–4) and `UPD_gains` (values) as
+  distinct keys; index mapping corrected 1-based → 0-based.
+- Tail of `AmpGainReq_array` filled from `AmpGain` instead of `AmpReqGain`.
+- Step-scan transmission: `trans_pin_*` ← diode and `trans_I0_*` ← I0 were
+  swapped; `MeasuredTransmission` was the reciprocal of the intended value.
+- Blank cache for step scans was never invalidated: `getBlankStepscan` now
+  receives the caller's `recalculateAllData` flag (was hardcoded `False`).
+
+**Crash fixes (Phase 1)**
+- `desmearData` failure path returned 5 values; callers unpack 4 — fixed.
+- `oneDesmearIteration` returned bare `1`; `ExtensionFailed` flag now truthful.
+- `find_crossing_index` returned `float`, breaking downstream `range()` call.
+- `reduceFlyscanToQR` raised `KeyError` on group deletion without existence check.
+- `processUSAXSFolder` raised `IndexError` on missing technique folders; now skips
+  with a warning and continues.
+- `forceFirstBlank` with empty blank list silently failed; now logs one clear error
+  and returns early.
+- `save_dict_to_hdf5` crashed on `None` values and duplicate datasets.
+- `subtract_data`: guard against `Y2_min == 0` (avoids `log(0)`).
+- `calibrateAndSubtractFlyscan`: `nanmax`/`nanmin` replacing `max`/`min` (NaN-safe).
+- `rebin_QRSdata`: added `< 2`-point guard; rebinning threshold changed to `>=`.
+- `desmearData`: guard for `endme == 0` / NaN.
+- `readGenericNXcanSAS`: defensive rewrite — returns `None` on malformed files.
+- `saveNXcanSAS` / `readMyNXcanSAS`: `None`-attribute guards.
+- `readMyNXcanSAS` trailing-comma `(None,)` tuple bug fixed.
+- `extract_number_from_filename` regex now matches `.h5`, `.hdf`, `.hdf5`, `.nxs`.
+
+**ASCII export (Phase 4)**
+- `_read_group_data` used Python `or` between two `_read_arr()` calls to pick the
+  dQ array; multi-element numpy arrays raised *"The truth value of an array is
+  ambiguous"*. Fixed with explicit `None` check.
+- `_hdf5_str()` helper safely converts HDF5 attributes (`np.ndarray`, `np.bytes_`,
+  `bytes`, or `str`) to plain Python strings before comparison in
+  `_find_nxcansas_groups`.
+- Thickness attribute normalised to `float` or `""` at read time.
+- Worker now logs full tracebacks via `logging.exception`.
+
+**Robustness (Phase 3)**
+- Duplicate Tiled filter keys removed; `title` and `hdf5_path` now matched
+  client-side; module docstring documents the one-condition-per-filter-type limit.
+- N+1 HTTP: `exit_status` added to `select_metadata`; per-uid fallback only when
+  absent from metadata.
+- `technique_detector` now checks `/entry/Metadata` first (Bluesky path fallback).
+- FIFO eviction: `_remember_file()` helper + ordered dicts replace `set.pop()`
+  (which removed an arbitrary element). Bound: `_MAX_TRACKED_FILES = 100`.
+- `_find_matching_partner` disambiguates multiple matches by full stem and warns.
+- `Bkg_map`/gain matching uses `np.isclose` (rtol 1e-3) with warnings on unknown
+  gains in both `createUPDGainsAndBkgErrArrays` and `CorrectUPDGainsStep`.
+- Path handling: `os.path.join` replaces manual string concatenation in four
+  converters (`importFlyscan`, `importStepScan`, `ImportAndReduceAD`,
+  `reduceFlyscanToQR`).
+- Stray `print(Totaltime)` converted to `logging.debug`.
+
+**GUI fixes (Phase 6)**
+- `EXTRAP_METHODS` in `parameter_tabs.py` listed method names unknown to
+  `desmearing.extendData`; the extension region silently recycled garbage.
+  GUI list now matches real method names; unknown methods fall back to flat with
+  a warning.
+- STOP MOTORS was gated by the instrument-busy check; emergency stop now always
+  sends `allstop`.
+- Beamline-survey saved positions were overwritten by stale table contents on
+  the next export/save; the table now reloads on dialog close.
+- `main_window.closeEvent` cancels and joins running worker threads (destroying
+  a running `QThread` was crashing the app on exit).
+- `_set_slits` guards against `caget` timeout returning `None` before `caput`.
+
+### Changed / Refactored (Phase 5, behavior-preserving)
+- `read_group_to_dict` / `filter_nested_dict`: canonical copies in `hdf5code`,
+  re-exported from `supportFunctions` for backwards compatibility.
+- `clearAndCheckCachedReduction()` + `writeThicknessOverride()` in `hdf5code`
+  replace ~50 duplicated lines across `processFlyscan`, `processStepscan`, and
+  `process2Ddata`.
+- `empty_calibrated_data()` factory replaces 4 pasted all-`None` dicts.
+- `_build_search_uri()` in `readfromtiled` replaces 8 near-identical URI blocks;
+  sort standardised to `-time`; 6 new unit tests cover URI construction.
+- `convertSWAXS`: `_geometry_from_dicts()` + `_build_mask()` unify diverged
+  geometry/mask copies; `ImportAndReduceAD` now gets detector-aware masks and
+  `StartTime` metadata for the SAXS year branch.
+- Large commented-out legacy blocks removed (`results_to_dataset`,
+  `reduceStepScanToQR`, `find_NXcanSAS_entries`, tilt-test scaffolding).
+- `tifffile` removed from runtime dependencies (only referenced in commented-out
+  debug code).
+
+### Documentation
+- Clock-frequency invariants documented at all sites: flyscans use MCA 1 MHz
+  clock; step scans use Joerger scaler 10 MHz clock. Both values confirmed
+  correct against measurement data; must not be unified.
+- Docstring drift corrected: 15 s → 5 s polling interval; `extrap_qstart` 0.15
+  everywhere; desmear `MaxNumIter` 50 → 20.
+- `thickness_override` file-mutation side-effect documented with NOTE comments
+  in all three converters.
+
+---
+
+## [0.1.1] — 2026-05-11
+
+Minor bug-fix release.
+
+- Step-scan plotting bug fixes (two rounds).
+- Blank plotting bug fix.
+- Thickness override: honour user choice in HDF5 output.
+- Flyscan: fix occasional wrong number of points.
+- Old detector masks added.
+- Thickness leakage in batch reduction fixed.
+- Old step-scan structure compatibility fix.
+- Blank search with name filter fixed.
+- Input-variable stepping fixed.
+- Graph-scaling behaviour fix.
+- Installation instructions updated (clone-first flow for end users).
+
+---
+
+## [0.1.0] — 2026-04 (initial release)
+
+First packaged release of Matilda. Core live-processing service for
+USAXS/SAXS/WAXS at APS beamline 9-ID: flyscan and step-scan reduction,
+Tiled/DataBroker integration, pyFAI-based 2-D integration, NXcanSAS output,
+ASCII export, GUI tools (sample-plate setup, data-reduction monitor).

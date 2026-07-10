@@ -21,9 +21,20 @@ FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1)
     Return the most-recent blank/background scans for a given plan type,
     optionally restricted to a specific file-system path.
 
-All three functions return a list of [hdf5_path, hdf5_file] pairs suitable
+The three functions above return a list of [hdf5_path, hdf5_file] pairs suitable
 for passing to the processXxx() functions in matilda.py.  On network failure
 they return an empty list rather than raising an exception.
+
+FindLastTuneScans(plan_name, NumScans=5, LastNdays=1)
+    Return metadata dicts for the most-recent tuning scans (tune_ar/tune_mr/
+    tune_a2rp).  These carry no HDF5 file; the measured arrays are fetched
+    separately via tiled_get_primary_data().
+
+tiled_get_primary_data(uid)
+    Download the primary data stream (flat dict of column arrays) for one run.
+
+Both tune helpers return empty/None on network failure so the service loop and
+offline installations never crash.
 
 Tiled server
 ------------
@@ -36,15 +47,18 @@ Method based on:
     https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
 and mirrors the Igor macro logic for scan selection.
 
-TODO: bare except clauses (lines ~226, ~346, ~425) should be narrowed to
-      'except Exception' to avoid silently swallowing KeyboardInterrupt.
-TODO: debug print() calls should be replaced with logging.debug().
+Note on duplicate filter keys
+-----------------------------
+Tiled accepts only ONE condition per filter type (filter[eq], filter[regex])
+in a query string; a second block with the same key is ignored.  Where two
+conditions of the same type are needed (plan_name + title, or title + path),
+the second condition is applied client-side after the response arrives.
 """
 
 # import necessary libraries
 import requests
-import json
 import datetime
+import re
 import time
 import socket
 import logging
@@ -76,6 +90,9 @@ select_metadata = ",".join([
     "scan_title:start.plan_args.scan_title",
     "hdf5_file:start.hdf5_file",
     "hdf5_path:start.hdf5_path",
+    # exit_status lets convert_results() check run success without an extra
+    # per-uid metadata request (was an N+1 HTTP pattern before).
+    "exit_status:stop.exit_status",
 ])
 
 def tiled_get(
@@ -103,6 +120,65 @@ def tiled_get(
         url += f"/{uid}"
     response = requests.get(url, params=params, timeout=timeout)
     return response.json()
+
+
+def _build_search_uri(NumScans, plan_name=None, title_regex=None, lastNdays=0,
+                      require_exit_status=False, select_md=None):
+    """Build a Tiled /search URI (single place for the query syntax).
+
+    Parameters
+    ----------
+    NumScans : int
+        page[limit]; must be > 0.
+    plan_name : str or None
+        Adds a filter[eq] condition on plan_name.
+    title_regex : str or None
+        Adds a filter[regex] condition on title (e.g. '(?i)blank').
+    lastNdays : int
+        > 0 adds a time_range filter covering the last N days; 0 = all time.
+    require_exit_status : bool
+        Adds filter[contains][condition][exit_status] — only runs whose stop
+        document exists (i.e. finished runs).
+    select_md : str or None
+        select_metadata template; defaults to the module-level select_metadata.
+
+    Notes
+    -----
+    * Tiled accepts only ONE condition per filter type ([eq], [regex]) in a
+      query string; additional same-type conditions must be applied
+      client-side by the caller (see FindScanDataByName / FindLastBlankScan).
+    * Sort is always '-time' (newest first); verified to work on the current
+      server both with and without a time_range filter.
+    * Useful Tiled filter keywords (for reference): [noteq], [contains],
+      [in], [notin], [comparison] (lt/gt/le/ge).  Working example:
+      /api/v1/search/<catalog>/?page[limit]=10&filter[eq][condition][key]=plan_name
+      &filter[eq][condition][value]="WAXS"&filter[regex][condition][key]=title
+      &filter[regex][condition][pattern]=(?i)blank&sort=-time
+    """
+    parts = [
+        f"http://{server}:{port}/api/v1/search/{catalog}",
+        f"?page[limit]={NumScans}",
+    ]
+    if require_exit_status:
+        parts.append("&filter[contains][condition][exit_status]")
+    if plan_name is not None:
+        parts.append("&filter[eq][condition][key]=plan_name")
+        parts.append(f'&filter[eq][condition][value]="{plan_name}"')
+    if title_regex is not None:
+        parts.append("&filter[regex][condition][key]=title")
+        parts.append(f"&filter[regex][condition][pattern]={title_regex}")
+    if lastNdays > 0:
+        end_time = time.time()
+        start_time = end_time - (lastNdays * 86400)
+        # server works in UTC; timezone parameter provided for completeness
+        parts.append(f"&filter[time_range][condition][since]={start_time}")
+        parts.append(f"&filter[time_range][condition][until]={end_time}")
+        parts.append("&filter[time_range][condition][timezone]=US/Central")
+    parts.append("&sort=-time")
+    parts.append("&fields=metadata")
+    parts.append("&omit_links=true")
+    parts.append(f"&select_metadata={{{select_md if select_md is not None else select_metadata}}}")
+    return "".join(parts)
 
 
 def successful_run(uid: Optional[str] = None) -> bool:
@@ -150,7 +226,6 @@ def print_results_summary(r):
     Helper used during interactive debugging / development; not called by the
     main processing loop.
     """
-    xref = dict(First=0, Last=-1)
     for k, v in dict(First=0, Last=-1).items():
         md = r["data"][v]["attributes"]["metadata"]["selected"]  #From 6-1-2025 ["selected"] is in both VM and usaxscontrol tiled
         #print(md)
@@ -183,7 +258,13 @@ def convert_results(r):
         uid = r["data"][v]["id"]
         raw_md = r["data"][v]["attributes"]["metadata"]
         md = raw_md.get("selected", raw_md)   # usaxscontrol/VM has ["selected"]; OTZ does not
-        success = successful_run(uid)
+        # Prefer exit_status delivered with the search results (via
+        # select_metadata); fall back to a per-uid request only when absent.
+        exit_status = md.get("exit_status")
+        if exit_status is not None:
+            success = (exit_status == "success")
+        else:
+            success = successful_run(uid)
         #if not success and (md["plan_name"] == "Flyscan"):
         if not success :
             tempPlanName=md["plan_name"]
@@ -222,84 +303,30 @@ def FindScanDataByName(plan_name, scan_title, NumScans=1, lastNdays=1):
     list of [str, str]
         [hdf5_path, hdf5_file] pairs, empty list on network failure.
 
-    TODO: the two filter[eq] blocks for plan_name and title share the same
-          Tiled filter key — the second silently overwrites the first.
-          This is a known Tiled API quirk; the title filter may not work.
-    TODO: debug print(uri) on line ~217 should be logging.debug().
+    Notes
+    -----
+    The title match is applied CLIENT-SIDE: Tiled ignores a second
+    filter[eq] block with the same condition key, so only the plan_name
+    filter is sent to the server and the title is matched here.  Because
+    page[limit] applies before the client-side filter, fewer than NumScans
+    results may be returned when many scans share the plan but not the title.
     """
-    #this filters for specific time AND for specific plan_name
-    # select_metadata = ",".join([
-    #     "plan_name:start.plan_name",
-    #     "time:start.time",
-    #     "scan_title:start.plan_args.scan_title",
-    #     "hdf5_file:start.hdf5_file",
-    #     "hdf5_path:start.hdf5_path",
-    # ])
-    if lastNdays > 0:
-        # if LastNdays is set, then we will ask for data from the last N days
-        start_time = time.time() - (lastNdays * 86400)
-        end_time = time.time()      # current time in seconds
-        tz = "US/Central"
-        # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-        #offset = 6*60*60  # US/Central is UTC-6
-        #start_time += offset
-        #end_time += offset
-        uri = (
-            f"http://{server}:{port}"
-            "/api/v1/search"
-            f"/{catalog}"
-            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&filter[eq][condition][key]=title"                                 # filter by title
-            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-            f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            "&sort=-time"                                                        # sort by time, -time gives last scans first
-            #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-            #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-            "&fields=metadata"                                                  # return metadata
-            "&omit_links=true"                                                  # no links
-            f"&select_metadata={{{select_metadata}}}"                               # select metadata
-            )
-    else:
-        uri = (
-            f"http://{server}:{port}"
-            "/api/v1/search"
-            f"/{catalog}"
-            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            "&filter[eq][condition][key]=title"                                 # filter by title
-            f'&filter[eq][condition][value]="{scan_title}"'                     # filter by title value
-            "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-            "&fields=metadata"                                                  # return metadata
-            "&omit_links=true"                                                  # no links
-            f"&select_metadata={{{select_metadata}}}"                               # select metadata
-            )
-      
-    #logging.info(f"{uri=}")
-    #additional keywords:
-    #[noteq] - not equal
-    #[contains] - seems same as eq in use, and cannot be made into case insensitive. Not useful. 
-    #[in] - in a list of values
-    #[notin] - not in a list of values
-    #[comparison] - comparison with lt, gt, le, ge for numerical values
-    #working examples:
-    #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=10&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time
-    #returns list of "Blank" samples, not not ist of samples contains "blank" in name
-    #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)water*blank&sort=-time
-    #returns last scan which conatins case independent "water blank" in name
-    #http://10.211.55.7:8000/api/v1/search/usaxs/?page[limit]=1&filter[eq][condition][key]=plan_name&filter[eq][condition][value]=%22WAXS%22&filter[regex][condition][key]=title&filter[regex][condition][pattern]=(?i)blank&sort=-time&omit_links=true&select_metadata={plan_name:start.plan_name,time:start.time,scan_title:start.plan_args.scan_title,hdf5_file:start.hdf5_file,hdf5_path:start.hdf5_path}
-    #returns last scan which conatisn case independet "water blank" in name
+    # plan_name filtered server-side; title matched client-side below
+    # (Tiled query syntax reference lives in _build_search_uri)
+    uri = _build_search_uri(NumScans, plan_name=plan_name, lastNdays=lastNdays)
     logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
-        #logging.info(f"Got json for : {plan_name}")        #this does not work for some reason? 
+        # Client-side title filter (see Notes in docstring): keep only runs
+        # whose scan_title matches exactly.
+        filtered = []
+        for entry in r.get("data", []):
+            raw_md = entry["attributes"]["metadata"]
+            md = raw_md.get("selected", raw_md)
+            if md.get("scan_title") == scan_title:
+                filtered.append(entry)
+        r["data"] = filtered
         ScanList = convert_results(r)
-        #ScanList=[]
         logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
         return ScanList
@@ -323,7 +350,11 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
         Bluesky plan name (e.g. 'Flyscan', 'SAXS', 'WAXS', 'uascan').
     path : str or None, optional
         If provided, additionally filter by hdf5_path matching this string
-        (regex-matched by Tiled).  Default None (no path restriction).
+        (regex, applied CLIENT-SIDE — Tiled ignores a second filter[regex]
+        block with the same condition key, so the title regex is sent to the
+        server and the path is matched here).  Default None (no restriction).
+        Note: page[limit] applies before the client-side filter, so fewer
+        than NumScans results may be returned.
     NumScans : int, optional
         Maximum number of blank scans to return.  Default 1.
     lastNdays : int, optional
@@ -334,115 +365,24 @@ def FindLastBlankScan(plan_name, path=None, NumScans=1, lastNdays=1):
     -------
     list of [str, str]
         [hdf5_path, hdf5_file] pairs, empty list on network failure.
-
-    TODO: debug print(uri) should be logging.debug().
     """
-    #this filters for last collected Blank for specific plan_name
-    if path is None:
-        if lastNdays > 0:
-            # if LastNdays is set, then we will ask for data from the last N days
-            start_time = time.time() - (lastNdays * 86400)
-            end_time = time.time()    #current time in seconds
-            tz = "US/Central"
-            # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-            #offset = 6*60*60  # US/Central is UTC-6
-            #start_time += offset
-            #end_time += offset
-            uri = (
-                f"http://{server}:{port}"
-                "/api/v1/search"
-                f"/{catalog}"
-                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-                "&filter[regex][condition][key]=title"                              # filter by title
-                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-                #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-                #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
-                "&fields=metadata"                                                  # return metadata
-                "&omit_links=true"                                                  # no links
-                f"&select_metadata={{{select_metadata}}}"                               # select metadata
-                )
-        else:
-            # if LastNdays is not set, then we will ask for all data
-            uri = (
-                f"http://{server}:{port}"
-                "/api/v1/search"
-                f"/{catalog}"
-                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-                "&filter[regex][condition][key]=title"                              # filter by title
-                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-                "&fields=metadata"                                                  # return metadata
-                "&omit_links=true"                                                  # no links
-                f"&select_metadata={{{select_metadata}}}"                               # select metadata
-                )
-    else:
-        if lastNdays > 0:
-            # if LastNdays is set, then we will ask for data from the last N days
-            start_time = time.time() - (lastNdays * 86400)
-            end_time = time.time()    #current time in seconds
-            tz = "US/Central"
-            # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-            #offset = 6*60*60  # US/Central is UTC-6
-            #start_time += offset
-            #end_time += offset            
-            uri = (
-                f"http://{server}:{port}"
-                "/api/v1/search"
-                f"/{catalog}"
-                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-                "&filter[regex][condition][key]=title"                              # filter by title
-                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
-                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-                f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-                f"&filter[time_range][condition][timezone]={tz}"                    # time range
-                #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-                #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-                #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
-                "&fields=metadata"                                                  # return metadata
-                "&omit_links=true"                                                  # no links
-                f"&select_metadata={{{select_metadata}}}"                               # select metadata
-                )
-        else:
-            # if LastNdays is not set, then we will ask for all data
-            uri = (
-                f"http://{server}:{port}"
-                "/api/v1/search"
-                f"/{catalog}"
-                f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-                "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-                f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-                #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-                "&filter[regex][condition][key]=title"                              # filter by title
-                f'&filter[regex][condition][pattern]=(?i)blank'                     # filter by title value
-                "&filter[regex][condition][key]=hdf5_path"                          # filter by path
-                f'&filter[regex][condition][pattern]={path}'                        # filter by path value, if path is provided
-                "&sort=-time"                                                       # sort by time, -time gives last scans first
-                #"&sort=-metadata.start.time"                                                       # sort by time, -time gives last scans first
-                "&fields=metadata"                                                  # return metadata
-                "&omit_links=true"                                                  # no links
-                f"&select_metadata={{{select_metadata}}}"                               # select metadata
-                )
-                   
+    # plan_name (eq) and blank-title (regex) filtered server-side;
+    # hdf5_path (when given) matched client-side below.
+    uri = _build_search_uri(NumScans, plan_name=plan_name,
+                            title_regex="(?i)blank", lastNdays=lastNdays)
     logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
+        if path is not None:
+            # Client-side hdf5_path filter (see docstring): Tiled cannot take
+            # two filter[regex] blocks in one query.
+            filtered = []
+            for entry in r.get("data", []):
+                raw_md = entry["attributes"]["metadata"]
+                md = raw_md.get("selected", raw_md)
+                if re.search(path, md.get("hdf5_path") or ""):
+                    filtered.append(entry)
+            r["data"] = filtered
         ScanList = convert_results(r)
         #logging.info('Received expected data from tiled server at usaxscontrol.xray.aps.anl.gov')
         logging.info(f"Plan name: {plan_name}, list of scans:{ScanList}")
@@ -482,71 +422,10 @@ def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
       latency has been removed (see commented-out offsetTime code).
     * The filter[contains][condition][exit_status] clause is a Tiled-specific
       filter that checks whether the 'exit_status' key exists in the stop doc.
-    TODO: debug print(f"{uri=}") should be logging.debug().
     """
-    #print (FindLastScanData("Flyscan",10,LastNdays=1))
-    #print (FindLastScanData("uascan",10,LastNdays=1))
-    #print (FindLastScanData("SAXS",10,LastNdays=1))
-    #print (FindLastScanData("WAXS",10,LastNdays=1))
-    #print(f"Search for {plan_name=}")
-    # Find all runs in a catalog between these two ISO8601 dates.
-    start_time = 0
-    # we need to fix file not ready issue. Sometimes the last file is simply not ready 
-    # when we are asking for it. Let's try to ask for files at least 30 second before now. 
-    #offsetTime = 20
-    ##if plan_name == "Flyscan" or plan_name == "uascan":
-     #   offsetTime = 95
-    # this shifts the querried time by offsetTime seconds to past, providing file flush out the files. 
-    end_time = time.time() #- offsetTime
-    tz = "US/Central"
-    # server works in UTC, no need to provide timezone, but we need to add offset if needed.
-    #offset = 6*60*60  # US/Central is UTC-6
-    #end_time += offset    
-    if LastNdays > 0:
-        # if LastNdays is set, then we will ask for data from the last N days
-        start_time = end_time - (LastNdays * 86400)
-    
-    #this filters for specific time AND for specific plan_name
-    if LastNdays > 0:
-        uri = (
-            f"http://{server}:{port}"
-            "/api/v1/search"
-            f"/{catalog}"
-            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            "&filter[contains][condition][exit_status]"                         # filter by exist status key present
-            #&filter[comparison][condition][operator]=gt&filter[comparison][condition][key]=duration&filter[comparison][condition][value]=0.1
-            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-            f"&filter[time_range][condition][since]={(start_time)}"             # time range, start time - 24 hours from now
-            f"&filter[time_range][condition][until]={end_time}"                 # time range, current time in seconds
-            f"&filter[time_range][condition][timezone]={tz}"                    # time range
-            #f"&filter[comparison][condition][key]=start.time&filter[comparison][condition][operator]=ge&filter[comparison][condition][value]={(start_time)}"             # time range, start time - 24 hours from now
-            #f"&filter[comparison2][condition][key]=start.time&filter[comparison2][condition][operator]=le&filter[comparison2][condition][value]={end_time}"                 # time range, current time in seconds
-            "&sort=-time"                                                      # sort by time, -time gives last scans first
-            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-            "&fields=metadata"                                                  # return metadata
-            "&omit_links=true"                                                  # no links
-            f"&select_metadata={{{select_metadata}}}"                               # select metadata
-            )
-    else:
-        # if LastNdays is not set, then we will ask for all data
-        uri = (
-            f"http://{server}:{port}"
-            "/api/v1/search"
-            f"/{catalog}"
-            f"?page[limit]={NumScans}"                                          # 0: all matching, 10 is 10 scans. Must be >0 value
-            "&filter[contains][condition][exit_status]"                         # filter by exist status key present
-            "&filter[eq][condition][key]=plan_name"                             # filter by plan_name
-            f'&filter[eq][condition][value]="{plan_name}"'                      # filter by plan_name value
-            #f'&filter[full_text][condition][text]={plan_name}'                   # filter by plan_name value, full text search, should be faster than eq   
-            #"&sort=-metadata.start.time"                                        # sort by time, -time gives last scans first
-            "&sort=-time"                                        # sort by time, -time gives last scans first
-            "&fields=metadata"                                                  # return metadata
-            "&omit_links=true"                                                  # no links
-            f"&select_metadata={{{select_metadata}}}"                               # select metadata
-            )
-          
+    # Only finished runs (exit_status present in stop doc) for this plan_name.
+    uri = _build_search_uri(NumScans, plan_name=plan_name, lastNdays=LastNdays,
+                            require_exit_status=True)
     logging.debug(f"{uri=}")
     try:
         r = requests.get(uri, timeout=TILED_TIMEOUT).json()
@@ -559,6 +438,126 @@ def FindLastScanData(plan_name, NumScans=10, LastNdays=1):
         logging.error(f'Could not get data from tiled server at  {server}')
         logging.error(f"Failed {uri=}")
         return []
+
+
+def FindLastTuneScans(plan_name, NumScans=5, LastNdays=1):
+    """Return metadata for the most-recent tuning scans of a given plan type.
+
+    Used by the Matilda service to plot live tuning curves (tune_ar, tune_mr,
+    tune_a2rp).  Unlike FindLastScanData, tune scans do not write HDF5 files;
+    their data lives only in the Tiled/DataBroker catalog and is downloaded
+    separately via tiled_get_primary_data().
+
+    Parameters
+    ----------
+    plan_name : str
+        Tuning plan name, e.g. 'tune_ar', 'tune_mr', 'tune_a2rp'.
+    NumScans : int, optional
+        Maximum number of scans to return (Tiled page[limit]).  Default 5.
+    LastNdays : int, optional
+        Restrict search to the last N days.  0 means all time.  Default 1.
+
+    Returns
+    -------
+    list of dict
+        One dict per scan, newest-first, with keys:
+            'uid'      : str   — run uid (== Tiled id), used to fetch arrays
+            'scan_id'  : int   — Bluesky scan_id (may be None)
+            'time'     : float — POSIX start time (may be None)
+            'motor'    : str   — x-axis motor name (motors[0], may be None)
+            'detector' : str   — y-axis detector name (first non-scaler0, may be None)
+        Returns an empty list on network failure or if the server is absent
+        (offline installations), so the caller never crashes.
+    """
+    # Tune scans carry no hdf5 file; we need scan_id, time, motors and detectors
+    # so the downloader can derive the x-axis (motor) and y-axis (detector) keys.
+    tune_select_metadata = ",".join([
+        "plan_name:start.plan_name",
+        "time:start.time",
+        "scan_id:start.scan_id",
+        "uid:start.uid",
+        "motors:start.motors",
+        "detectors:start.detectors",
+    ])
+
+    uri = _build_search_uri(NumScans, plan_name=plan_name, lastNdays=LastNdays,
+                            select_md=tune_select_metadata)
+    logging.debug(f"{uri=}")
+    try:
+        r = requests.get(uri, timeout=TILED_TIMEOUT).json()
+        results = []
+        for v in range(len(r["data"])):
+            uid = r["data"][v]["id"]
+            raw_md = r["data"][v]["attributes"]["metadata"]
+            # usaxscontrol/VM may wrap in ["selected"]; OTZ/current does not.
+            md = raw_md.get("selected", raw_md)
+            motors = md.get("motors") or []
+            detectors = md.get("detectors") or []
+            motor = motors[0] if motors else None
+            # y-axis is the first detector that is not the scaler channel.
+            detector = None
+            for det in detectors:
+                if det and not det.startswith("scaler0"):
+                    detector = det
+                    break
+            results.append({
+                "uid": md.get("uid", uid),
+                "scan_id": md.get("scan_id"),
+                "time": md.get("time"),
+                "motor": motor,
+                "detector": detector,
+            })
+        logging.info(f"Plan name: {plan_name}, found {len(results)} tune scans")
+        return results
+    except Exception:
+        # url communication failed; must not crash the service loop.
+        logging.error(f'Could not get tune data from tiled server at {server}')
+        logging.error(f"Failed {uri=}")
+        return []
+
+
+def tiled_get_primary_data(uid, timeout=TILED_TIMEOUT):
+    """Download the primary data stream (flat dict of arrays) for one run.
+
+    Hits the Tiled 'node/full' endpoint, which returns the actual measured
+    arrays as JSON:
+
+        GET /api/v1/node/full/{catalog}/{uid}/primary/data?format=json
+
+    For a tune scan this returns keys such as
+    {'UPD': [...], 'scaler0_time': [...], 'a_stage_r': [...],
+     'a_stage_r_user_setpoint': [...]}.
+
+    Parameters
+    ----------
+    uid : str
+        Run uid (Tiled id) of the scan.
+    timeout : float, optional
+        Request timeout in seconds.  Default TILED_TIMEOUT.
+
+    Returns
+    -------
+    dict or None
+        Mapping of column name to list of values, or None on failure.  Never
+        raises, so callers on the service loop are safe against a dead server.
+    """
+    uri = (
+        f"http://{server}:{port}"
+        f"/api/v1/node/full/{catalog}/{uid}/primary/data?format=json"
+    )
+    logging.debug(f"{uri=}")
+    try:
+        r = requests.get(uri, timeout=timeout)
+        r.raise_for_status()
+        data = r.json()
+        if isinstance(data, dict):
+            return data
+        logging.error(f"Unexpected primary-data payload for {uid}: not a dict")
+        return None
+    except Exception:
+        logging.error(f'Could not get primary data for {uid} from tiled at {server}')
+        logging.error(f"Failed {uri=}")
+        return None
 
 
 # Example usage of the functions

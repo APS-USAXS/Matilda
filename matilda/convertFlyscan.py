@@ -54,18 +54,18 @@ Notes
 * pprint is imported twice (as pprint and as pp); one import is redundant.
 """
 import h5py
-import numpy as np
 import os
-import pprint as pp
 import logging
 #from scipy.optimize import curve_fit
 
 
-from .supportFunctions import subtract_data
-from .convertUSAXS import rebinData
-from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+# rebinData lives in supportFunctions (was imported via convertUSAXS re-export)
+from .supportFunctions import rebinData
+from .hdf5code import load_dict_from_hdf5, save_dict_to_hdf5, saveNXcanSAS, readMyNXcanSAS
+from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
+from .supportFunctions import empty_calibrated_data
 from .desmearing import desmearData
 
 
@@ -104,7 +104,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
     extrap_method : str, optional
         High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
     extrap_qstart : float, optional
-        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+        Q value above which extrapolation is applied.  Default 0.15 Å⁻¹.
     minQMinFindRatio : float, optional
         Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
     thickness_override : float or None, optional
@@ -123,68 +123,31 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
-        required_items = {'definition': 'NXcanSAS'}
-        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if recalculateAllData:
-            # Delete the groups which may have een created by previously run saveNXcanSAS
-            location = 'entry/QRS_data/'
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
-
-
-        #Now, we will read the data from the file, if the exist. 
-        # More checks... if we have blankname, full NXcanSAS need to exist or recalculate
-        # if blankname=None, then we just need the QRS_data group.   
-
-        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-        location = None
-        if blankFilename is not None and blankPath is not None and "blank" not in filename.lower():
-            location = NXcanSASentry        # require we have desmeared data
-        else:
-            location = 'entry/QRS_data/'            # all we want here are QRS data
-        
-        if location is not None and location in hdf_file:
+        # Cache bookkeeping (shared with processStepscan): with a blank we
+        # require the full desmeared NXcanSAS entry, otherwise QRS_data is enough.
+        requireCalibrated = (blankFilename is not None and blankPath is not None
+                             and "blank" not in filename.lower())
+        if clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
             # exists, so lets reuse the data from the file
-            Sample = dict()
             Sample = readMyNXcanSAS(path, filename, isUSAXS = True)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
-        
+
         else:
             Sample = dict()
             if thickness_override is not None:
-                thick_path = '/entry/sample/thickness'
-                orig_path  = '/entry/sample/thickness_original'
-                if thick_path in hdf_file:
-                    if orig_path not in hdf_file:
-                        hdf_file[orig_path] = hdf_file[thick_path][()]
-                    del hdf_file[thick_path]
-                hdf_file[thick_path] = float(thickness_override)
-                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+                writeThicknessOverride(hdf_file, '/entry/sample/thickness',
+                                       thickness_override, filename)
             Sample["RawData"]=importFlyscan(path, filename)                         # import data
             Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
             Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   # Beam center correction
             Sample["reducedData"].update(smooth_r_data(Sample["reducedData"]["Intensity"],     #smooth data data
-                                                    Sample["reducedData"]["Q"], 
-                                                    Sample["reducedData"]["UPD_gains"], 
-                                                    Sample["reducedData"]["Error"], 
+                                                    Sample["reducedData"]["Q"],
+                                                    Sample["reducedData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
+                                                    Sample["reducedData"]["Error"],
                                                     Sample["RawData"]["TimePerPoint"],
-                                                    replaceNans=True))                 
+                                                    replaceNans=True))
 
             if (
                 blankPath is not None
@@ -217,40 +180,12 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                 else:
                     logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
                                     "Skipping desmearing and rebinning steps. ")
-                    #set calibrated data in the structure to None 
-                    Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                                "SMR_Int":None,
-                                                "SMR_Error":None,
-                                                "SMR_dQ":None,
-                                                "Kfactor":None,
-                                                "OmegaFactor":None,
-                                                "blankname":None,
-                                                "thickness":None,
-                                                "units":"[cm2/cm3]",
-                                                "Intensity":None,
-                                                "Q":None,
-                                                "Error":None,
-                                                "dQ":None,
-                                                "slitLength":None,
-                                                }                    
-            
+                    #set calibrated data in the structure to None
+                    Sample["CalibratedData"] = empty_calibrated_data()
+
             else:
-                #set calibrated data in the structure to None 
-                Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                            "SMR_Int":None,
-                                            "SMR_Error":None,
-                                            "SMR_dQ":None,
-                                            "Kfactor":None,
-                                            "OmegaFactor":None,
-                                            "blankname":None,
-                                            "thickness":None,
-                                            "units":"[cm2/cm3]",
-                                            "Intensity":None,
-                                            "Q":None,
-                                            "Error":None,
-                                            "dQ":None,
-                                            "slitLength":None,
-                                            }
+                #set calibrated data in the structure to None
+                Sample["CalibratedData"] = empty_calibrated_data()
         # Ensure all changes are written and close the HDF5 file
         hdf_file.flush()
     # The 'with' statement will automatically close the file when the block ends
@@ -261,12 +196,13 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
 def reduceFlyscanToQR(path, filename, recalculateAllData=False):
     # Open the HDF5 file in read/write mode
     location = 'entry/displayData/'
-    with h5py.File(path+'/'+filename, 'r+') as hdf_file:
+    with h5py.File(os.path.join(path, filename), 'r+') as hdf_file:
             # Check if the group 'displayData' exists
             if recalculateAllData:
-                # Delete the group
-                del hdf_file[location]
-                logging.info("Deleted existing group 'entry/displayData'.")
+                if location in hdf_file:
+                    # Delete the group only if it exists (first run has none)
+                    del hdf_file[location]
+                    logging.info("Deleted existing group 'entry/displayData'.")
 
             if location in hdf_file:
                 # exists, so lets reuse the data from the file
@@ -289,7 +225,6 @@ def reduceFlyscanToQR(path, filename, recalculateAllData=False):
 
 def test_matildaLocal():
 
-    Sample = dict()
     #does the file exists?
     # e = os.path.isfile("C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/USAXS.h5")
     # if not e:
@@ -304,7 +239,8 @@ def test_matildaLocal():
     samplename="hematite_48C_98min_0050.h5"
     blankPath=samplePath 
     blankFilename="CapillaryBlank_0006.h5"
-    Sample = processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)    
+    # assign to `Sample` if you re-enable the debug plotting below
+    processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)
     #Sample = processFlyscan(samplePath,blankFilename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
     
     # # this is for testing save/restore from Nexus file... 
@@ -347,8 +283,8 @@ def test_matildaLocal():
     # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"] 
     # SMR_Int =Sample["CalibratedData"]["SMR_Int"] 
     # #SMR_Error =Sample["CalibratedData"]["SMR_Error"] 
-    DSM_Qvec =Sample["CalibratedData"]["Q"]
-    DSM_Int =Sample["CalibratedData"]["Intensity"]
+    # DSM_Qvec =Sample["CalibratedData"]["Q"]        # used by debug plot below
+    # DSM_Int =Sample["CalibratedData"]["Intensity"]
     #DSM_Error =Sample["CalibratedData"]["Error"]
     # Debug plot (requires matplotlib; commented out for production):
     # import matplotlib.pyplot as plt

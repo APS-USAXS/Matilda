@@ -14,6 +14,9 @@ from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+# canonical copies of the dict helpers live in hdf5code; re-exported here
+# because convertUSAXS/convertSWAXS historically import them from this module
+from .hdf5code import read_group_to_dict, filter_nested_dict
 
 #this is to enable graphs in R data clacualtion for debugging. 
 debugme = 0
@@ -21,13 +24,36 @@ debugme = 0
 
 MinQMinFindRatio = 1.05
 
+
+def empty_calibrated_data():
+    """Return the CalibratedData dict used when calibration is not possible
+    (no blank provided, or too few points survived subtraction).
+
+    A fresh dict is returned each call so callers can mutate it safely.
+    """
+    return {"SMR_Qvec": None,
+            "SMR_Int": None,
+            "SMR_Error": None,
+            "SMR_dQ": None,
+            "Kfactor": None,
+            "OmegaFactor": None,
+            "blankname": None,
+            "thickness": None,
+            "units": "[cm2/cm3]",
+            "Intensity": None,
+            "Q": None,
+            "Error": None,
+            "dQ": None,
+            "slitLength": None,
+            }
+
 ## support stuff here
 
 
 ## importFlyscan loads data from flyscan NX file. It should be same for QR pass as well as for calibrated data processing. 
 def importFlyscan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    with h5py.File(path+"/"+filename, 'r') as file:
+    with h5py.File(os.path.join(path, filename), 'r') as file:
         #read various data sets
         # mca1/2/3 always contain exactly the number of collected data points — no padding.
         # Use mca1 length as ground truth, then align ARangles to it.
@@ -189,11 +215,11 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                 Blank["BlankData"].update(calculatePDErrorFly(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
                 Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
                 Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
-                                                        Blank["BlankData"]["Q"], 
-                                                        Blank["BlankData"]["UPD_gains"], 
-                                                        Blank["BlankData"]["Error"], 
+                                                        Blank["BlankData"]["Q"],
+                                                        Blank["BlankData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
+                                                        Blank["BlankData"]["Error"],
                                                         Blank["RawData"]["TimePerPoint"],
-                                                        replaceNans=True )) 
+                                                        replaceNans=True ))
                 # we need to return just the BlankData part 
                 BlankData=dict()
                 BlankData=Blank["BlankData"]
@@ -248,9 +274,10 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     #Intensity and Error are corrected for transmission in normalize by transmission above. 
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
     # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
-    MaxSMR_Int = np.max(SMR_Int)
+    # use NaN-safe variants: SMR_Int may contain NaNs from masked gain changes
+    MaxSMR_Int = np.nanmax(SMR_Int)
     #find min value in SMR_Int for points from half to end
-    MinSMR_Int = np.min(SMR_Int[int(len(SMR_Int)/2):])
+    MinSMR_Int = np.nanmin(SMR_Int[int(len(SMR_Int)/2):])
     #if MinSMR_Int < 0, then we need add to SMR_Int enough to lift it above zero
     ScaleByBackground = 1.1         #this is from Igor code IN3_FixNegativeIntensities
     ScaleByIntMax = 3e-11           #this is from Igor code IN3_FixNegativeIntensities
@@ -380,7 +407,10 @@ def calculatePDErrorFly(Sample, isBlank=False):
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    Frequency=1e6   #this is frequency of clock fed into mca1
+    # CONFIRMED 2026-07-08 (JIL): flyscan MCA gets a dedicated 1e6 Hz clock;
+    # step scans use the Joerger scaler internal 1e7 Hz clock (convertUSAXS).
+    # Both are correct for their geometry — do not unify.
+    Frequency=1e6   # flyscan MCA clock (mca1 time base)
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
@@ -442,18 +472,19 @@ def calculatePD_Fly(data_dict):
     AmpReqGain = data_dict["RawData"]["AmpReqGain"]
     Channel = data_dict["RawData"]["Channel"]
     metadata_dict = data_dict["RawData"]["metadata"]
-    instrument_dict = data_dict["RawData"]["instrument"]
     UPD_array = data_dict["RawData"]["UPD_array"]
     TimePerPoint = data_dict["RawData"]["TimePerPoint"]
     Monitor = data_dict["RawData"]["Monitor"]
-    VToFFactor = data_dict["RawData"]["VToFFactor"]
 
     
         # Create Gains arrays - one for requested and one for real
     I0Gain = metadata_dict["I0Gain"]
-    num_elements = UPD_array.size 
+    num_elements = UPD_array.size
+    # Fill defaults with the LAST recorded change of each array.
+    # (Former bug: AmpGainReq_array was filled from AmpGain, corrupting the
+    # AmpGain == AmpReqGain mask used for gain-change/deadtime masking.)
     AmpGain_array = np.full(num_elements, AmpGain[len(AmpGain)-1])
-    AmpGainReq_array = np.full(num_elements,AmpGain[len(AmpReqGain)-1])
+    AmpGainReq_array = np.full(num_elements, AmpReqGain[len(AmpReqGain)-1])
 
         # Iterate over the Channel array to get index pairs
     for i in range(0, len(Channel)-2, 1):
@@ -506,10 +537,10 @@ def calculatePD_Fly(data_dict):
             updBkgErr[i] =  metadata_dict[updBkgErrName]
 
         #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
-    Frequency= 1e6      #VToFFactor[0]/10   #this is frequency of clock fed into mca1/10 for HDF5 writer 1.3 and higher
+    Frequency= 1e6      # flyscan MCA clock, confirmed 2026-07-08 (JIL); step scans use 1e7 Joerger clock instead
     TimeInSec = TimePerPoint/Frequency
     Totaltime= sum(TimeInSec)
-    print(f"{Totaltime}")
+    logging.debug(f"Total measurement time: {Totaltime} s")
     n_pts = len(TimeInSec)
     for i in range(0, len(Channel)-1, 1):
         startPnt = int(Channel[i])
@@ -557,9 +588,16 @@ def calculatePD_Fly(data_dict):
     # Igor has code to avoid 0 uncertainties. Not needed here, this is recalculated anyway. 
     
     
+    # NOTE (fix for former duplicate-key bug): the dict used to list
+    # "UPD_gains" twice, so GainsIndx was silently dropped and downstream
+    # smoothing received gain VALUES where it expected the range INDEX.
+    #   UPD_gainsIndx — amplifier range index (0-4, from changes_DDPCA300_ampGain),
+    #                   NaN at masked points; used by smooth_r_data.
+    #   UPD_gains     — actual amplifier gain values (V/A, ~1e4-1e12) looked up
+    #                   from DDPCA300_gainN; used by calculatePDErrorFly.
     result = {"Intensity":PD_Intensity,
               "Error":PD_error,
-              "UPD_gains":GainsIndx,
+              "UPD_gainsIndx":GainsIndx,
               "UPD_gains":Gains,
               "UPD_bkgErr":updBkgErr}
     return result
@@ -740,8 +778,14 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     return results
 
 
-def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans=True):
-    # Smoothing times for different ranges
+def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time, replaceNans=True):
+    """Smooth flyscan R data per amplifier range.
+
+    UPD_gainsIndx is the amplifier RANGE INDEX (0-4, from
+    changes_DDPCA300_ampGain; NaN at masked points) — NOT the gain value.
+    Each range has its own minimum smoothing time in rwave_smooth_times.
+    """
+    # Smoothing times for different ranges, indexed by range 0-4
     rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
 
     # Logarithm of intensity
@@ -762,7 +806,7 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
 
 
     smooth_intensity = np.copy(temp_int_log)
-    meas_time_sec = meas_time/1e6       # meas_time is still frequency, need time in seconds. 
+    meas_time_sec = meas_time/1e6       # convert mca1 counts to seconds; 1e6 Hz flyscan MCA clock (confirmed 2026-07-08)
 
     def linear_fit(x, a, b):
         return a + b * x
@@ -771,15 +815,21 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
     startIndex = find_crossing_index(qvector, 0.0003)
 
     for i in range(startIndex, len(intensity)):
-        if UPD_gains[i] == 1:
+        # 0-based range index mapping (ranges are 0-4 in this code base:
+        # DDPCA300_gain0..gain4, upd_bkg0..4).  The previous 1-based mapping
+        # never matched because the array held gain VALUES (duplicate-key
+        # bug in calculatePD_Fly) — every point got times[4] = 0.4 s.
+        # ⚗️ validate smoothing against Igor after this change.
+        if UPD_gainsIndx[i] == 0:
             tmp_time = rwave_smooth_times[0]
-        elif UPD_gains[i] == 2:
+        elif UPD_gainsIndx[i] == 1:
             tmp_time = rwave_smooth_times[1]
-        elif UPD_gains[i] == 3:
+        elif UPD_gainsIndx[i] == 2:
             tmp_time = rwave_smooth_times[2]
-        elif UPD_gains[i] == 4:
+        elif UPD_gainsIndx[i] == 3:
             tmp_time = rwave_smooth_times[3]
         else:
+            # range 4, or NaN (masked point)
             tmp_time = rwave_smooth_times[4]
 
         if meas_time_sec[i] > tmp_time:
@@ -794,7 +844,7 @@ def smooth_r_data(intensity, qvector, UPD_gains, r_error, meas_time, replaceNans
             if i + end_points > len(intensity) - 1:
                 end_points = len(intensity) - 1 - i
 
-            if (UPD_gains[i - start_points] != UPD_gains[i]) or (UPD_gains[i + end_points] != UPD_gains[i]):
+            if (UPD_gainsIndx[i - start_points] != UPD_gainsIndx[i]) or (UPD_gainsIndx[i + end_points] != UPD_gainsIndx[i]):
                 temp_r = temp_int_log[i - start_points:i + end_points]
                 temp_q = qvector[i - start_points:i + end_points]
 
@@ -826,7 +876,9 @@ def find_crossing_index(array, target_value):
     for index, value in enumerate(array):
         if value >= target_value:
             return index
-    return 0.1*len(array)  # Return None if the target value is not crossed
+    # Fallback: target never crossed — return an int (used as a range() start)
+    # at 10% of the array length.
+    return int(0.1 * len(array))
 
 # subtract QRS data
 def subtract_data(X1, Y1, E1, X2, Y2, E2):
@@ -856,7 +908,9 @@ def subtract_data(X1, Y1, E1, X2, Y2, E2):
     #if Y2_min<1e-30, offset whole Y2 by 3*abs(Y2_min)
     offset=0
     if Y2_min<1e-30:
-        offset =  3*abs(Y2_min)
+        # +1e-30 also covers Y2_min == 0 exactly, where 3*abs(0) would leave
+        # log(0) = -inf below.
+        offset =  3*abs(Y2_min) + 1e-30
     
     Y2 = Y2 + offset
     logY2 = np.log(Y2)
@@ -913,70 +967,9 @@ def modifiedGauss(xvar, a, x0, sigma, exponent):
 
 
 
-# Function to recursively read a group and store its datasets in a dictionary
-def read_group_to_dict(group):
-    data_dict = {}
-    for key, item in group.items():
-        if isinstance(item, h5py.Dataset):
-            # Read the dataset
-            data = item[()]
-             # Check if the dataset is bytes
-            if isinstance(data, bytes):
-                # Decode bytes to string
-                data = data.decode('utf-8')
-            # Check if the dataset is an array with a single element
-            elif hasattr(data, 'size') and data.size == 1:
-                # Convert to a scalar (number or string)
-                data = data.item()
-                if isinstance(data, bytes):
-                    # Decode bytes to string, the above does not seem to catch this? 
-                    data = data.decode('utf-8')
-            data_dict[key] = data
-        elif isinstance(item, h5py.Group):
-            # If the item is a group, recursively read its contents
-            data_dict[key] = read_group_to_dict(item)
-    return data_dict
-
-
-# this should not fail if keys on the list are not present
-def filter_nested_dict(d, keys_to_keep):
-    if isinstance(d, dict):
-        return {k: filter_nested_dict(v, keys_to_keep) for k, v in d.items() if k in keys_to_keep and k in d}
-    elif isinstance(d, list):
-        return [filter_nested_dict(item, keys_to_keep) for item in d]
-    else:
-        return d    
-
-# def results_to_dataset(results):
-#     results = copy.deepcopy(results)
-#     ds = xr.Dataset()
-#     ds['USAXS_int'] = ('q',results['reducedData']['UPD'])
-#     ds['q'] = results['reducedData']['Q_array']
-#     del results['reducedData']['UPD']
-#     del results['reducedData']['Q_array']
-#     ds.update(results['reducedData'])
-#     for our_name,raw_name in [('AR_angle','ARangles'),
-#                               ('TimePerPoint','TimePerPoint'),
-#                               ('Monitor','Monitor'),
-#                               ('UPD','UPD_array'),
-#                              ]:
-#         ds[our_name] = ('flyscan_bin',results['RawData'][raw_name])
-#         del results['RawData'][raw_name]
-#     for our_name,raw_name in [('AmpGain','AmpGain'),
-#                               ('AmpReqGain','AmpReqGain'),
-#                               ('amp_change_channel','Channel')
-#                              ]:
-#         ds[our_name] = ('amp_change_channel',results['RawData'][raw_name])
-#         del results['RawData'][raw_name]
-                                      
-#     ds.attrs.update(results['RawData']['metadata'])
-#     del results['RawData']['metadata']
-#     ds.attrs['instrument'] = results['RawData']['instrument']
-#     del results['RawData']['instrument']
-#     ds.update(results['RawData'])
-
-#     return ds
-
+# read_group_to_dict and filter_nested_dict live in hdf5code (canonical copies)
+# and are re-exported from this module for backwards compatibility (see the
+# import at the top of this file).
 
 '''
     Converted by AI from Igor code
@@ -1017,12 +1010,19 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints):
     Ws_less = Ws[mask_less]
     Wdx_less = Wdx[mask_less]
 
-    # Split arrays based on the condition Q > 0.0002
-    mask_greater = Wx > 0.0002
+    # Split arrays based on the condition Q >= 0.0002
+    # (>= so a point exactly at the threshold is not silently dropped)
+    mask_greater = Wx >= 0.0002
     Wx_greater = Wx[mask_greater]
     Wy_greater = Wy[mask_greater]
     Ws_greater = Ws[mask_greater]
     Wdx_greater = Wdx[mask_greater]
+
+    if len(Wx_greater) < 2:
+        # Not enough high-Q points to rebin — return the data unchanged.
+        logging.warning(f"rebin_QRSdata: only {len(Wx_greater)} points above Q=0.0002; "
+                        "skipping rebinning and returning data unchanged.")
+        return Wx, Wy, Ws, Wdx
 
     MinStep = Wx_greater[1] - Wx_greater[0]
 
@@ -1203,13 +1203,3 @@ def find_correct_log_scale_start(StartValue, EndValue, NumPoints, MinStep):
 
     # The optimal start value is in result.x[0]
     return result.x[0]
-
-
-# # Example usage
-# StartValue = 1.0
-# EndValue = 10.0
-# NumPoints = 100
-# MinStep = 0.1
-
-# optimal_start = find_correct_log_scale_start(StartValue, EndValue, NumPoints, MinStep)
-# print("Optimal Start Value:", optimal_start)

@@ -192,7 +192,7 @@ class ReductionWorker(QThread):
                 num_points=params.get("npts", 500),
                 desmear_iter=params.get("desmear_iter", 20),
                 extrap_method=params.get("extrap_method", "PowerLaw w flat"),
-                extrap_qstart=params.get("extrap_qstart", 0.1),
+                extrap_qstart=params.get("extrap_qstart", 0.15),  # keep in sync with converter default
                 minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
                 thickness_override=params.get("thickness"),
                 use_mu=params.get("use_mu", False),
@@ -210,7 +210,7 @@ class ReductionWorker(QThread):
                 recalculateAllData=recalc,
                 desmear_iter=params.get("desmear_iter", 20),
                 extrap_method=params.get("extrap_method", "PowerLaw w flat"),
-                extrap_qstart=params.get("extrap_qstart", 0.1),
+                extrap_qstart=params.get("extrap_qstart", 0.15),  # keep in sync with converter default
                 minQMinFindRatio=params.get("minQMinFindRatio", 1.05),
                 thickness_override=params.get("thickness"),
                 use_mu=params.get("use_mu", False),

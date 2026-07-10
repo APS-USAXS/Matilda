@@ -37,16 +37,14 @@ TODO: reduceStepScanToQR and reduceFlyscanToQR mentioned in original header
 import os
 import h5py
 import numpy as np
-from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-import pprint as pp
 import logging
 from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
-from .supportFunctions import beamCenterCorrection, rebinData
+from .supportFunctions import beamCenterCorrection
 from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
-from .supportFunctions import subtract_data
-from .hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from .supportFunctions import beamCenterCorrection, smooth_r_data, getBlankFlyscan, normalizeByTransmission
+from .hdf5code import saveNXcanSAS, readMyNXcanSAS
+from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
+from .supportFunctions import empty_calibrated_data
+from .supportFunctions import normalizeByTransmission
 from .desmearing import desmearData
 from .plotData import plotUSAXSResults
 
@@ -84,7 +82,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
     extrap_method : str, optional
         High-Q extrapolation method for desmearing.  Default 'PowerLaw w flat'.
     extrap_qstart : float, optional
-        Q value above which extrapolation is applied.  Default 0.1 Å⁻¹.
+        Q value above which extrapolation is applied.  Default 0.15 Å⁻¹.
     minQMinFindRatio : float, optional
         Threshold for Q-minimum selection after blank subtraction.  Default 1.05.
     thickness_override : float or None, optional
@@ -99,58 +97,22 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
-        required_items = {'definition': 'NXcanSAS'}
-        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if recalculateAllData:
-            # Delete the groups which may have een created by previously run saveNXcanSAS
-            location = 'entry/QRS_data/'
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
-
-
-        #Now, we will read the data from the file, if the exist. 
-        # More checks... if we have blankname, full NXcanSAS need to exist or recalculate
-        # if blankname=None, then we just need the QRS_data group.   
-
-        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-        location = None
-        if blankFilename is not None and blankPath is not None and "blank" not in filename.lower():
-            location = NXcanSASentry        # require we have desmeared data
-        else:
-            location = 'entry/QRS_data/'            # all we want here are QRS data
-        
-        if location is not None and location in hdf_file:
+        # Cache bookkeeping (shared with processFlyscan): with a blank we
+        # require the full desmeared NXcanSAS entry, otherwise QRS_data is enough.
+        requireCalibrated = (blankFilename is not None and blankPath is not None
+                             and "blank" not in filename.lower())
+        if clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
             # exists, so lets reuse the data from the file
-            Sample = dict()
             Sample = readMyNXcanSAS(path, filename, isUSAXS=True)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
-        
+
         else:
             Sample = dict()
             if thickness_override is not None:
-                thick_path = '/entry/instrument/bluesky/metadata/sample_thickness_mm'
-                orig_path  = '/entry/instrument/bluesky/metadata/sample_thickness_mm_original'
-                if thick_path in hdf_file:
-                    if orig_path not in hdf_file:
-                        hdf_file[orig_path] = hdf_file[thick_path][()]
-                    del hdf_file[thick_path]
-                hdf_file[thick_path] = float(thickness_override)
-                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+                writeThicknessOverride(hdf_file,
+                                       '/entry/instrument/bluesky/metadata/sample_thickness_mm',
+                                       thickness_override, filename)
             Sample["RawData"]=importStepScan(path, filename)                #import data
             Sample["reducedData"]=(createUPDGainsAndBkgErrArrays(Sample))
             Sample["reducedData"].update(CorrectUPDGainsStep(Sample))    # Correct UPD gains=CorrectUPDGainsStep(Sample)    # Correct UPD gains, this is the first step in data reduction
@@ -169,7 +131,9 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                 and blankFilename != filename
                 and "blank" not in filename.lower()
             ):
-                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=False)
+                # pass recalculateAllData through so a forced reprocess also
+                # invalidates the cached blank (was hardcoded False before)
+                Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density, transmission_override=transmission_override, qmin_override=qmin_override))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
@@ -193,40 +157,12 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                 else:
                     logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
                                     "Skipping desmearing and rebinning steps. ")
-                    #set calibrated data in the structure to None 
-                    Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                                "SMR_Int":None,
-                                                "SMR_Error":None,
-                                                "SMR_dQ":None,
-                                                "Kfactor":None,
-                                                "OmegaFactor":None,
-                                                "blankname":None,
-                                                "thickness":None,
-                                                "units":"[cm2/cm3]",
-                                                "Intensity":None,
-                                                "Q":None,
-                                                "Error":None,
-                                                "dQ":None,
-                                                "slitLength":None,
-                                                }                    
-            
+                    #set calibrated data in the structure to None
+                    Sample["CalibratedData"] = empty_calibrated_data()
+
             else:
-                #set calibrated data in the structure to None 
-                Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                            "SMR_Int":None,
-                                            "SMR_Error":None,
-                                            "SMR_dQ":None,
-                                            "Kfactor":None,
-                                            "OmegaFactor":None,
-                                            "blankname":None,
-                                            "thickness":None,
-                                            "units":"[cm2/cm3]",
-                                            "Intensity":None,
-                                            "Q":None,
-                                            "Error":None,
-                                            "dQ":None,
-                                            "slitLength":None,
-                                            }
+                #set calibrated data in the structure to None
+                Sample["CalibratedData"] = empty_calibrated_data()
         # Ensure all changes are written and close the HDF5 file
         hdf_file.flush()
     # The 'with' statement will automatically close the file when the block ends
@@ -288,29 +224,33 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
 def createUPDGainsAndBkgErrArrays(Sample):
     # Create UPD_gains and UPD_bkgErr arrays based on the AmpGain values
     AmpGain = Sample["RawData"]["AmpGain"]
-    Bkg_map = Sample["RawData"]["Bkg_map"]  
-    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # Convert to seconds if needed
+    Bkg_map = Sample["RawData"]["Bkg_map"]
+    # CONFIRMED 2026-07-08 (JIL): 1e7 Hz = Joerger scaler internal clock,
+    # correct for step scans (flyscans use a 1e6 Hz MCA clock instead).
+    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # convert scaler counts to seconds
     UPD_gains = np.zeros_like(AmpGain, dtype=float)
     UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
-    
-    # Assign values based on AmpGain
+
+    # Assign values based on AmpGain.  Match with tolerance (EPICS-sourced
+    # floats may not be bit-exact) and warn on unknown gains, which would
+    # otherwise silently leave UPD_gains 0 (division by zero downstream).
+    known_gains = {1e4: "1e4", 1e6: "1e6", 1e8: "1e8", 1e10: "1e10", 1e12: "1e12"}
+    unknown_gains = set()
     for i, gain in enumerate(AmpGain):
-        if gain == 1e4:
-            UPD_gains[i] = 1e4
-            UPD_bkgErr[i] = Bkg_map["1e4"] * TimePerPoint[i] 
-        elif gain == 1e6:
-            UPD_gains[i] = 1e6
-            UPD_bkgErr[i] = Bkg_map["1e6"] * TimePerPoint[i] 
-        elif gain == 1e8:
-            UPD_gains[i] = 1e8
-            UPD_bkgErr[i] = Bkg_map["1e8"] * TimePerPoint[i] 
-        elif gain == 1e10:
-            UPD_gains[i] = 1e10
-            UPD_bkgErr[i] = Bkg_map["1e10"] * TimePerPoint[i] 
-        elif gain == 1e12:
-            UPD_gains[i] = 1e12
-            UPD_bkgErr[i] = Bkg_map["1e12"] * TimePerPoint[i] 
-    
+        matched_key = None
+        for gval, gkey in known_gains.items():
+            if np.isclose(gain, gval, rtol=1e-3):
+                matched_key = gkey
+                UPD_gains[i] = gval
+                break
+        if matched_key is not None:
+            UPD_bkgErr[i] = Bkg_map[matched_key] * TimePerPoint[i]
+        else:
+            unknown_gains.add(float(gain))
+    if unknown_gains:
+        logging.warning(f"Unknown UPD amplifier gain values {sorted(unknown_gains)}; "
+                        "gain/background left at 0 for those points.")
+
     result = dict()
     result["UPD_gains"] = UPD_gains
     result["UPD_bkgErr"] = UPD_bkgErr
@@ -342,7 +282,11 @@ def calculatePDErrorStep(Sample, isBlank=False):
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
     MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    Frequency=1e7   #this is frequency of clock fed into mca1
+    # CONFIRMED 2026-07-08 (JIL): the time-base clock differs by geometry.
+    # Step scans count time with the Joerger scaler INTERNAL 1e7 Hz clock;
+    # flyscans use the MCA with a dedicated 1e6 Hz clock source.
+    # 1e7 here and 1e6 in calculatePDErrorFly are BOTH correct — do not unify.
+    Frequency=1e7   # Joerger scaler internal clock (step scans)
     MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
@@ -375,7 +319,7 @@ def calculatePDErrorStep(Sample, isBlank=False):
 ## Stepscan main code here
 def importStepScan(path, filename):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    with h5py.File(path+"/"+filename, 'r') as file:
+    with h5py.File(os.path.join(path, filename), 'r') as file:
         #read various data sets
         #AR angle
         dataset = file['/entry/data/a_stage_r'] 
@@ -413,10 +357,15 @@ def importStepScan(path, filename):
         USAXSPinT_pinGain = data[0]
         data = file['/entry/instrument/bluesky/streams/baseline/terms_USAXS_transmission_count_time/value']
         USAXSPinT_Time = data[0]
-        metadata_dict['trans_pin_counts'] = USAXSPinT_I0Counts
-        metadata_dict['trans_pin_gain'] = USAXSPinT_I0Gain
-        metadata_dict['trans_I0_counts'] = USAXSPinT_pinCounts
-        metadata_dict['trans_I0_gain'] = USAXSPinT_pinGain
+        # Fix for former pin<->I0 swap: the diode stream goes to trans_pin_*,
+        # the I0 stream to trans_I0_*.  With the old swapped assignment
+        # MeasuredTransmission in calibrateAndSubtractFlyscan computed the
+        # RECIPROCAL of the intended value for step scans.
+        # ⚗️ validate step-scan transmission/calibration against Igor.
+        metadata_dict['trans_pin_counts'] = USAXSPinT_pinCounts
+        metadata_dict['trans_pin_gain'] = USAXSPinT_pinGain
+        metadata_dict['trans_I0_counts'] = USAXSPinT_I0Counts
+        metadata_dict['trans_I0_gain'] = USAXSPinT_I0Gain
         metadata_dict['trans_I0_time'] = USAXSPinT_Time
         data = file['/entry/start_time']
         timeStamp = data[()]
@@ -515,10 +464,24 @@ def CorrectUPDGainsStep(data_dict):
     # Convert keys to floats in Bkg_map for matching with AmpGain
     Bkg_map_float_keys = {float(k): v for k, v in Bkg_map.items()}
 
+    unknown_gains = set()
     for i, gain in enumerate(AmpGain):
-        background_value = Bkg_map_float_keys.get(gain, 0) # Default to 0 if not found
-        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # Convert to seconds if needed, here we assume TimePerPoint is in microseconds
-    #TODO: check 1e7 is correct, elsewhere we use 1e6. 
+        background_value = Bkg_map_float_keys.get(gain)
+        if background_value is None:
+            # tolerant match — EPICS-sourced floats may not be bit-exact
+            for gval, bval in Bkg_map_float_keys.items():
+                if np.isclose(gain, gval, rtol=1e-3):
+                    background_value = bval
+                    break
+        if background_value is None:
+            background_value = 0    # unknown gain: no background subtraction
+            unknown_gains.add(float(gain))
+        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # 1e7 Hz Joerger scaler clock (confirmed, see calculatePDErrorStep)
+    if unknown_gains:
+        logging.warning(f"CorrectUPDGainsStep: unknown UPD amplifier gain values "
+                        f"{sorted(unknown_gains)}; background set to 0 for those points.")
+    # 1e7 confirmed correct for step scans (Joerger scaler internal clock);
+    # the 1e6 used elsewhere is the flyscan MCA clock — different hardware.
     # Now we can correct UPD_array for background
     # Remove background from UPD_array
     UPD_array_corr = UPD_array - Bckg_corr       
@@ -528,50 +491,8 @@ def CorrectUPDGainsStep(data_dict):
     return result
 
 
-# def reduceStepScanToQR(path, filename, recalculateAllData=True):
-#   # Open the HDF5 file in read/write mode
-#     location = 'entry/displayData/'
-#     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
-#         if recalculateAllData:
-#             # Delete the group
-#             if location in hdf_file:
-#                 del hdf_file[location]
-#                 logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
-        
-#         if location in hdf_file:
-#                 # # exists, reuse existing data
-#                 Sample = dict()
-#                 Sample = load_dict_from_hdf5(hdf_file, location)
-#                 return Sample
-#         else:
-#                 Sample = dict()
-#                 Sample["RawData"]=ImportStepScan(path, filename)
-#                 Sample["reducedData"]= CorrectUPDGainsStep(Sample)
-#                 Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=1))
-#                 # Create the group and dataset for the new data inside the hdf5 file for future use.
-#                 # these are not fully reduced data, this is for web plot purpose.
-#                 save_dict_to_hdf5(Sample, location, hdf_file)
-#                 return Sample
-
-
-# def PlotResults(data_dict):
-#         # Plot UPD vs Q.
-#     Q = data_dict["reducedData"]["Q"]
-#     Intensity = data_dict["reducedData"]["Intensity"]
-    
-#         # Plot ydata against xdata
-#     plt.figure(figsize=(6, 12))
-#     plt.plot(Q, Intensity, marker='o', linestyle='-')  # You can customize the marker and linestyle
-#     plt.title('Plot of UPD vs. Q')
-#     plt.xlabel('log(Q) [1/A]')
-#     plt.ylabel('UPD')
-#     plt.xscale('log')
-#     plt.yscale('log')
-#     plt.grid(True)
-#     plt.show()
-
-
-
+# (legacy commented-out reduceStepScanToQR / PlotResults removed 2026-07;
+#  see git history if needed again)
 
 
 if __name__ == "__main__":

@@ -14,13 +14,29 @@ readme = "README.md"
 authors = [
     { name = "Jan Ilavsky", email = "ilavsky@anl.gov" },
 ]
-# license = { file = "LICENSE" }
+license = { file = "LICENSE.txt" }
 requires-python = ">=3.11"
+keywords = [
+    "SAXS", "USAXS", "WAXS", "small-angle X-ray scattering",
+    "synchrotron", "data reduction", "NXcanSAS", "HDF5", "Tiled",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Chemistry",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: Other/Proprietary License",
 ]
+
+[project.urls]
+Homepage = "https://github.com/APS-USAXS/Matilda"
+Repository = "https://github.com/APS-USAXS/Matilda"
+"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
+Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
 
 # Core runtime dependencies (verified used in source code).
 # GUI dependencies (PyQt6, pyqtgraph) are listed separately below so the
@@ -35,7 +51,7 @@ dependencies = [
     "pyFAI",
     "requests",
     "scipy",
-    "tifffile",
+    # tifffile removed 2026-07: only referenced from commented-out debug code
 ]
 
 [project.optional-dependencies]
@@ -64,6 +80,7 @@ all = [
     "pyepics",
     "pytest",
     "pytest-cov",
+    "ruff",
 ]
 
 [project.scripts]
@@ -84,4 +101,32 @@ packages = ["matilda"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Only collect test_*.py — tests/manual_test.py is a hand-run integration
+# script with hardcoded local paths, not a pytest module.
+python_files = ["test_*.py"]
+
+[tool.ruff]
+# Scratch/example folders are not linted.
+extend-exclude = ["CodeFragments", "IgorExample", "docs"]
+line-length = 200          # legacy code has long lines; do not fight it yet
+
+[tool.ruff.lint]
+# Start with correctness-focused rules (pyflakes + syntax-level pycodestyle).
+# F-rules would have caught the duplicate-dict-key and unused-import issues
+# found in the 2026-07 review.  Style rules can be enabled later.
+select = ["E4", "E7", "E9", "F", "B006"]
+ignore = [
+    "E731",   # lambda assignment — used intentionally in a few places
+    "E741",   # ambiguous variable names (l, I) — common in scattering code (I = intensity)
+    "E701",   # compact one-line if statements — pervasive legacy style; revisit later
+    "E702",   # semicolon-separated statements — pervasive legacy style; revisit later
+]
+
+[tool.ruff.lint.per-file-ignores]
+# supportFunctions re-exports HDF5 helpers for convertUSAXS et al.
+"matilda/supportFunctions.py" = ["F401"]
+# tests import after pytest.importorskip() by design
+"tests/*" = ["E402"]
+# manual_test.py is a template; imports are meant to be used by hand-edits
+"tests/manual_test.py" = ["F401", "E402"]
 

@@ -19,8 +19,7 @@
 import numpy as np
 import logging
 from scipy.optimize import curve_fit
-from scipy.interpolate import interp1d
-from scipy.integrate import simpson, trapezoid
+from scipy.integrate import trapezoid
 
 
 
@@ -151,7 +150,14 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
                 Int_wave[DataLengths + i] = popt[0] + popt[1] * Q_vct[DataLengths + i]**popt[2]
         except RuntimeError:
             ProblemWithFit = "Power Law with flat fit function did not converge properly, change function or Q range"
-    
+
+    else:
+        # Unknown method name: previously this fell through SILENTLY, leaving
+        # the np.resize-recycled values in the extension region (garbage).
+        # Route through the flat fallback below instead.
+        ProblemWithFit = (f"Unknown extrapolation method {SelectedFunction!r} "
+                          "(valid: 'flat', 'Power law', 'Porod', 'PowerLaw w flat')")
+
     ExtensionFailed = False
     ErrorMessages = ""
     if ProblemsWithQ:
@@ -162,13 +168,16 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
         ErrorMessages += ProblemWithFit
     
     if ErrorMessages:
-        ExtensionFailed = True
         logging.warning(f"Extending data by average intensity (aka:flat). Error was: {ErrorMessages}")
         AveInt = np.mean(Int_wave[FitFrom:DataLengths])
-        for i in range(1, NumNewPoints + 1):
-            Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
-            Int_wave[DataLengths + i] = AveInt
-        ExtensionFailed = False
+        if np.isfinite(AveInt):
+            for i in range(1, NumNewPoints + 1):
+                Q_vct[DataLengths + i] = Q_vct[DataLengths] + (ExtendByQ) * (i / NumNewPoints)
+                Int_wave[DataLengths + i] = AveInt
+        else:
+            # Even the flat fallback is impossible (non-finite average) —
+            # report an honest failure to the caller.
+            ExtensionFailed = True
     
     return Q_vct, Int_wave, Err_wave, ExtensionFailed
 
@@ -393,7 +402,11 @@ def oneDesmearIteration(SlitLength, QWave, DesmearIntWave, DesmearEWave, origSme
     # it shoudl never fail as if it does with complex functions, inside will simply do flat extension.
     SmQWave, SmFitIntensity, SmErrors, ExtensionFailed = extendData(QWave,DesmearIntWave,SmErrors, SlitLength, BckgStartQ, BackgroundFunction)
     if ExtensionFailed:
-        return 1
+        # Extension failed even with the flat fallback. Return the inputs
+        # unchanged (4-tuple, matching the normal return signature) so the
+        # caller's unpacking and convergence loop remain valid.
+        logging.error("Data extension failed in desmearing iteration; returning data unchanged.")
+        return QWave, DesmearIntWave, DesmearEWave, NormalizedError
     #this is now smeared version of Intensity
     if SlitLength > 0:
         SmFitIntensity = smearIntensityArray(SmFitIntensity, SmQWave, SlitLength)
@@ -455,7 +468,7 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
     SlitLength : float
         The length of the slit. in Q units, [1/A] most likely
     MaxNumIter : int
-        The number of iterations for the desmearing process.Typically 5-10, if not provided usign automatic method and max number set to 50. 
+        The number of iterations for the desmearing process. Typically 5-10, if not provided using automatic method and max number set to 20.
     SMR_Int : array-like
         The smeared intensities.
     SMR_Error : array-like
@@ -474,7 +487,9 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
         DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ
     """
     if SMR_Int is None or len(SMR_Int) == 0 or slitLength is None:
-        return None, None, None, None, None
+        # NOTE: must return exactly 4 values — all callers unpack
+        # (DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ).
+        return None, None, None, None
 
     tmpWork_Int = np.copy(SMR_Int)
     tmpWork_Error = np.copy(SMR_Error)
@@ -496,7 +511,11 @@ def desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, MaxNumIte
         absNormalizedError = np.abs(DesmNormalizedError)
         endme = np.average(absNormalizedError)
         #this is difference in convergence between iterations
-        difff = 1 - (oldendme / endme)
+        #guard against endme == 0 or NaN (perfect or degenerate convergence)
+        if endme == 0 or not np.isfinite(endme):
+            difff = 0.0     # treat as converged, terminates the loop below
+        else:
+            difff = 1 - (oldendme / endme)
         oldendme = endme
         NumIterations += 1
         #Conditions under which we will end 

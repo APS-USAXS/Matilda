@@ -51,9 +51,6 @@ TODO: add to each processXYZ option to force Blank if Blanks is only one and avo
 '''
 
 import glob as _glob
-import pprint as pp
-import numpy as np
-import socket
 import re
 import time
 import logging
@@ -63,18 +60,21 @@ import os
 import subprocess
 
 
-from .readfromtiled import FindLastScanData, FindLastBlankScan
+from .readfromtiled import FindLastScanData, FindLastBlankScan, FindLastTuneScans
 from .convertFlyscan import processFlyscan
 from .convertUSAXS import processStepscan
 from .convertSWAXS import process2Ddata
+from .convertTune import getTuneResults, TUNE_PLAN_NAMES, NumberOfTunesToShow, NumberOfDaysToLookBackTunes
 from .supportFunctions import findProperBlankScan
-from .plotData import plotUSAXSResults, plotSWAXSResults
+from .plotData import plotUSAXSResults, plotSWAXSResults, plotTuneResults
 
 
-#set ImagePath to None to prevent saving images
-#imagePath = None  # Do not save images
-imagePath = '/home/joule/WEBUSAXS/www_live/'  # Path to save images
-#imagePath = '/home/parallels/Desktop/'  # Path to save images
+#Path to save live-monitoring images.  Override with the MATILDA_IMAGE_PATH
+#environment variable; set it to the literal string "none" to disable image
+#saving entirely (plot functions skip when imagePath is None).
+imagePath = os.environ.get('MATILDA_IMAGE_PATH', '/home/joule/WEBUSAXS/www_live/')
+if imagePath.lower() == 'none':
+    imagePath = None
 
 # Conda setup for external tools (pynika, pyirena).
 # Full path to the conda executable used at this beamline.
@@ -88,12 +88,26 @@ PYIRENA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pyirena'
 _PYIRENA_CONFIG_FILENAME = 'pyirena_config.json'
 # Name of the per-experiment JSON config that triggers USAXS+SAXS merging.
 _MERGE_CONFIG_FILENAME = 'merge_config.json'
-# Subfolder name for merged USAXS+SAXS output files.
-_MERGED_FOLDER_NAME = 'data_usaxs_merged'
-# Maximum number of (path, filename) entries kept in each per-technique
-# analyzed-files set.  Large enough to cover user transitions without growing
-# without bound.
-_MAX_PYIRENA_ANALYZED = 100
+# Suffix appended to the USAXS folder name to form the merged output folder
+# (e.g. OPC_usaxs → OPC_usaxs_merged), matching GUI behaviour.
+_MERGED_FOLDER_SUFFIX = '_merged'
+# Maximum number of entries kept in each per-technique "already processed"
+# tracker (calibration, pyirena analysis, merges).  Large enough to cover
+# user transitions without growing without bound.
+_MAX_TRACKED_FILES = 100
+
+
+def _remember_file(tracked, key, maxlen=_MAX_TRACKED_FILES):
+    """Record *key* in an ordered 'already processed' tracker (dict used as
+    an ordered set), evicting the OLDEST entries when the bound is exceeded.
+
+    Plain set.pop() removes an *arbitrary* element — possibly the key just
+    added — which could cause files to be re-processed. Dicts preserve
+    insertion order, giving proper FIFO eviction.
+    """
+    tracked[key] = None
+    while len(tracked) > maxlen:
+        tracked.pop(next(iter(tracked)))
 
 # Regex pattern to detect AgBehenateLaB6 calibrant files (any capitalisation)
 _CALIBRANT_PATTERN = re.compile(r'agbehenatelab6', re.IGNORECASE)
@@ -104,23 +118,30 @@ NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
 
 #recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
-# Configure logging
-# Log directory: use MATILDA_LOG_DIR env variable if set, otherwise default to
-# ~/.local/share/matilda/log (standard XDG user data location).
-# On the beamline service, serv_matilda.sh sets MATILDA_LOG_DIR=/share1/log/matilda.
-_default_log_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "matilda", "log")
-log_dir = os.environ.get("MATILDA_LOG_DIR", _default_log_dir)
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, 'matilda.log')
-# Rotating log: 1 MB per file, 3 backups → max 4 MB total on disk.
-handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
-logging.basicConfig(
-    handlers=[handler],
-    level=logging.INFO,
-    #level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+def _setup_logging():
+    """Configure rotating-file logging for the Matilda service.
+
+    Called from main() so that merely importing this module has no side
+    effects (no directory creation, no root-logger reconfiguration —
+    important for the GUI and for notebook use).
+
+    Log directory: MATILDA_LOG_DIR env variable if set, otherwise
+    ~/.local/share/matilda/log (standard XDG user data location).
+    On the beamline service, serv_matilda.sh sets MATILDA_LOG_DIR=/share1/log/matilda.
+    """
+    default_log_dir = os.path.join(os.path.expanduser("~"), ".local", "share", "matilda", "log")
+    log_dir = os.environ.get("MATILDA_LOG_DIR", default_log_dir)
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'matilda.log')
+    # Rotating log: 1 MB per file, 3 backups → max 4 MB total on disk.
+    handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
+    logging.basicConfig(
+        handlers=[handler],
+        level=logging.INFO,
+        #level=logging.DEBUG,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
 
 
 # --- pynika auto-calibration helpers ---
@@ -138,9 +159,10 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
         HDF5 filename of the calibrant scan.
     instrument_type : str
         'SAXS' or 'WAXS' — passed to pynika --instrument flag.
-    calibrated_set : set
-        Mutable set of (path, filename) tuples already processed this session.
-        Updated in-place on success to prevent re-running the same file.
+    calibrated_set : dict
+        Ordered dict used as a bounded FIFO set of (path, filename) tuples
+        already processed this session.  Updated in-place on success to
+        prevent re-running the same file.
     """
     file_key = (path, filename)
     if file_key in calibrated_set:
@@ -164,10 +186,8 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
         )
         if result.returncode == 0:
             logging.info(f"Pynika calibration succeeded for {filename}")
-            calibrated_set.add(file_key)
-            # Keep the set bounded to match the Tiled look-back window
-            while len(calibrated_set) > NumberOfImagesInGraphs:
-                calibrated_set.pop()
+            # Bounded FIFO tracker — evicts oldest entries, never the newest
+            _remember_file(calibrated_set, file_key)
         else:
             logging.error(
                 f"Pynika calibration failed for {filename} "
@@ -203,10 +223,11 @@ def _runPyirenaAnalysis(path, filename, analyzed_set):
         Directory containing the reduced HDF5 file.
     filename : str
         HDF5 filename of the reduced scan.
-    analyzed_set : set
-        Mutable set of (path, filename) tuples already analyzed this session.
-        Updated in-place on success to prevent re-running the same file.
-        Bounded to _MAX_PYIRENA_ANALYZED entries to limit memory use.
+    analyzed_set : dict
+        Ordered dict used as a bounded FIFO set of (path, filename) tuples
+        already analyzed this session.  Updated in-place on success to
+        prevent re-running the same file.  Bounded to _MAX_TRACKED_FILES
+        entries to limit memory use.
     """
     # Blanks are not analyzed.
     if 'blank' in filename.lower():
@@ -237,9 +258,8 @@ def _runPyirenaAnalysis(path, filename, analyzed_set):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0:
             logging.info(f"Pyirena analysis succeeded for {filename}")
-            analyzed_set.add(file_key)
-            while len(analyzed_set) > _MAX_PYIRENA_ANALYZED:
-                analyzed_set.pop()
+            # Bounded FIFO tracker — evicts oldest entries, never the newest
+            _remember_file(analyzed_set, file_key)
         else:
             logging.error(
                 f"Pyirena analysis failed for {filename} "
@@ -331,6 +351,23 @@ def _find_matching_partner(path, filename, partner_suffix):
     if not matches:
         return None
 
+    if len(matches) > 1:
+        # Disambiguate: prefer a partner whose full stem (minus the scan
+        # number) matches the sample's stem, since the (prefix, number) key
+        # alone can collide (e.g. SampleA_10min_0044 vs SampleA_20min_0044).
+        sample_stem = os.path.splitext(filename)[0].rsplit('_', 1)[0]
+        preferred = [
+            m for m in matches
+            if os.path.splitext(os.path.basename(m))[0].rsplit('_', 1)[0] == sample_stem
+        ]
+        if preferred:
+            matches = preferred
+        if len(matches) > 1:
+            logging.warning(
+                f"Multiple partner candidates for {filename}: "
+                f"{[os.path.basename(m) for m in matches]}; using {os.path.basename(matches[0])}"
+            )
+
     partner_file = os.path.basename(matches[0])
     return (partner_folder, partner_file)
 
@@ -352,8 +389,9 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
         Path and filename of the reduced SAXS file.
     config_file : str
         Full path to the merge_config.json file.
-    merged_set : set
-        Mutable set of merge keys already processed this session.
+    merged_set : dict
+        Ordered dict used as a bounded FIFO set of merge keys already
+        processed this session.
 
     Returns
     -------
@@ -365,7 +403,9 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
     merge_key = (usaxs_file, saxs_file)
 
     parent_dir = os.path.dirname(usaxs_path)
-    output_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+    output_folder = os.path.join(
+        parent_dir, os.path.basename(usaxs_path) + _MERGED_FOLDER_SUFFIX
+    )
     os.makedirs(output_folder, exist_ok=True)
 
     logging.info(f"Merging USAXS+SAXS: {usaxs_filename} + {saxs_filename}")
@@ -400,9 +440,8 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
         )
 
     # Always record the pair so it is not retried this session.
-    merged_set.add(merge_key)
-    while len(merged_set) > _MAX_PYIRENA_ANALYZED:
-        merged_set.pop()
+    # Bounded FIFO tracker — evicts oldest entries, never the newest.
+    _remember_file(merged_set, merge_key)
 
     return success
 
@@ -420,9 +459,9 @@ def _checkAndRunMerge(ListOfScans, technique, merged_set, analyzed_merged_set):
     technique : str
         'USAXS' or 'SAXS' — indicates which technique *ListOfScans*
         belongs to.
-    merged_set : set
+    merged_set : dict
         Tracks (usaxs_file, saxs_file) pairs already merged this session.
-    analyzed_merged_set : set
+    analyzed_merged_set : dict
         Tracks merged output files already sent to pyirena this session.
     """
     if technique == "USAXS":
@@ -468,7 +507,9 @@ def _checkAndRunMerge(ListOfScans, technique, merged_set, analyzed_merged_set):
 
         if success:
             # Run pyirena analysis on the merged output if config exists.
-            merged_folder = os.path.join(parent_dir, _MERGED_FOLDER_NAME)
+            merged_folder = os.path.join(
+                parent_dir, os.path.basename(usaxs_path) + _MERGED_FOLDER_SUFFIX
+            )
             # The merged file is named after the USAXS (file1) input.
             merged_filename = usaxs_filename
             _runPyirenaAnalysis(merged_folder, merged_filename,
@@ -490,7 +531,8 @@ def processUSAXSFolder(path):
             <name>_saxs/    — SAXS area-detector files (.hdf)
             <name>_waxs/    — WAXS area-detector files (.hdf)
 
-    All three sub-folder types must be present.  Files are sorted by the
+    Each sub-folder type is optional; missing ones are skipped with a
+    warning.  Files are sorted by the
     trailing scan number embedded in the filename (see extract_number_from_filename).
 
     Parameters
@@ -512,59 +554,46 @@ def processUSAXSFolder(path):
     if not os.path.exists(path):
         logging.error(f"The path {path} does not exist.")
         return
-    # Get the list of folders in the path folder
+    # Locate the per-technique folders; each is optional — missing ones are
+    # skipped with a warning instead of crashing (IndexError previously).
     folders = os.listdir(path)
-    # Filter the list to include only the folders that end with _usaxs
-    usaxs_folder = [folder for folder in folders if folder.endswith('_usaxs')][0]
-    
-    saxs_folder = [folder for folder in folders if folder.endswith('_saxs')][0]
-    
-    waxs_folder = [folder for folder in folders if folder.endswith('_waxs')][0]
-    
-    #get list of files in the usaxs folder
-    usaxs_files = []
-    files = os.listdir(os.path.join(path, usaxs_folder))
-    # Filter the list to include only the files with the extension .h5
-    # Sort by the number before .hdf
-    h5_files = [file for file in files if file.endswith('.h5')]
-    usaxs_files = sorted(h5_files, key=extract_number_from_filename)
-    usaxs_blanks = [file for file in usaxs_files if 'blank' in file.lower()]
+    usaxs_folder = next((folder for folder in folders if folder.endswith('_usaxs')), None)
+    saxs_folder = next((folder for folder in folders if folder.endswith('_saxs')), None)
+    waxs_folder = next((folder for folder in folders if folder.endswith('_waxs')), None)
 
-    #get list of files in the saxs folder
-    saxs_files = []
-    files = os.listdir(os.path.join(path, saxs_folder))
-    # Filter the list to include only the files with the extension .hdf
-    # Sort by the number before .hdf
-    h5_files = [file for file in files if file.endswith('.hdf')]
-    saxs_files = sorted(h5_files, key=extract_number_from_filename)
-    saxs_blanks = [file for file in saxs_files if 'blank' in file.lower()]
+    def _list_sorted_files(folder, extension):
+        files = os.listdir(os.path.join(path, folder))
+        matched = [file for file in files if file.endswith(extension)]
+        data_files = sorted(matched, key=extract_number_from_filename)
+        blank_files = [file for file in data_files if 'blank' in file.lower()]
+        return data_files, blank_files
 
-    
-    #get list of files in the waxs folder
-    waxs_files = []
-    files = os.listdir(os.path.join(path, waxs_folder))
-    # Filter the list to include only the files with the extension .hdf
-    # Sort by the number before .hdf
-    h5_files = [file for file in files if file.endswith('.hdf')]
-    waxs_files = sorted(h5_files, key=extract_number_from_filename)
-    waxs_blanks = [file for file in waxs_files if 'blank' in file.lower()]
-           
-    #process all flyscans
-    logging.info("Processing USAXS Flyscans")
-    ListOfScans = [(os.path.join(path, usaxs_folder), file) for file in usaxs_files]
-    ListOfBlanks = [(os.path.join(path, usaxs_folder), file) for file in usaxs_blanks]
-    data = processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    if usaxs_folder is not None:
+        logging.info("Processing USAXS Flyscans")
+        usaxs_files, usaxs_blanks = _list_sorted_files(usaxs_folder, '.h5')
+        ListOfScans = [(os.path.join(path, usaxs_folder), file) for file in usaxs_files]
+        ListOfBlanks = [(os.path.join(path, usaxs_folder), file) for file in usaxs_blanks]
+        processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    else:
+        logging.warning(f"No *_usaxs folder found in {path}; skipping USAXS processing.")
 
-    logging.info("Processing SAXS data")
-    ListOfScans = [(os.path.join(path, saxs_folder), file) for file in saxs_files]
-    ListOfBlanks = [(os.path.join(path, saxs_folder), file) for file in saxs_blanks]
-    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    if saxs_folder is not None:
+        logging.info("Processing SAXS data")
+        saxs_files, saxs_blanks = _list_sorted_files(saxs_folder, '.hdf')
+        ListOfScans = [(os.path.join(path, saxs_folder), file) for file in saxs_files]
+        ListOfBlanks = [(os.path.join(path, saxs_folder), file) for file in saxs_blanks]
+        processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    else:
+        logging.warning(f"No *_saxs folder found in {path}; skipping SAXS processing.")
 
-
-    logging.info("Processing WAXS data")
-    ListOfScans = [(os.path.join(path, waxs_folder), file) for file in waxs_files]
-    ListOfBlanks = [(os.path.join(path, waxs_folder), file) for file in waxs_blanks]
-    data = processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    if waxs_folder is not None:
+        logging.info("Processing WAXS data")
+        waxs_files, waxs_blanks = _list_sorted_files(waxs_folder, '.hdf')
+        ListOfScans = [(os.path.join(path, waxs_folder), file) for file in waxs_files]
+        ListOfBlanks = [(os.path.join(path, waxs_folder), file) for file in waxs_blanks]
+        processADscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+    else:
+        logging.warning(f"No *_waxs folder found in {path}; skipping WAXS processing.")
     
 
 
@@ -579,7 +608,10 @@ def processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=False,forceFir
     recalculateAllData=True will force reprocessing of the data, otherwise it
     """
     results=[]
-    logging.info("Processing of flyscans with blanks")    
+    logging.info("Processing of flyscans with blanks")
+    if forceFirstBlank and not ListOfBlanks:
+        logging.error("forceFirstBlank=True but ListOfBlanks is empty; cannot process any scans.")
+        return results
     for scan_path, scan_filename in ListOfScans:
         try:
             if forceFirstBlank:
@@ -631,7 +663,10 @@ def processStepscans(ListOfScans, ListOfBlanks, recalculateAllData=False, forceF
         as returned by processStepscan).  Failed scans are logged and skipped.
     """
     results=[]
-    logging.info("Processing of Step scans with blanks")    
+    logging.info("Processing of Step scans with blanks")
+    if forceFirstBlank and not ListOfBlanks:
+        logging.error("forceFirstBlank=True but ListOfBlanks is empty; cannot process any scans.")
+        return results
     for scan_path, scan_filename in ListOfScans:
         try:
             if forceFirstBlank:
@@ -663,8 +698,10 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirst
     that is smaller than the sample's number.
     """
     results=[]
-    #logging.info("Processing of SAXS/WAXS with blanks")    
-    logging.info("Processing of SAXS/WAXS with blanks")    
+    logging.info("Processing of SAXS/WAXS with blanks")
+    if forceFirstBlank and not ListOfBlanks:
+        logging.error("forceFirstBlank=True but ListOfBlanks is empty; cannot process any scans.")
+        return results
     for scan_path, scan_filename in ListOfScans:
         try:
             if forceFirstBlank:
@@ -688,38 +725,48 @@ def processADscans(ListOfScans, ListOfBlanks,recalculateAllData=False,forceFirst
 
 
 def extract_number_from_filename(filename):
-    """Extract number from filename, return 0 if no number found"""
-    match = re.search(r'_(\d+)\.hdf', filename)
+    """Extract the trailing scan number from a data filename.
+
+    Handles all extensions used at the beamline: .h5 (USAXS flyscans),
+    .hdf / .hdf5 (SAXS/WAXS area detector), .nxs.  Returns 0 if no number
+    is found so sorted() still works on unexpected names.
+    """
+    match = re.search(r'_(\d+)\.(?:h5|hdf5?|nxs)$', filename, re.IGNORECASE)
     return int(match.group(1)) if match else 0
 
 
 
 def main():
-    """Entry point for the Matilda service (15-second polling loop).
+    """Entry point for the Matilda service (polling loop, 5 s sleep between cycles).
 
     Invoked by the ``matilda`` console script installed by pyproject.toml,
     or directly via ``python -m matilda.matilda``.
     """
+    _setup_logging()
     try:
         listofFlyscansOld=dict()
         listofStepScansOld=dict()
         listofSAXSOld=dict()
         listOfWAXSOld=dict()
         # Track AgBehenateLaB6 calibrant files already processed by pynika this
-        # session.  Separate sets for SAXS and WAXS because files share the same
+        # session.  Ordered dicts used as bounded FIFO sets (see _remember_file).
+        # Separate trackers for SAXS and WAXS because files share the same
         # name across detectors but live in different folders.
-        calibratedSAXSFiles = set()
-        calibratedWAXSFiles = set()
+        calibratedSAXSFiles = dict()
+        calibratedWAXSFiles = dict()
         # Track files already submitted to pyirena analysis this session.
-        # Separate sets per technique because each folder has its own config.
-        analyzedFlyscanFiles = set()
-        analyzedStepFiles = set()
-        analyzedSAXSFiles = set()
-        analyzedWAXSFiles = set()
+        # Separate trackers per technique because each folder has its own config.
+        analyzedFlyscanFiles = dict()
+        analyzedStepFiles = dict()
+        analyzedSAXSFiles = dict()
+        analyzedWAXSFiles = dict()
         # Track USAXS+SAXS pairs already merged and merged files already
-        # analyzed this session.  Bounded like the sets above.
-        mergedUSAXSSAXSFiles = set()
-        analyzedMergedFiles = set()
+        # analyzed this session.  Bounded like the trackers above.
+        mergedUSAXSSAXSFiles = dict()
+        analyzedMergedFiles = dict()
+        # Track the uid list of the last-plotted tune scans per plan type so we
+        # only re-download and re-plot when a new tune scan appears.
+        listOfTunesOld = {pn: [] for pn in TUNE_PLAN_NAMES}
         while True:
             logging.info("New round of processing started at : %s", datetime.datetime.now()) 
 
@@ -791,8 +838,22 @@ def main():
                 _checkAndRunPyirenaAnalysis(ListOfScans, analyzedWAXSFiles)
                 listOfWAXSOld = ListOfScans
 
-            logging.info('Sleeping for 15 seconds')
-            time.sleep(15)
+            # Process live tuning scans (tune_ar, tune_mr, tune_a2rp).
+            # These have no HDF5 file; data comes from Tiled only.  Safe against
+            # a missing/offline server: FindLastTuneScans returns [] and we skip.
+            logging.info("Processing the Tune scans")
+            for pn in TUNE_PLAN_NAMES:
+                tuneMeta = FindLastTuneScans(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                uidList = [m["uid"] for m in tuneMeta]
+                if uidList == listOfTunesOld[pn] or len(uidList) == 0:
+                    logging.info(f'No new {pn} tune data found')
+                    continue
+                results = getTuneResults(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                plotTuneResults(results, imagePath, pn)
+                listOfTunesOld[pn] = uidList
+
+            logging.info('Sleeping for 5 seconds')
+            time.sleep(5)                   #delay between tries to prevent overload 
     except KeyboardInterrupt:
             logging.info('Keyboard interrupt')
 

@@ -37,7 +37,6 @@ Notes
 import h5py
 import os
 import numpy as np
-import datetime
 import logging
 from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
 
@@ -79,50 +78,64 @@ def readGenericNXcanSAS(path, filename):
         for attr_name, attr_value in attributes.items():
             logging.debug(f"{attr_name}: {attr_value}")
 
-        data_location= current_location+'/'+attributes['signal']
+        # Initialize everything up front so a malformed file produces a clear
+        # result (None values) instead of NameError on missing datasets.
+        intensity = None
+        Q = None
+        Error = None
+        dQ = None
+        units = None
+        Kfactor = None
+        OmegaFactor = None
+        blankname = None
+        thickness = None
+        label = None
+        Int_attributes = {}
+        Q_attributes = {}
+        Error_attributes = {}
+        dQ_attributes = {}
+
+        signal_name = attributes.get('signal')
+        if signal_name is None:
+            logging.warning(f"No 'signal' attribute at '{current_location}' in {filename}; cannot read data.")
+            return None
+        data_location = current_location + '/' + signal_name
         if data_location in f:
             # Access the dataset at the specified location
             dataset = f[data_location]
             # Read the data into a NumPy array
-            intensity = dataset[()] 
-            # Retrieve and print the list of attributes
+            intensity = dataset[()]
             Int_attributes = dataset.attrs
-            units=Int_attributes['units']
-            Kfactor = Int_attributes["Kfactor"]
-            OmegaFactor = Int_attributes["OmegaFactor"]
-            blankname = Int_attributes["blankname"]
-            thickness = Int_attributes["thickness"]
-            label = Int_attributes["label"]
+            units = Int_attributes.get('units')
+            Kfactor = Int_attributes.get("Kfactor")
+            OmegaFactor = Int_attributes.get("OmegaFactor")
+            blankname = Int_attributes.get("blankname")
+            thickness = Int_attributes.get("thickness")
+            label = Int_attributes.get("label")
 
-        data_location= current_location+'/'+attributes['I_axes']
-        if data_location in f:
-            # Access the dataset at the specified location
-            dataset = f[data_location]
-            # Read the data into a NumPy array
-            Q = dataset[()] 
-            # Retrieve and print the list of attributes
-            Q_attributes = dataset.attrs
-            #for attr_name, attr_value in Q_attributes.items():
-            #    print(f"{attr_name}: {attr_value}")
+        I_axes = attributes.get('I_axes')
+        if I_axes is not None:
+            data_location = current_location + '/' + I_axes
+            if data_location in f:
+                dataset = f[data_location]
+                Q = dataset[()]
+                Q_attributes = dataset.attrs
 
-        data_location= current_location+'/'+Int_attributes['uncertainties']
-        if data_location in f:
-            # Access the dataset at the specified location
-            dataset = f[data_location]
-            # Read the data into a NumPy array
-            Error = dataset[()] 
-            # Retrieve and print the list of attributes
-            Error_attributes = dataset.attrs
+        uncertainties = Int_attributes.get('uncertainties') if len(Int_attributes) else None
+        if uncertainties is not None:
+            data_location = current_location + '/' + uncertainties
+            if data_location in f:
+                dataset = f[data_location]
+                Error = dataset[()]
+                Error_attributes = dataset.attrs
 
-
-        data_location= current_location+'/'+Q_attributes['resolutions']
-        if data_location in f:
-            # Access the dataset at the specified location
-            dataset = f[data_location]
-            # Read the data into a NumPy array
-            dQ = dataset[()] 
-            # Retrieve and print the list of attributes
-            dQ_attributes = dataset.attrs
+        resolutions = Q_attributes.get('resolutions') if len(Q_attributes) else None
+        if resolutions is not None:
+            data_location = current_location + '/' + resolutions
+            if data_location in f:
+                dataset = f[data_location]
+                dQ = dataset[()]
+                dQ_attributes = dataset.attrs
         Data = {
             'Intensity':intensity,
             'Q':Q,
@@ -434,9 +447,13 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['units'] = units
             ds.attrs['uncertainties'] = 'Idev'
             ds.attrs['long_name'] = 'Intensity'
-            ds.attrs['blankname'] = blankname
-            ds.attrs['thickness'] = thickness
-            ds.attrs['label'] = label
+            # h5py cannot store None attributes — guard each optional one
+            if blankname is not None:
+                ds.attrs['blankname'] = blankname
+            if thickness is not None:
+                ds.attrs['thickness'] = thickness
+            if label is not None:
+                ds.attrs['label'] = label
             if Kfactor is not None:
                 ds.attrs['Kfactor'] = Kfactor
             if OmegaFactor is not None:
@@ -497,11 +514,17 @@ def saveNXcanSAS(Sample,path, filename):
             ds.attrs['units'] = units
             ds.attrs['uncertainties'] = 'Idev'
             ds.attrs['long_name'] = f'Intensity{units}'
-            ds.attrs['Kfactor'] = Kfactor
-            ds.attrs['OmegaFactor'] = OmegaFactor
-            ds.attrs['blankname'] = blankname
-            ds.attrs['thickness'] = thickness
-            ds.attrs['label'] = label
+            # h5py cannot store None attributes — guard each optional one
+            if Kfactor is not None:
+                ds.attrs['Kfactor'] = Kfactor
+            if OmegaFactor is not None:
+                ds.attrs['OmegaFactor'] = OmegaFactor
+            if blankname is not None:
+                ds.attrs['blankname'] = blankname
+            if thickness is not None:
+                ds.attrs['thickness'] = thickness
+            if label is not None:
+                ds.attrs['label'] = label
 
             # X axis data
             ds = nxdata.create_dataset('Q', data=SMR_Qvec)
@@ -561,7 +584,8 @@ def saveNXcanSAS(Sample,path, filename):
             ds = nxDataEntry.create_dataset('Intensity', data=BL_R_Int)
             ds.attrs['units'] = 'arb'
             ds.attrs['long_name'] = 'Intensity'    # suggested X axis plot label
-            ds.attrs['blankname']=blankname 
+            if blankname is not None:
+                ds.attrs['blankname'] = blankname
             # R_Qvec axis data
             ds = nxDataEntry.create_dataset('Q', data=BL_Q_vec)
             ds.attrs['units'] = '1/angstrom'
@@ -651,11 +675,13 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
             if dataset is not None:
                 Sample['CalibratedData']['slitLength'] = dataset
         else:
-            Sample["CalibratedData"] ["SMR_Qvec"] = None,
-            Sample["CalibratedData"] ["SMR_Int"] = None,
-            Sample["CalibratedData"] ["SMR_Error"] = None,
-            Sample["CalibratedData"] ["SMR_dQ"] = None,
-            Sample["CalibratedData"] ["slitLength"] = None,
+            # NOTE: no trailing commas here — they would store (None,) tuples,
+            # which pass "is not None" checks downstream.
+            Sample["CalibratedData"]["SMR_Qvec"] = None
+            Sample["CalibratedData"]["SMR_Int"] = None
+            Sample["CalibratedData"]["SMR_Error"] = None
+            Sample["CalibratedData"]["SMR_dQ"] = None
+            Sample["CalibratedData"]["slitLength"] = None
 
      
         location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
@@ -684,12 +710,13 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
             location = location+'/sasdata/'
             if "I" in f[location]:
                 attributes = f[location + "I"].attrs
-                Sample['CalibratedData']['units'] = attributes['units']
-                Sample['CalibratedData']['blankname'] = attributes["blankname"]
-                Sample['CalibratedData']['thickness'] = attributes["thickness"]
-                Sample["RawData"]["filename"] = attributes["label"]
-                Sample['CalibratedData']['Kfactor'] = attributes["Kfactor"] if "Kfactor" in attributes else None
-                Sample['CalibratedData']['OmegaFactor'] = attributes["OmegaFactor"] if "OmegaFactor" in attributes else None
+                # all attributes are optional (saveNXcanSAS skips None values)
+                Sample['CalibratedData']['units'] = attributes.get('units')
+                Sample['CalibratedData']['blankname'] = attributes.get("blankname")
+                Sample['CalibratedData']['thickness'] = attributes.get("thickness")
+                Sample["RawData"]["filename"] = attributes.get("label", filename)
+                Sample['CalibratedData']['Kfactor'] = attributes.get("Kfactor")
+                Sample['CalibratedData']['OmegaFactor'] = attributes.get("OmegaFactor")
 
             # Read SAStransmission_spectrum if present (written by saveNXcanSAS)
             # location was modified above to point to sasdata/, go back to parent
@@ -819,6 +846,52 @@ def _get_h5_value(h5file, path):
         return h5file[path][()]
     return None
 
+
+def clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
+    """Cached-reduction bookkeeping shared by processFlyscan and processStepscan.
+
+    1. Finds NXcanSAS entries previously written by saveNXcanSAS.
+    2. When *recalculateAllData*, deletes the cached QRS / SMR / NXcanSAS groups.
+    3. Returns True when a reusable cached result is present:
+       * requireCalibrated=True  — the desmeared NXcanSAS entry must exist
+         (used when a blank is provided, i.e. full calibration expected)
+       * requireCalibrated=False — the QRS_data group is enough
+    """
+    required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+    required_items = {'definition': 'NXcanSAS'}
+    SASentries = find_matching_groups(hdf_file, required_attributes, required_items)
+
+    if recalculateAllData:
+        for location, label in (
+            ('entry/QRS_data/', "'entry/QRS_data'"),
+            (next((e + '/' for e in SASentries if '_SMR' in e), None), 'SMR_data'),
+            (next((e + '/' for e in SASentries if '_SMR' not in e), None), 'NXcanSAS'),
+        ):
+            if location is not None and location in hdf_file:
+                del hdf_file[location]
+                logging.info(f"Deleted existing group {label} for file {filename}. ")
+
+    if requireCalibrated:
+        location = next((e + '/' for e in SASentries if '_SMR' not in e), None)
+    else:
+        location = 'entry/QRS_data/'
+    return location is not None and location in hdf_file
+
+
+def writeThicknessOverride(hdf_file, thick_path, thickness_override, filename):
+    """Write a user-supplied thickness override into the raw data file.
+
+    NOTE: this permanently modifies the raw data file; the original value is
+    preserved once at ``<thick_path>_original``.
+    """
+    orig_path = thick_path + '_original'
+    if thick_path in hdf_file:
+        if orig_path not in hdf_file:
+            hdf_file[orig_path] = hdf_file[thick_path][()]
+        del hdf_file[thick_path]
+    hdf_file[thick_path] = float(thickness_override)
+    logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+
 def save_dict_to_hdf5(dic, location, h5file):
     """
     Save a dictionary to an HDF5 file.
@@ -830,12 +903,18 @@ def save_dict_to_hdf5(dic, location, h5file):
     def recursively_save_dict_contents_to_group(h5file, path, dic):
         for key, item in dic.items():
             if isinstance(item, dict):
-                # Create a new group for nested dictionaries
+                # Create (or reuse) a group for nested dictionaries
                 logging.debug(f"Creating group: {path} + {key}")
-                group = h5file.create_group(path + key)
+                h5file.require_group(path + key)
                 recursively_save_dict_contents_to_group(h5file, path + key + '/', item)
+            elif item is None:
+                # h5py cannot store None — skip (readers treat a missing
+                # dataset the same as None).
+                logging.debug(f"Skipping None value for key: {path + key}")
             else:
-                # Save numpy arrays and other data types
+                # Save numpy arrays and other data types; overwrite if present
+                if path + key in h5file:
+                    del h5file[path + key]
                 h5file[path + key] = item
 
     recursively_save_dict_contents_to_group(h5file, location, dic)
@@ -905,6 +984,8 @@ def read_group_to_dict(group):
 
 
 # this should not fail if keys on the list are not present
+# NOTE: nested dicts are kept only if their own key is in keys_to_keep;
+# wanted keys deeper inside unlisted parent groups are dropped.
 def filter_nested_dict(d, keys_to_keep):
     if isinstance(d, dict):
         return {k: filter_nested_dict(v, keys_to_keep) for k, v in d.items() if k in keys_to_keep and k in d}
@@ -913,33 +994,6 @@ def filter_nested_dict(d, keys_to_keep):
     else:
         return d    
 
-
-# def find_NXcanSAS_entries(group, path=''):
-#     nxcanSAS_entries = []
-    
-#     for name, item in group.items():
-#         current_path = f"{path}/{name}" if path else name
-        
-#         # Check if the item is a group
-#         if isinstance(item, h5py.Group):
-#             # Check if the group has the attribute "NXcanSAS"
-#             if 'canSAS_class' in item.attrs:
-#                 if(item.attrs['canSAS_class'] == 'SASentry'):
-#                     if "definition" in item:
-#                         definition_data = item["definition"][()]
-#                         # Check if "NXcanSAS" is in the definition data
-#                         if isinstance(definition_data, bytes):
-#                             definition_data = definition_data.decode('utf-8')
-                        
-#                         print(f"Definition data: {definition_data}")
-#                         if definition_data == 'NXcanSAS':
-#                             print(f"Found NXcanSAS entry at: {current_path}")
-#                             nxcanSAS_entries.append(current_path)
-            
-#             # Recursively search within the group
-#             nxcanSAS_entries.extend(find_NXcanSAS_entries(item, current_path))
-    
-#     return nxcanSAS_entries
 
 # this code can find any group which contains listed attributes:values and items:values (strings and variables)
 # this is general purpose code for HDF5 - Nexus evaluation

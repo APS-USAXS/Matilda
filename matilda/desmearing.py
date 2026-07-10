@@ -150,7 +150,14 @@ def extendData(Q_vct, Int_wave, Err_wave, slitLength, Qstart, SelectedFunction):
                 Int_wave[DataLengths + i] = popt[0] + popt[1] * Q_vct[DataLengths + i]**popt[2]
         except RuntimeError:
             ProblemWithFit = "Power Law with flat fit function did not converge properly, change function or Q range"
-    
+
+    else:
+        # Unknown method name: previously this fell through SILENTLY, leaving
+        # the np.resize-recycled values in the extension region (garbage).
+        # Route through the flat fallback below instead.
+        ProblemWithFit = (f"Unknown extrapolation method {SelectedFunction!r} "
+                          "(valid: 'flat', 'Power law', 'Porod', 'PowerLaw w flat')")
+
     ExtensionFailed = False
     ErrorMessages = ""
     if ProblemsWithQ:

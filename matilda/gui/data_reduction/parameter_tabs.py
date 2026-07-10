@@ -39,11 +39,14 @@ except ImportError:
     from PyQt6.QtCore import pyqtSignal as Signal
 
 
+# Must match the SelectedFunction branch names in matilda.desmearing.extendData
+# EXACTLY — unknown names silently fell through to no extension at all before
+# extendData grew a fallback (2026-07 review).
 EXTRAP_METHODS = [
     "PowerLaw w flat",
-    "PowerLaw",
-    "Flat",
-    "Linear",
+    "Power law",
+    "Porod",
+    "flat",
 ]
 
 # Maps technique name → tab index (must stay in sync with addTab order)

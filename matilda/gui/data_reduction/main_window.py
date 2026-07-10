@@ -493,5 +493,11 @@ class MatildaReductionWindow(QMainWindow):
             self._splitter.setSizes(sizes)
 
     def closeEvent(self, event):
+        # Stop background workers before the window (their parent) is
+        # destroyed — destroying a running QThread crashes the application.
+        for worker in (self._worker, self._export_worker):
+            if worker is not None and worker.isRunning():
+                worker.cancel()
+                worker.wait(10_000)   # cancellation is checked between files
         self._save_session()
         super().closeEvent(event)

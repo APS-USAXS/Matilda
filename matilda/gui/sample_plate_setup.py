@@ -1733,10 +1733,12 @@ class BeamlineSurveyDialog(QDialog):
         self._move_motor(PV_SY_VAL, 0.0)
 
     def _stop_motors(self):
-        if self._check_instrument_busy():
-            return
+        # NOTE: deliberately NOT gated by _check_instrument_busy() — the
+        # emergency STOP must always be available, especially while the
+        # instrument is moving/collecting.
         try:
             epics.caput(PV_ALL_STOP, 1)
+            self._status_lbl.setText("STOP sent (allstop)")
         except Exception as e:
             self._status_lbl.setText(f"EPICS error: {e}")
 
@@ -1752,11 +1754,17 @@ class BeamlineSurveyDialog(QDialog):
             elif mode == "usaxs":
                 sx = epics.caget(PV_USAXS_HSLIT)
                 sy = epics.caget(PV_USAXS_VSLIT)
+                if sx is None or sy is None:
+                    self._status_lbl.setText("EPICS: could not read USAXS slit setpoints")
+                    return
                 epics.caput(PV_C1M8, sx)
                 epics.caput(PV_C1M7, sy)
             elif mode == "saxswaxs":
                 sx = epics.caget(PV_SAXS_HSLIT)
                 sy = epics.caget(PV_SAXS_VSLIT)
+                if sx is None or sy is None:
+                    self._status_lbl.setText("EPICS: could not read SAXS slit setpoints")
+                    return
                 epics.caput(PV_C1M8, sx)
                 epics.caput(PV_C1M7, sy)
         except Exception as e:
@@ -2442,7 +2450,18 @@ class SamplePlateSetupWindow(QMainWindow):
     def _on_beamline_survey(self):
         self._current_set.rows = self._table.get_sample_set()
         dlg = BeamlineSurveyDialog(self._current_set, self)
+        # "Save current position to table" in the dialog modifies
+        # self._current_set.rows in place.  Reload the table when the dialog
+        # closes — otherwise the next export/save would overwrite the surveyed
+        # positions with the stale table contents (silent data loss).
+        dlg.finished.connect(lambda _result=0: self._after_survey_closed())
         dlg.show()
+
+    def _after_survey_closed(self):
+        """Sync UI with positions saved during a beamline survey."""
+        self._table.load_from_sample_set(self._current_set)
+        self._canvas.update_markers(self._current_set.rows)
+        self._update_runtime()
 
     # -- File menu actions --
 

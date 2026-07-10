@@ -67,7 +67,35 @@ Verification: compile clean; `smooth_r_data` exercised with a proper 0-4 index a
 - ✅ `tifffile` removed from dependencies (only referenced from commented-out debug code).
 - ✅ **GitHub Actions CI** (`.github/workflows/ci.yml`): ruff + pytest on Python 3.11/3.12 for pushes and PRs.
 
-**NEXT: Phase 5 (refactor/dedup — safe now that tests exist), Phase 6 (GUI deep review).**
+**2026-07-08 — Phase 5 (refactor/dedup) DONE**, same branch, behavior-preserving (54 tests green throughout):
+
+- ✅ `read_group_to_dict` / `filter_nested_dict`: canonical copies in hdf5code, re-exported from supportFunctions for compatibility.
+- ✅ `clearAndCheckCachedReduction()` + `writeThicknessOverride()` (hdf5code) replace ~50 duplicated lines in processFlyscan / processStepscan / process2Ddata.
+- ✅ `empty_calibrated_data()` factory (supportFunctions) replaces four pasted all-None dicts.
+- ✅ `_build_search_uri()` (readfromtiled) replaces eight near-identical URI blocks; sort standardized to `-time` (previously mixed with `-metadata.start.time` in rarely-used branches — verify once against the live server); 6 new unit tests cover URI construction.
+- ✅ convertSWAXS: `_geometry_from_dicts()` + `_build_mask()` unify the diverged geometry/mask copies. `ImportAndReduceAD` (QR display path) now uses the detector-aware masks (old-detector + pre-2023 SAXS branches) and reads StartTime metadata — a mask *improvement* over its old inline copy.
+- ✅ Large commented-out legacy blocks deleted (results_to_dataset, reduceStepScanToQR, find_NXcanSAS_entries, GSAXS-II tilt-test scaffolding) — recoverable from git history.
+- ⏳ Deferred by design: the `matilda/reduction/` + `matilda/io/` package split — churns every import and the service deployment; do as a standalone change if still wanted.
+
+**2026-07-08 — Phase 6 (GUI deep review) DONE.** Full read of all `gui/data_reduction/` modules; `sample_plate_setup.py` reviewed in depth for the data model, HDF5 persistence, command-file export, run-time estimator, EPICS survey dialog, and all export/save/load paths (the pure widget-layout middle sections got a lighter pass).
+
+Bugs FIXED during the review:
+- ✅ **Desmearing extrapolation silently broken from the GUI**: `EXTRAP_METHODS` offered "PowerLaw"/"Flat"/"Linear", which match NO branch in `extendData` — the extension region kept `np.resize`-recycled garbage (non-monotonic Q!) with no warning. GUI list now matches the real method names, and `extendData` routes unknown method names through the flat fallback with a warning (covered by a new check in the verification run).
+- ✅ **STOP MOTORS button was gated by the instrument-busy check** (`sample_plate_setup._stop_motors`) — the emergency stop refused to fire exactly when needed. Gate removed; STOP always sends `allstop`.
+- ✅ **Beamline-survey position data loss**: "Save current position to table" updated `_current_set.rows` in place, but the table widget was never refreshed, so the next export/save overwrote surveyed positions with stale table contents. The table now reloads when the survey dialog closes.
+- ✅ **App-close crash risk** (`main_window.closeEvent`): running QThread workers are now cancelled and joined before the window is destroyed.
+- ✅ `_set_slits`: caget timeouts (None) no longer get caput straight back to the slit PVs.
+
+Findings documented, NOT changed (need a decision or are cosmetic):
+- ⚠️ **SAXS azimuth-range controls are dead**: `_SAXSTab.get_params()` returns `az_min`/`az_max` but neither `ReductionWorker` nor `process2Ddata` consumes them. Related: `reduceADData` integrates SAXS over the FULL azimuth while the legacy `ImportAndReduceAD` used ±30° (Nika-style). Since calibrated SAXS was validated against Igor as-is, wiring the azimuth range through would CHANGE results — decide whether to wire it (and re-validate) or remove the controls.
+- ⚠️ `_on_import_cmdfile` parses only comma-separated lines — it cannot re-import the space-separated .mac files this tool exports. Works for CSV; label or extend.
+- Right-axis raw curves in `graph_panel` are pre-log10-transformed, so the X log/Y log toggle buttons desync them from the left axis (and the top d-spacing axis assumes log X). Cosmetic; log-log is the default and standard view.
+- File-tree blank auto-detection candidates come from already-loaded (expanded) folders only, due to lazy loading.
+- `main_window` "N error(s)" count includes converter warnings routed to the same log panel.
+- `SampleTable` displays SX/SY of exactly 0.0 as an empty cell (value round-trips correctly).
+- ascii_exporter, viewer_2d, sas_plot, file_tree, technique_detector, reduction_worker: no defects found beyond the above; code quality in `gui/data_reduction/` is notably good.
+
+**All plan phases (1-6) are now complete.** Remaining follow-ups: validate Phase 2 items against more beamline data over time; decide the SAXS azimuth-range question; one live-server check of the Tiled query changes (2.7 + Phase 5 sort standardization); optional package-layout split.
 
 ---
 

@@ -30,6 +30,7 @@ import logging
 from .supportFunctions import read_group_to_dict, filter_nested_dict
 from .supportNikaFunctions import convert_Nika_to_Fit2D
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .hdf5code import writeThicknessOverride
 
 # ── Integrator cache ──────────────────────────────────────────────────────────
 # pyFAI builds internal lookup tables on the first integrate1d() call for a
@@ -59,6 +60,87 @@ def _get_integrator(my_poni):
     _cached_geometry_key = key
     logging.info("Created new pyFAI AzimuthalIntegrator (geometry changed or first call)")
     return ai
+
+
+def _geometry_from_dicts(instrument_dict, metadata_dict):
+    """Extract Nika geometry from the file dicts and convert to pyFAI PONI.
+
+    Returns (my_poni, usingWAXS).  SAXS files are recognised by the presence
+    of ``pin_ccd_tilt_x`` in the metadata.
+
+    Units follow Nika conventions (wavelength A, pixel size mm, distance mm);
+    conversion to Fit2D/pyFAI units happens inside convert_Nika_to_Fit2D.
+    Pixels are assumed square (y_pixel_size ignored); BCX/BCY are swapped for
+    Fit2D inside convert_Nika_to_Fit2D.
+    """
+    wavelength = instrument_dict["monochromator"]["wavelength"]
+    pixel_size1 = instrument_dict["detector"]["x_pixel_size"]
+    detector_distance = instrument_dict["detector"]["distance"]
+    BCX = instrument_dict["detector"]["beam_center_x"]
+    BCY = instrument_dict["detector"]["beam_center_y"]
+    if "pin_ccd_tilt_x" in metadata_dict:               # SAXS
+        usingWAXS = 0
+        HorTilt = metadata_dict["pin_ccd_tilt_x"]       # degrees
+        VertTilt = metadata_dict["pin_ccd_tilt_y"]
+    else:                                               # WAXS
+        usingWAXS = 1
+        HorTilt = metadata_dict["waxs_ccd_tilt_x"]
+        VertTilt = metadata_dict["waxs_ccd_tilt_y"]
+    my_poni = convert_Nika_to_Fit2D(SSD=detector_distance, pix_size=pixel_size1,
+                                    BCX=BCX, BCY=BCY, HorTilt=HorTilt,
+                                    VertTilt=VertTilt, wavelength=wavelength)
+    return my_poni, usingWAXS
+
+
+def _build_mask(my2DRAWdata, usingWAXS, metadata_dict):
+    """Build the bad-pixel/gap mask for azimuthal integration.
+
+    Single source of truth — the inline copies in ImportAndReduceAD and
+    reduceADData had diverged before this was factored out.
+
+    Detector geometry has changed over time: WAXS masks branch by detector
+    size, SAXS masks by acquisition year (StartTime metadata).  The >1e7 /
+    <0 cuts differ because Pilatus and Eiger mark bad pixels differently.
+    numpy 2-D shape is (rows, cols); rows is the short axis on these detectors.
+    """
+    mask = np.zeros_like(my2DRAWdata)
+    if usingWAXS:
+        if my2DRAWdata.shape[0] >= 256:
+            # current WAXS detector: 512 x 2068 (4-tile, gaps at cols 512/1024/1536)
+            mask[my2DRAWdata > 1e7] = 1
+            mask[:, 511:516] = 1
+            mask[:, 1026:1041] = 1
+            mask[:, 1551:1556] = 1
+        else:
+            # old WAXS detector (195 x 981)
+            mask[my2DRAWdata > 1e7] = 1
+            mask[my2DRAWdata < 0] = 1
+            mask[:, 486:494] = 1
+            mask[:, 979:980] = 1
+            mask[0:3, :] = 1
+            mask[193:194, :] = 1
+    else:
+        # SAXS: pick mask by acquisition year.
+        # StartTime format: "2022-12-15 10:48:51.230765" (string from /entry/Metadata).
+        start_time_raw = metadata_dict.get("StartTime", "")
+        if isinstance(start_time_raw, bytes):
+            start_time_raw = start_time_raw.decode("utf-8", errors="replace")
+        try:
+            acquisition_year = int(str(start_time_raw).strip()[:4])
+        except (ValueError, TypeError):
+            acquisition_year = 9999   # unknown -> treat as current
+        mask[my2DRAWdata < 0] = 1
+        mask[my2DRAWdata > 1e7] = 1
+        if acquisition_year >= 2023:
+            # current SAXS detector
+            mask[:, :4] = 1
+            mask[:, 242:245] = 1
+        else:
+            # pre-2023 SAXS detector
+            mask[:, 0:7] = 1
+            mask[86, 17] = 1
+            mask[58, 112] = 1
+    return mask
 
 
 # TODO: split into multiple steps as needed
@@ -114,16 +196,8 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
         else:
             Sample = dict()
             if thickness_override is not None:
-                # NOTE: this permanently modifies the raw data file; the
-                # original value is preserved once in *_original.
-                thick_path = '/entry/sample/thickness'
-                orig_path  = '/entry/sample/thickness_original'
-                if thick_path in hdf_file:
-                    if orig_path not in hdf_file:
-                        hdf_file[orig_path] = hdf_file[thick_path][()]
-                    del hdf_file[thick_path]
-                hdf_file[thick_path] = float(thickness_override)
-                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+                writeThicknessOverride(hdf_file, '/entry/sample/thickness',
+                                       thickness_override, filename)
             Sample = importADData(path, filename)   #this is for sample path and blank
             Sample["reducedData"] = reduceADData(Sample, useRawData=True, npts=npts)   #this generates Int vs Q for raw data plot
                                         # q = Sample["reducedData"]["Q"]
@@ -235,8 +309,8 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
                             'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
                             'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
                             'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
-                            'scaler_freq'                     
-                        ]        
+                            'scaler_freq', 'StartTime',      # StartTime needed by _build_mask (SAXS year branch)
+                        ]
             metadata_group = hdf_file['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
@@ -245,53 +319,10 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
             Sample["RawData"]["metadata"]= metadata_dict
             Sample["RawData"]["instrument"]= instrument_dict
             Sample["RawData"]["sample"]= sample_dict
-            # wavelength, keep in A for Fit2D
-            wavelength = instrument_dict["monochromator"]["wavelength"]
-            # pixel_size, keep in mm, converted in convert_Nika_to_Fit2D to micron for Fit2D and then to m for pyFAI... 
-            pixel_size1 = instrument_dict["detector"]["x_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
-            # assume pixels are square, therefore size2 is not needed. No idea how to fix this in Nika or pyFAI for that matter anyway. 
-            #pixel_size2 = instrument_dict["detector"]["y_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
-            # detector_distance, keep in mm for Fit2D
-            detector_distance = instrument_dict["detector"]["distance"] #in mm in Nika, in mm in Fit2D
-            #logging.info(f"Read metadata")
-            if "pin_ccd_tilt_x" in metadata_dict:                       # this is SAXS
-                usingWAXS=0
-                BCX= instrument_dict["detector"]["beam_center_x"]       #  This will be swapped later in convert_Nika_to_Fit2D 
-                BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
-                HorTilt = metadata_dict["pin_ccd_tilt_x"]               #   keep in degrees for Fit2D
-                VertTilt = metadata_dict["pin_ccd_tilt_y"]              #   keep in degrees for Fit2D
-            else:                                                       # and this is WAXS
-                usingWAXS=1
-                BCX = instrument_dict["detector"]["beam_center_x"]      #  This will be swapped later in convert_Nika_to_Fit2D
-                BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
-                HorTilt = metadata_dict["waxs_ccd_tilt_x"]              #   keep in degrees for Fit2D
-                VertTilt = metadata_dict["waxs_ccd_tilt_y"]             #   keep in degrees for Fit2D    
+        # geometry + mask via the shared helpers (single source of truth)
+        my_poni, usingWAXS = _geometry_from_dicts(instrument_dict, metadata_dict)
+        mask = _build_mask(my2DData, usingWAXS, metadata_dict)
 
-            #logging.info(f"Finished reading metadata")
-        
-        # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
-        my_poni = convert_Nika_to_Fit2D(SSD=detector_distance, pix_size=pixel_size1, BCX=BCX, BCY=BCY, HorTilt=HorTilt, VertTilt=VertTilt, wavelength=wavelength)
-
-        #create mask here. Duplicate the my2DData and set all values above 1e7 to NaN for WAXS or for SAXS mask all negative intensities
-        # the differecne is due to Pilatus vs Eiger handing bad pixels differently. Dectris issue... 
-        if usingWAXS:
-            mask = np.copy(my2DData)
-            mask = 0*mask   # set all values to zero
-            mask[my2DData > 1e7] = 1
-            mask[:, 511:516] = 1
-            mask[:, 1026:1041] = 1
-            mask[:, 1551:1556] = 1
-        else:
-            mask = np.copy(my2DData)
-            mask = 0*mask   # set all values to zero
-            mask[my2DData < 0] = 1
-            # Set the first 4 rows to 1
-            mask[:, :4] = 1
-            # Set rows 192 to 195 to 1
-            mask[:, 242:245] = 1
-
-        #logging.info(f"Finished creating mask")
-        
         ai = _get_integrator(my_poni)
 
         #   You can specify the number of bins for the integration
@@ -306,20 +337,6 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
             # using azimuth_range=(-30,30) should limit the range of data to what Nika is using for SAXS. 
             q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask,azimuth_range=(-30,30), error_model= "azimuthal", correctSolidAngle=True, unit="q_A^-1")
 
-        # Perform azimuthal integration
-        # logging.info(f"Finished 2d to 1D conversion")
-        # this is using two dimentions. 
-        # intensity, q, chi = ai.integrate2d(my2DData, npt_rad=npt, npt_azim=6,azimuth_range=(-30,30), mask=mask, correctSolidAngle=True, unit="q_A^-1")
-        # Q, Chi = np.meshgrid(q, chi)
-        # # Plot the intensity as a heatmap
-        # plt.figure(figsize=(10, 8))
-        # plt.pcolormesh(Q, Chi, intensity, shading='auto', cmap='viridis')
-        # plt.colorbar(label='Intensity')
-        # plt.xlabel('q (nm^-1)')
-        # plt.ylabel('Chi (degrees)')
-        # plt.title('Intensity as a function of q and Chi')
-        # plt.show()
-  
         Sample["reducedData"] = dict()
         Sample["reducedData"]["Q_array"] = q
         Sample["reducedData"]["Intensity"] = intensity
@@ -481,94 +498,10 @@ def reduceADData(Sample, useRawData=True, npts=None, per_gram=False, density=Non
         samplename = Sample["RawData"]["samplename"]
         metadata_dict = Sample["RawData"]["metadata"]
         instrument_dict = Sample["RawData"]["instrument"]
-        #extract numbers needed to reduce the data here. 
-        # wavelength, keep in A for Fit2D
-        wavelength = instrument_dict["monochromator"]["wavelength"]
-        # pixel_size, keep in mm, converted in convert_Nika_to_Fit2D to micron for Fit2D and then to m for pyFAI... 
-        pixel_size1 = instrument_dict["detector"]["x_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
-        # assume pixels are square, therefore size2 is not needed. No idea how to fix this in Nika or pyFAI for that matter anyway. 
-        #pixel_size2 = instrument_dict["detector"]["y_pixel_size"] #in mm in NIka, will convert to micron for Fit2D later
-        # detector_distance, keep in mm for Fit2D
-        detector_distance = instrument_dict["detector"]["distance"] #in mm in Nika, in mm in Fit2D
-        #logging.info(f"Read metadata")
-        if "pin_ccd_tilt_x" in metadata_dict:                       # this is SAXS
-            usingWAXS=0
-            BCX= instrument_dict["detector"]["beam_center_x"]       #  This will be swapped later in convert_Nika_to_Fit2D 
-            BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
-            HorTilt = metadata_dict["pin_ccd_tilt_x"]               #   keep in degrees for Fit2D
-            VertTilt = metadata_dict["pin_ccd_tilt_y"]              #   keep in degrees for Fit2D
-        else:                                                       # and this is WAXS
-            usingWAXS=1
-            BCX = instrument_dict["detector"]["beam_center_x"]      #  This will be swapped later in convert_Nika_to_Fit2D
-            BCY = instrument_dict["detector"]["beam_center_y"]      #  This will be swapped later in convert_Nika_to_Fit2D
-            HorTilt = metadata_dict["waxs_ccd_tilt_x"]              #   keep in degrees for Fit2D
-            VertTilt = metadata_dict["waxs_ccd_tilt_y"]             #   keep in degrees for Fit2D    
+        # geometry + mask via the shared helpers (single source of truth)
+        my_poni, usingWAXS = _geometry_from_dicts(instrument_dict, metadata_dict)
+        mask = _build_mask(my2DRAWdata, usingWAXS, metadata_dict)
 
-        #logging.info(f"Finished reading metadata")
-    
-        # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
-        my_poni = convert_Nika_to_Fit2D(SSD=detector_distance, pix_size=pixel_size1, BCX=BCX, BCY=BCY, HorTilt=HorTilt, VertTilt=VertTilt, wavelength=wavelength)
-        #create mask here. Duplicate the my2DData and set all values above 1e7 to NaN for WAXS or for SAXS mask all negative intensities
-        # the differecne is due to Pilatus vs Eiger handing bad pixels differently. Dectris issue...
-        # Detector geometry has changed over time, so masks branch by detector size (WAXS) or acquisition year (SAXS).
-        # numpy 2-D shape is (rows, cols) — for these detectors rows is the short axis, cols is the long axis.
-        if usingWAXS:
-            # WAXS: pick mask by detector size.
-            #   current detector: 512 x 2068 pixels (4-tile, gaps at cols 512/1024/1536)
-            #   old detector:     195 x 981 pixels
-            if my2DRAWdata.shape[0] >= 256:
-                # current WAXS detector
-                mask = np.copy(my2DRAWdata)
-                mask = 0*mask   # set all values to zero
-                mask[my2DRAWdata > 1e7] = 1
-                mask[:, 511:516] = 1
-                mask[:, 1026:1041] = 1
-                mask[:, 1551:1556] = 1
-            else:
-                # old WAXS detector (195 x 981) — TODO: fill in mask values
-                mask = np.copy(my2DRAWdata)
-                mask = 0*mask   # set all values to zero
-                mask[my2DRAWdata > 1e7] = 1
-                mask[my2DRAWdata < 0]   = 1
-                mask[:, 486:494] = 1
-                mask[:, 979:980] = 1
-                mask[0:3, :]     = 1                
-                mask[193:194, :] = 1                
-        else:
-            # SAXS: pick mask by acquisition year.
-            # StartTime format: "2022-12-15 10:48:51.230765" (string from /entry/Metadata).
-            start_time_raw = metadata_dict.get("StartTime", "")
-            if isinstance(start_time_raw, bytes):
-                start_time_raw = start_time_raw.decode("utf-8", errors="replace")
-            try:
-                acquisition_year = int(str(start_time_raw).strip()[:4])
-            except (ValueError, TypeError):
-                acquisition_year = 9999   # unknown → treat as current
-
-            if acquisition_year >= 2023:
-                # current SAXS detector
-                mask = np.copy(my2DRAWdata)
-                mask = 0*mask   # set all values to zero
-                mask[my2DRAWdata < 0]   = 1
-                mask[my2DRAWdata > 1e7] = 1
-                # Set the first 4 rows to 1
-                mask[:, :4] = 1
-                # Set rows 192 to 195 to 1
-                mask[:, 242:245] = 1
-            else:
-                # pre-2023 SAXS detector — TODO: fill in mask values
-                mask = np.copy(my2DRAWdata)
-                mask = 0*mask   # set all values to zero
-                mask[my2DRAWdata < 0]   = 1
-                mask[my2DRAWdata > 1e7] = 1
-                # Set the first 4 rows to 1
-                mask[:, 0:7] = 1
-                # mask few bad points
-                mask[86,17 ] = 1
-                mask[58,112 ] = 1
-                
-        #logging.info(f"Finished creating mask")
-        
         ai = _get_integrator(my_poni)
 
         #   You can specify the number of bins for the integration
@@ -606,18 +539,6 @@ def reduceADData(Sample, useRawData=True, npts=None, per_gram=False, density=Non
             result["Error"] = result["Error"] / density
             result["units"] = "[cm2/g]"
         return result
-
-# def reduceADToQR(path, filename):
-#         tempFilename= os.path.splitext(filename)[0]
-#         tempSample = {"RawData":{"filename": tempFilename}}
-#         # label = data_dict["RawData"]["filename"]
-#         # Q_array = data_dict["reducedData"]["Q_array"]
-#         # Intensity = data_dict["reducedData"]["PD_intensity"]
-#         tempSample["reducedData"]=ImportAndReduceAD(path, filename)
-#         #pp.pprint(tempSample)
-#         #pp.pprint(tempSample["RawData"]["filename"])
-#         return tempSample
-
 
 def PlotResults(data_dict):
     # result = {"Int_raw":np.ravel(intensity), 
@@ -668,37 +589,5 @@ if __name__ == "__main__":
 
 
 
-                ## test for tilts using LaB6 45 deg tilted detector from GSAXS-II goes here
-                # to the best of my undestanding, the images loaded from tiff file are mirrored and the values here are just weird. 
-                # def test(path, filename):
-                #     # read data from tiff file and read the data 
-                #     # tiff files are actually loaded differently than HDF5 files. Looks like they are mirrored. 
-                #     my2DData = tiff.imread(path+'/'+filename)
-                #     wavelength = 0.10798 # in A
-                #     # pixel_size
-                #     pixel_size1 = 0.1 # x in Nika, in mm
-                #     #pixel_size2 = 0.1 # y in Nika, in mm
-                #     # detector_distance, in mm
-                #     detector_distance = 1004.91 # in Nika, in mm 
-                #     # Nika BCX and BCY in pixels
-                #     BCY = 886.7     # this is for hdf5 x in Nika
-                #     BCX = 1048.21   # this is for hdf5 y in Nika
-                #     # read Nika HorTilt and VertTilt 
-                #     VertTilt  = -44.7   # this is negative value for horizontal tilt in Nika
-                #     HorTilt = 0.02      # this is value for vertical tilt in Nika, not sure if this shoudl be negative. 
-                #     # poni is geometry file for pyFAI, created by converting first to Fit2D and then calling pyFAI conversion function.
-                #     my_poni = convert_Nika_to_Fit2D(detector_distance, pixel_size1, BCX, BCY, HorTilt, VertTilt, wavelength)
-                #     # setup integrator geometry
-                #     ai = AzimuthalIntegrator(dist=my_poni.dist, poni1=my_poni.poni1, poni2=my_poni.poni2, rot1=my_poni.rot1, rot2=my_poni.rot2,
-                #                        rot3=my_poni.rot3, pixel1=my_poni.detector.pixel1, pixel2=my_poni.detector.pixel2, 
-                #                        wavelength=my_poni.wavelength)
-                #     #create mask here. Duplicate the my2DData and set all values to be masked to NaN, not used here. 
-                #     mask = np.copy(my2DData)
-                #     mask = 0*mask           # set all values to zero
-                #     # Perform azimuthal integration
-                #     # You can specify the number of bins for the integration
-                #     #set npt to larger of dimmension of my2DData  `
-                #     npt = max(my2DData.shape)
-                #     q, intensity = ai.integrate1d(my2DData, npt, mask=mask, correctSolidAngle=True, unit="q_A^-1")
-                #     result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
-                #     return result
+# (historical tilt-test scaffolding for GSAXS-II LaB6 tiff data removed 2026-07;
+#  see git history or CodeFragments/ if needed again)

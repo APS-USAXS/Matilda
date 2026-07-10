@@ -14,12 +14,38 @@ from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+# canonical copies of the dict helpers live in hdf5code; re-exported here
+# because convertUSAXS/convertSWAXS historically import them from this module
+from .hdf5code import read_group_to_dict, filter_nested_dict
 
 #this is to enable graphs in R data clacualtion for debugging. 
 debugme = 0
 #recalculateAllData = False
 
 MinQMinFindRatio = 1.05
+
+
+def empty_calibrated_data():
+    """Return the CalibratedData dict used when calibration is not possible
+    (no blank provided, or too few points survived subtraction).
+
+    A fresh dict is returned each call so callers can mutate it safely.
+    """
+    return {"SMR_Qvec": None,
+            "SMR_Int": None,
+            "SMR_Error": None,
+            "SMR_dQ": None,
+            "Kfactor": None,
+            "OmegaFactor": None,
+            "blankname": None,
+            "thickness": None,
+            "units": "[cm2/cm3]",
+            "Intensity": None,
+            "Q": None,
+            "Error": None,
+            "dQ": None,
+            "slitLength": None,
+            }
 
 ## support stuff here
 
@@ -941,72 +967,9 @@ def modifiedGauss(xvar, a, x0, sigma, exponent):
 
 
 
-# Function to recursively read a group and store its datasets in a dictionary
-def read_group_to_dict(group):
-    data_dict = {}
-    for key, item in group.items():
-        if isinstance(item, h5py.Dataset):
-            # Read the dataset
-            data = item[()]
-             # Check if the dataset is bytes
-            if isinstance(data, bytes):
-                # Decode bytes to string
-                data = data.decode('utf-8')
-            # Check if the dataset is an array with a single element
-            elif hasattr(data, 'size') and data.size == 1:
-                # Convert to a scalar (number or string)
-                data = data.item()
-                if isinstance(data, bytes):
-                    # Decode bytes to string, the above does not seem to catch this? 
-                    data = data.decode('utf-8')
-            data_dict[key] = data
-        elif isinstance(item, h5py.Group):
-            # If the item is a group, recursively read its contents
-            data_dict[key] = read_group_to_dict(item)
-    return data_dict
-
-
-# this should not fail if keys on the list are not present
-# NOTE: nested dicts are kept only if their own key is in keys_to_keep;
-# wanted keys deeper inside unlisted parent groups are dropped.
-def filter_nested_dict(d, keys_to_keep):
-    if isinstance(d, dict):
-        return {k: filter_nested_dict(v, keys_to_keep) for k, v in d.items() if k in keys_to_keep and k in d}
-    elif isinstance(d, list):
-        return [filter_nested_dict(item, keys_to_keep) for item in d]
-    else:
-        return d    
-
-# def results_to_dataset(results):
-#     results = copy.deepcopy(results)
-#     ds = xr.Dataset()
-#     ds['USAXS_int'] = ('q',results['reducedData']['UPD'])
-#     ds['q'] = results['reducedData']['Q_array']
-#     del results['reducedData']['UPD']
-#     del results['reducedData']['Q_array']
-#     ds.update(results['reducedData'])
-#     for our_name,raw_name in [('AR_angle','ARangles'),
-#                               ('TimePerPoint','TimePerPoint'),
-#                               ('Monitor','Monitor'),
-#                               ('UPD','UPD_array'),
-#                              ]:
-#         ds[our_name] = ('flyscan_bin',results['RawData'][raw_name])
-#         del results['RawData'][raw_name]
-#     for our_name,raw_name in [('AmpGain','AmpGain'),
-#                               ('AmpReqGain','AmpReqGain'),
-#                               ('amp_change_channel','Channel')
-#                              ]:
-#         ds[our_name] = ('amp_change_channel',results['RawData'][raw_name])
-#         del results['RawData'][raw_name]
-                                      
-#     ds.attrs.update(results['RawData']['metadata'])
-#     del results['RawData']['metadata']
-#     ds.attrs['instrument'] = results['RawData']['instrument']
-#     del results['RawData']['instrument']
-#     ds.update(results['RawData'])
-
-#     return ds
-
+# read_group_to_dict and filter_nested_dict live in hdf5code (canonical copies)
+# and are re-exported from this module for backwards compatibility (see the
+# import at the top of this file).
 
 '''
     Converted by AI from Igor code
@@ -1240,13 +1203,3 @@ def find_correct_log_scale_start(StartValue, EndValue, NumPoints, MinStep):
 
     # The optimal start value is in result.x[0]
     return result.x[0]
-
-
-# # Example usage
-# StartValue = 1.0
-# EndValue = 10.0
-# NumPoints = 100
-# MinStep = 0.1
-
-# optimal_start = find_correct_log_scale_start(StartValue, EndValue, NumPoints, MinStep)
-# print("Optimal Start Value:", optimal_start)

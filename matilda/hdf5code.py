@@ -846,6 +846,52 @@ def _get_h5_value(h5file, path):
         return h5file[path][()]
     return None
 
+
+def clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
+    """Cached-reduction bookkeeping shared by processFlyscan and processStepscan.
+
+    1. Finds NXcanSAS entries previously written by saveNXcanSAS.
+    2. When *recalculateAllData*, deletes the cached QRS / SMR / NXcanSAS groups.
+    3. Returns True when a reusable cached result is present:
+       * requireCalibrated=True  — the desmeared NXcanSAS entry must exist
+         (used when a blank is provided, i.e. full calibration expected)
+       * requireCalibrated=False — the QRS_data group is enough
+    """
+    required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
+    required_items = {'definition': 'NXcanSAS'}
+    SASentries = find_matching_groups(hdf_file, required_attributes, required_items)
+
+    if recalculateAllData:
+        for location, label in (
+            ('entry/QRS_data/', "'entry/QRS_data'"),
+            (next((e + '/' for e in SASentries if '_SMR' in e), None), 'SMR_data'),
+            (next((e + '/' for e in SASentries if '_SMR' not in e), None), 'NXcanSAS'),
+        ):
+            if location is not None and location in hdf_file:
+                del hdf_file[location]
+                logging.info(f"Deleted existing group {label} for file {filename}. ")
+
+    if requireCalibrated:
+        location = next((e + '/' for e in SASentries if '_SMR' not in e), None)
+    else:
+        location = 'entry/QRS_data/'
+    return location is not None and location in hdf_file
+
+
+def writeThicknessOverride(hdf_file, thick_path, thickness_override, filename):
+    """Write a user-supplied thickness override into the raw data file.
+
+    NOTE: this permanently modifies the raw data file; the original value is
+    preserved once at ``<thick_path>_original``.
+    """
+    orig_path = thick_path + '_original'
+    if thick_path in hdf_file:
+        if orig_path not in hdf_file:
+            hdf_file[orig_path] = hdf_file[thick_path][()]
+        del hdf_file[thick_path]
+    hdf_file[thick_path] = float(thickness_override)
+    logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+
 def save_dict_to_hdf5(dic, location, h5file):
     """
     Save a dictionary to an HDF5 file.
@@ -948,33 +994,6 @@ def filter_nested_dict(d, keys_to_keep):
     else:
         return d    
 
-
-# def find_NXcanSAS_entries(group, path=''):
-#     nxcanSAS_entries = []
-    
-#     for name, item in group.items():
-#         current_path = f"{path}/{name}" if path else name
-        
-#         # Check if the item is a group
-#         if isinstance(item, h5py.Group):
-#             # Check if the group has the attribute "NXcanSAS"
-#             if 'canSAS_class' in item.attrs:
-#                 if(item.attrs['canSAS_class'] == 'SASentry'):
-#                     if "definition" in item:
-#                         definition_data = item["definition"][()]
-#                         # Check if "NXcanSAS" is in the definition data
-#                         if isinstance(definition_data, bytes):
-#                             definition_data = definition_data.decode('utf-8')
-                        
-#                         print(f"Definition data: {definition_data}")
-#                         if definition_data == 'NXcanSAS':
-#                             print(f"Found NXcanSAS entry at: {current_path}")
-#                             nxcanSAS_entries.append(current_path)
-            
-#             # Recursively search within the group
-#             nxcanSAS_entries.extend(find_NXcanSAS_entries(item, current_path))
-    
-#     return nxcanSAS_entries
 
 # this code can find any group which contains listed attributes:values and items:values (strings and variables)
 # this is general purpose code for HDF5 - Nexus evaluation

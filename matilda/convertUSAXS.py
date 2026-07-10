@@ -41,7 +41,9 @@ import logging
 from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from .supportFunctions import beamCenterCorrection
 from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
-from .hdf5code import saveNXcanSAS, readMyNXcanSAS, find_matching_groups
+from .hdf5code import saveNXcanSAS, readMyNXcanSAS
+from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
+from .supportFunctions import empty_calibrated_data
 from .supportFunctions import normalizeByTransmission
 from .desmearing import desmearData
 from .plotData import plotUSAXSResults
@@ -95,60 +97,22 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
     # Open the HDF5 file in read/write mode
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
-        required_items = {'definition': 'NXcanSAS'}
-        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if recalculateAllData:
-            # Delete the groups which may have een created by previously run saveNXcanSAS
-            location = 'entry/QRS_data/'
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group with SMR_data for file {filename}. ")
-            location = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
-
-
-        #Now, we will read the data from the file, if the exist. 
-        # More checks... if we have blankname, full NXcanSAS need to exist or recalculate
-        # if blankname=None, then we just need the QRS_data group.   
-
-        NXcanSASentry = next((entry + '/' for entry in SASentries if '_SMR' not in entry), None)
-        location = None
-        if blankFilename is not None and blankPath is not None and "blank" not in filename.lower():
-            location = NXcanSASentry        # require we have desmeared data
-        else:
-            location = 'entry/QRS_data/'            # all we want here are QRS data
-        
-        if location is not None and location in hdf_file:
+        # Cache bookkeeping (shared with processFlyscan): with a blank we
+        # require the full desmeared NXcanSAS entry, otherwise QRS_data is enough.
+        requireCalibrated = (blankFilename is not None and blankPath is not None
+                             and "blank" not in filename.lower())
+        if clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
             # exists, so lets reuse the data from the file
-            Sample = dict()
             Sample = readMyNXcanSAS(path, filename, isUSAXS=True)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
-        
+
         else:
             Sample = dict()
             if thickness_override is not None:
-                # NOTE: this permanently modifies the raw data file; the
-                # original value is preserved once in *_original.
-                thick_path = '/entry/instrument/bluesky/metadata/sample_thickness_mm'
-                orig_path  = '/entry/instrument/bluesky/metadata/sample_thickness_mm_original'
-                if thick_path in hdf_file:
-                    if orig_path not in hdf_file:
-                        hdf_file[orig_path] = hdf_file[thick_path][()]
-                    del hdf_file[thick_path]
-                hdf_file[thick_path] = float(thickness_override)
-                logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
+                writeThicknessOverride(hdf_file,
+                                       '/entry/instrument/bluesky/metadata/sample_thickness_mm',
+                                       thickness_override, filename)
             Sample["RawData"]=importStepScan(path, filename)                #import data
             Sample["reducedData"]=(createUPDGainsAndBkgErrArrays(Sample))
             Sample["reducedData"].update(CorrectUPDGainsStep(Sample))    # Correct UPD gains=CorrectUPDGainsStep(Sample)    # Correct UPD gains, this is the first step in data reduction
@@ -193,40 +157,12 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                 else:
                     logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
                                     "Skipping desmearing and rebinning steps. ")
-                    #set calibrated data in the structure to None 
-                    Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                                "SMR_Int":None,
-                                                "SMR_Error":None,
-                                                "SMR_dQ":None,
-                                                "Kfactor":None,
-                                                "OmegaFactor":None,
-                                                "blankname":None,
-                                                "thickness":None,
-                                                "units":"[cm2/cm3]",
-                                                "Intensity":None,
-                                                "Q":None,
-                                                "Error":None,
-                                                "dQ":None,
-                                                "slitLength":None,
-                                                }                    
-            
+                    #set calibrated data in the structure to None
+                    Sample["CalibratedData"] = empty_calibrated_data()
+
             else:
-                #set calibrated data in the structure to None 
-                Sample["CalibratedData"] = {"SMR_Qvec":None,
-                                            "SMR_Int":None,
-                                            "SMR_Error":None,
-                                            "SMR_dQ":None,
-                                            "Kfactor":None,
-                                            "OmegaFactor":None,
-                                            "blankname":None,
-                                            "thickness":None,
-                                            "units":"[cm2/cm3]",
-                                            "Intensity":None,
-                                            "Q":None,
-                                            "Error":None,
-                                            "dQ":None,
-                                            "slitLength":None,
-                                            }
+                #set calibrated data in the structure to None
+                Sample["CalibratedData"] = empty_calibrated_data()
         # Ensure all changes are written and close the HDF5 file
         hdf_file.flush()
     # The 'with' statement will automatically close the file when the block ends
@@ -555,50 +491,8 @@ def CorrectUPDGainsStep(data_dict):
     return result
 
 
-# def reduceStepScanToQR(path, filename, recalculateAllData=True):
-#   # Open the HDF5 file in read/write mode
-#     location = 'entry/displayData/'
-#     with h5py.File(path+'/'+filename, 'r+') as hdf_file:
-#         if recalculateAllData:
-#             # Delete the group
-#             if location in hdf_file:
-#                 del hdf_file[location]
-#                 logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
-        
-#         if location in hdf_file:
-#                 # # exists, reuse existing data
-#                 Sample = dict()
-#                 Sample = load_dict_from_hdf5(hdf_file, location)
-#                 return Sample
-#         else:
-#                 Sample = dict()
-#                 Sample["RawData"]=ImportStepScan(path, filename)
-#                 Sample["reducedData"]= CorrectUPDGainsStep(Sample)
-#                 Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=1))
-#                 # Create the group and dataset for the new data inside the hdf5 file for future use.
-#                 # these are not fully reduced data, this is for web plot purpose.
-#                 save_dict_to_hdf5(Sample, location, hdf_file)
-#                 return Sample
-
-
-# def PlotResults(data_dict):
-#         # Plot UPD vs Q.
-#     Q = data_dict["reducedData"]["Q"]
-#     Intensity = data_dict["reducedData"]["Intensity"]
-    
-#         # Plot ydata against xdata
-#     plt.figure(figsize=(6, 12))
-#     plt.plot(Q, Intensity, marker='o', linestyle='-')  # You can customize the marker and linestyle
-#     plt.title('Plot of UPD vs. Q')
-#     plt.xlabel('log(Q) [1/A]')
-#     plt.ylabel('UPD')
-#     plt.xscale('log')
-#     plt.yscale('log')
-#     plt.grid(True)
-#     plt.show()
-
-
-
+# (legacy commented-out reduceStepScanToQR / PlotResults removed 2026-07;
+#  see git history if needed again)
 
 
 if __name__ == "__main__":

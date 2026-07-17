@@ -67,6 +67,7 @@ from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrecti
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
 from .supportFunctions import empty_calibrated_data
 from .desmearing import desmearData
+from .desmearing_methods import desmear_dispatch
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
@@ -76,7 +77,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                     num_points=500, desmear_iter=20, extrap_method='PowerLaw w flat',
                     extrap_qstart=0.15, minQMinFindRatio=1.05, thickness_override=None,
                     use_mu=False, mu=None, per_gram=False, density=None,
-                    transmission_override=None, qmin_override=None):
+                    transmission_override=None, qmin_override=None,
+                    desmear_method='lake', gp_length_scale=0.5, gp_kernel='matern32'):
     """Reduce a single USAXS flyscan HDF5 file to calibrated 1-D I(Q).
 
     Results are cached inside the original HDF5 file as NXcanSAS groups so
@@ -168,7 +170,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod=extrap_method,ExtrapQstart=extrap_qstart, MaxNumIter=desmear_iter)
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter)
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,

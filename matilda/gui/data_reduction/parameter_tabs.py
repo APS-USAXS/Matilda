@@ -49,6 +49,9 @@ EXTRAP_METHODS = [
     "flat",
 ]
 
+# Desmearing method display strings -> (method_key, kernel_key) mappings.
+from ...desmearing_methods import GUI_METHOD_MAP, GUI_KERNEL_MAP  # noqa: E402
+
 # Maps technique name → tab index (must stay in sync with addTab order)
 TECHNIQUE_TAB_IDX: dict[str, int] = {
     "Flyscan":  0,
@@ -505,6 +508,36 @@ class _USAXSTab(_TechniqueTab):
         self._extrap_qstart.setToolTip("Q value above which the extrapolation is applied")
         form.addRow("Extrap Q start:", self._extrap_qstart)
 
+        # ── Desmearing method (Lake / Huang GP) ───────────────────────────────
+        self._desmear_method = QComboBox()
+        self._desmear_method.addItems(list(GUI_METHOD_MAP.keys()))
+        self._desmear_method.setToolTip(
+            "Desmearing algorithm. 'Lake' is the current default. 'Huang GP' is a "
+            "noise-suppressing Bayesian method that stays smooth and positive on "
+            "weak/over-subtracted data and returns uncertainties.")
+        self._desmear_method.currentTextChanged.connect(self._on_desmear_method_changed)
+        form.addRow("Method:", self._desmear_method)
+
+        self._gp_kernel = QComboBox()
+        self._gp_kernel.addItems(["Matérn-3/2", "RBF"])
+        self._gp_kernel.setToolTip(
+            "GP smoothness kernel. Matérn-3/2 preserves sharp features (peaks); "
+            "RBF is smoother but can erase peaks — use only on featureless samples.")
+        form.addRow("GP kernel:", self._gp_kernel)
+
+        self._gp_length_scale = QDoubleSpinBox()
+        self._gp_length_scale.setRange(0.1, 2.0)
+        self._gp_length_scale.setValue(0.5)
+        self._gp_length_scale.setSingleStep(0.1)
+        self._gp_length_scale.setDecimals(2)
+        self._gp_length_scale.setSuffix("  decades")
+        self._gp_length_scale.setToolTip(
+            "GP correction smoothness length, in decades of q. Larger = smoother "
+            "(more noise suppression, more risk of washing out real features).")
+        form.addRow("GP length scale:", self._gp_length_scale)
+
+        self._on_desmear_method_changed(self._desmear_method.currentText())
+
         layout.addLayout(form)
         layout.addStretch()
 
@@ -522,7 +555,15 @@ class _USAXSTab(_TechniqueTab):
             self._blank_label.setText("(none assigned)")
             self._blank_label.setStyleSheet("color: grey; font-style: italic;")
 
+    def _on_desmear_method_changed(self, text: str):
+        """Enable the GP-specific controls only when a GP method is selected."""
+        is_gp = "GP" in text
+        self._gp_kernel.setEnabled(is_gp)
+        self._gp_length_scale.setEnabled(is_gp)
+
     def get_params(self) -> dict:
+        method_key, kernel_default = GUI_METHOD_MAP.get(
+            self._desmear_method.currentText(), ("lake", "matern32"))
         params = {
             "blank_mode":         self._blank_mode.currentText(),
             "thickness":          self._get_thickness(),
@@ -530,6 +571,9 @@ class _USAXSTab(_TechniqueTab):
             "desmear_iter":       self._desmear_iter.value(),
             "extrap_method":      self._extrap_method.currentText(),
             "extrap_qstart":      self._extrap_qstart.value(),
+            "desmear_method":     method_key,
+            "gp_kernel":          GUI_KERNEL_MAP.get(self._gp_kernel.currentText(), kernel_default),
+            "gp_length_scale":    self._gp_length_scale.value(),
             "qmin_override":      (
                 self._qmin_spin.value()
                 if self._override_qmin.isChecked() else None

@@ -32,12 +32,6 @@ classifiers = [
     "License :: Other/Proprietary License",
 ]
 
-[project.urls]
-Homepage = "https://github.com/APS-USAXS/Matilda"
-Repository = "https://github.com/APS-USAXS/Matilda"
-"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
-Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
-
 # Core runtime dependencies (verified used in source code).
 # GUI dependencies (PyQt6, pyqtgraph) are listed separately below so the
 # headless server install can omit them if needed.
@@ -53,6 +47,12 @@ dependencies = [
     "scipy",
     # tifffile removed 2026-07: only referenced from commented-out debug code
 ]
+
+[project.urls]
+Homepage = "https://github.com/APS-USAXS/Matilda"
+Repository = "https://github.com/APS-USAXS/Matilda"
+"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
+Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]

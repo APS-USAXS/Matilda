@@ -226,6 +226,16 @@ are unaffected, because there the likelihood dominates the prior. (On a test
 sample with a real peak at $q\approx10^{-3}$ the recovered peak height is
 unchanged with the resolution-aware prior on or off.)
 
+A complementary safeguard operates directly on the GP output. Where the total
+column weight of $\mathbf M$ is small (the under-constrained low-$q$ block on a
+flat plateau), the desmeared intensity is not allowed to fall below the local
+*smeared* plateau level — the correct value for a flat region — which removes the
+artefactual low-$q$ ramp. A genuine rising low-$q$ power law (resolution-limited,
+strong signal) is untouched, because there the desmeared curve exceeds the
+smeared data and the floor never binds. This distinguishes the two physically
+different low-$q$ regimes automatically: signal-limited (flat, needs smoothing)
+versus resolution-limited (rising, well-determined).
+
 For the noisiest flat-plateau data a simpler alternative is offered:
 **smoothed Lake** — the Lake reconstruction followed by a geometric-mean
 smoothing. It inherits Lake's null-space-safe shape and removes the incoherent

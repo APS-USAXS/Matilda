@@ -104,6 +104,13 @@ pieces:
   For `gp_lake_mean`, `μ0` instead comes from `_smooth_loglog(lake)`.
 - **Kernel** `_kernel(x, ell, σ, kind)` over `x = ln q`, `ell = ls·ln10`:
   RBF `σ² exp(−d²/2)` or Matérn-3/2 `σ²(1+√3 d)exp(−√3 d)`, `d=|Δx|/ell`.
+- **Low-q guard** (`low_q_guard=True`, default): after the fit, over the
+  under-constrained low-q block (small column weight in `M`, i.e. slit ≥ q at
+  those points), clamp the desmeared intensity so it does not fall below the
+  local **smeared** plateau level. Fixes the downward low-q ramp that the fit
+  produces on weak flat-plateau data; leaves rising low-q power laws untouched
+  (there the desmeared exceeds the smeared, so the floor never binds). This is
+  the "weak/flat vs strong/rising" auto-discriminator.
 - **Resolution-aware prior** (`resolution_aware=True`, default): a non-stationary
   length scale `ell(q)=max(ell0, α·W(q))` with slit resolution
   `W(q)=½·ln(1+(L/q)²)`, applied by warping the coordinate

@@ -116,24 +116,25 @@ def _trend_on_work(q, base_measured, q_work, tail_order=2):
 
 
 def _smooth_curve(q, I, decades=0.3):
-    """Geometric-mean (log-space) smoothing of a curve over a window of ``decades``
-    in q. Clips to a small positive floor so Lake spikes / negatives don't break
-    log(). Used by the 'lake_smooth' method: keeps Lake's null-space-safe shape
-    (no coherent oscillation) while removing its incoherent point noise."""
+    """Robust smoothing of a curve over a window of ``decades`` in q, by a
+    rolling **median** in linear intensity. Used by the 'lake_smooth' method:
+    it keeps Lake's null-space-safe shape (no coherent oscillation), is robust to
+    Lake's up/down spikes, and — unlike geometric-mean (log) smoothing — does not
+    sit systematically below the data (log-averaging is biased low for noisy
+    data; the median is not)."""
     q = np.asarray(q, float); I = np.asarray(I, float)
     n = len(q)
-    pos = I[np.isfinite(I) & (I > 0)]
-    floor = (np.median(pos) * 1e-6) if pos.size else 1e-30
-    Ic = np.clip(I, max(floor, 1e-300), None)
     span = np.log10(q[-1] / q[0]) if q[-1] > q[0] else 1.0
     ppd = n / max(span, 1e-6)
     win = max(3, int(round(decades * ppd)))
     if win % 2 == 0:
         win += 1
     pad = win // 2
-    sm = np.convolve(np.pad(np.log(Ic), pad, mode="reflect"), np.ones(win) / win,
-                     mode="valid")[:n]
-    return np.exp(sm)
+    Ip = np.pad(I, pad, mode="reflect")
+    out = np.empty(n)
+    for i in range(n):
+        out[i] = np.median(Ip[i:i + win])
+    return out
 
 
 def _smooth_loglog(q, I, win_frac=0.04):
@@ -161,7 +162,7 @@ def _gp_core(q, y, err, slit_length, length_scale_decades=0.5, sigma_log=4.0,
              kernel="matern32", err_floor_frac=0.01, rel_err_floor=1e-2,
              n_sigma_band=2.0, max_iter=30, tol=1e-4, n_extra=40, n_slit=200,
              jitter=1e-8, resolution_aware=True, res_alpha=1.0,
-             prior_mean_q=None, prior_mean_I=None):
+             low_q_guard=True, prior_mean_q=None, prior_mean_I=None):
     q = np.asarray(q, float); y = np.asarray(y, float); err = np.asarray(err, float)
     m = np.isfinite(q) & (q > 0) & np.isfinite(y)
     q, y = q[m], y[m]
@@ -241,9 +242,36 @@ def _gp_core(q, y, err, slit_length, length_scale_decades=0.5, sigma_log=4.0,
     var = np.clip(np.diag(np.linalg.inv(A)), 0.0, None)
     sd = np.sqrt(var)
     I = x[:Nm]; sdm = sd[:Nm]
+    err_lin = I * sdm
     lower = I * np.exp(-n_sigma_band * sdm)
     upper = I * np.exp(+n_sigma_band * sdm)
-    return q, I, I * sdm, lower, upper
+
+    if low_q_guard:
+        # Weak, signal-limited flat low-q data (a Guinier plateau) leaves a broad
+        # low-q block in the operator's near-null space when slit >> q_min: many
+        # low-q smeared points integrate the same range, so the fit is free to
+        # ramp the desmeared curve down away from the flat plateau (an artefact —
+        # desmearing a flat region should leave it flat). Guard: over the
+        # under-constrained low-q block (small total column weight in M), do not
+        # let the desmeared intensity fall below the local *smeared* plateau
+        # level, which is the correct value for a flat region. A genuine rising
+        # low-q power law (resolution-limited, strong signal) is left untouched —
+        # there the desmeared exceeds the smeared, so the clamp never binds.
+        wcol = M.sum(axis=0)[:Nm]
+        thr = 0.5 * np.median(wcol)
+        k = 0
+        while k < Nm and wcol[k] < thr:
+            k += 1
+        if k >= 1:
+            ref = float(np.median(y[:k]))        # smeared plateau level of the weak block
+            I = I.copy()
+            i = 0
+            while i < Nm and I[i] < ref:          # flatten the contiguous low-q ramp
+                sc = ref / max(I[i], 1e-300)
+                I[i] = ref
+                err_lin[i] *= sc; lower[i] *= sc; upper[i] *= sc
+                i += 1
+    return q, I, err_lin, lower, upper
 
 
 def _match_dq(SMR_dQ, q_in, q_out):

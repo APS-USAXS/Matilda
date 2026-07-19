@@ -115,6 +115,27 @@ def _trend_on_work(q, base_measured, q_work, tail_order=2):
     return np.clip(mu, 1e-300, None)
 
 
+def _smooth_curve(q, I, decades=0.3):
+    """Geometric-mean (log-space) smoothing of a curve over a window of ``decades``
+    in q. Clips to a small positive floor so Lake spikes / negatives don't break
+    log(). Used by the 'lake_smooth' method: keeps Lake's null-space-safe shape
+    (no coherent oscillation) while removing its incoherent point noise."""
+    q = np.asarray(q, float); I = np.asarray(I, float)
+    n = len(q)
+    pos = I[np.isfinite(I) & (I > 0)]
+    floor = (np.median(pos) * 1e-6) if pos.size else 1e-30
+    Ic = np.clip(I, max(floor, 1e-300), None)
+    span = np.log10(q[-1] / q[0]) if q[-1] > q[0] else 1.0
+    ppd = n / max(span, 1e-6)
+    win = max(3, int(round(decades * ppd)))
+    if win % 2 == 0:
+        win += 1
+    pad = win // 2
+    sm = np.convolve(np.pad(np.log(Ic), pad, mode="reflect"), np.ones(win) / win,
+                     mode="valid")[:n]
+    return np.exp(sm)
+
+
 def _smooth_loglog(q, I, win_frac=0.04):
     """Smooth a (possibly spiky, possibly non-positive) curve in log-log for use
     as a GP prior mean. Drops non-positive points, geometric-mean smooths."""
@@ -139,7 +160,8 @@ def _smooth_loglog(q, I, win_frac=0.04):
 def _gp_core(q, y, err, slit_length, length_scale_decades=0.5, sigma_log=4.0,
              kernel="matern32", err_floor_frac=0.01, rel_err_floor=1e-2,
              n_sigma_band=2.0, max_iter=30, tol=1e-4, n_extra=40, n_slit=200,
-             jitter=1e-8, prior_mean_q=None, prior_mean_I=None):
+             jitter=1e-8, resolution_aware=True, res_alpha=1.0,
+             prior_mean_q=None, prior_mean_I=None):
     q = np.asarray(q, float); y = np.asarray(y, float); err = np.asarray(err, float)
     m = np.isfinite(q) & (q > 0) & np.isfinite(y)
     q, y = q[m], y[m]
@@ -169,8 +191,23 @@ def _gp_core(q, y, err, slit_length, length_scale_decades=0.5, sigma_log=4.0,
     M = op.M; q_work = op.q_work; Nm, Nw = M.shape
     mu0 = _trend_on_work(q, base, q_work); lnmu0 = np.log(mu0)
 
-    xln = np.log(q_work); ell = length_scale_decades * np.log(10.0)
-    K = _kernel(xln, ell, sigma_log, kernel) + jitter * np.eye(Nw)
+    # GP prior on s over x = ln q. Base (stationary) length scale:
+    xln = np.log(q_work); ell0 = length_scale_decades * np.log(10.0)
+    if resolution_aware:
+        # Slit-limited resolution: a point at q is smeared over [q, sqrt(q^2+L^2)],
+        # i.e. a half-width in ln q of  W(q) = 0.5*ln(1 + (L/q)^2). At low q
+        # (q << L, flat plateau) W is large — the data cannot resolve structure
+        # there. Enforce a *local* length scale >= that resolution by warping the
+        # coordinate u = integral dx / ell_local, then using a unit-length kernel
+        # in u. This gives a non-stationary GP that smooths the unconstrained
+        # low-q null space (no ringing) while keeping full resolution at high q.
+        W = 0.5 * np.log1p((L / q_work) ** 2)
+        ell_local = np.maximum(ell0, res_alpha * W)
+        inv = 1.0 / ell_local
+        u = np.concatenate([[0.0], np.cumsum(0.5 * (inv[1:] + inv[:-1]) * np.diff(xln))])
+        K = _kernel(u, 1.0, sigma_log, kernel) + jitter * np.eye(Nw)
+    else:
+        K = _kernel(xln, ell0, sigma_log, kernel) + jitter * np.eye(Nw)
     Kinv = np.linalg.inv(K)
     smax = np.log(1e8)
 
@@ -240,6 +277,18 @@ def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
                            slitLength=slitLength, ExtrapMethod=extrap_method,
                            ExtrapQstart=extrap_qstart, MaxNumIter=max_iter)
 
+    if method in ("lake_smooth", "smoothed_lake"):
+        # Lake, then geometric-mean smoothing (window = length_scale_decades).
+        # Best for very noisy flat-plateau data, where the GP would ring in the
+        # slit operator's low-q null space but Lake's incoherent noise smooths
+        # cleanly to the physical plateau.
+        from .desmearing import desmearData
+        lq, lI, lE, ldQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ,
+                                      slitLength=slitLength, ExtrapMethod=extrap_method,
+                                      ExtrapQstart=extrap_qstart, MaxNumIter=max_iter)
+        win = length_scale_decades if length_scale_decades and length_scale_decades > 0 else 0.3
+        return lq, _smooth_curve(lq, lI, decades=win), lE, ldQ
+
     if method in ("gp", "gp_matern", "gp_rbf", "huang", "huang_gp"):
         k = "rbf" if method == "gp_rbf" else kernel
         q, I, sd, lo, hi = _gp_core(
@@ -268,6 +317,7 @@ def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
 # Map GUI display strings -> (method_key, kernel_key)
 GUI_METHOD_MAP = {
     "Lake":                 ("lake", "matern32"),
+    "Lake (smoothed)":      ("lake_smooth", "matern32"),
     "Huang GP":             ("gp", "matern32"),
     "Huang GP + Lake mean": ("gp_lake_mean", "matern32"),
 }

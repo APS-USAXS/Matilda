@@ -556,10 +556,12 @@ class _USAXSTab(_TechniqueTab):
             self._blank_label.setStyleSheet("color: grey; font-style: italic;")
 
     def _on_desmear_method_changed(self, text: str):
-        """Enable the GP-specific controls only when a GP method is selected."""
+        """Enable GP kernel only for GP methods; the length-scale control is also
+        used by 'Lake (smoothed)' as its smoothing window (in decades)."""
         is_gp = "GP" in text
+        needs_length = is_gp or ("smooth" in text.lower())
         self._gp_kernel.setEnabled(is_gp)
-        self._gp_length_scale.setEnabled(is_gp)
+        self._gp_length_scale.setEnabled(needs_length)
 
     def get_params(self) -> dict:
         method_key, kernel_default = GUI_METHOD_MAP.get(

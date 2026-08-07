@@ -22,12 +22,10 @@ from .main_window import MatildaReductionWindow
 
 def main():
     """Launch the Matilda data-reduction GUI."""
-    try:
-        from PySide6.QtWidgets import QApplication
-    except ImportError:
-        from PyQt6.QtWidgets import QApplication
-
     import sys
+
+    from .._qt import QApplication
+
     app = QApplication.instance() or QApplication(sys.argv)
     window = MatildaReductionWindow()
     window.show()

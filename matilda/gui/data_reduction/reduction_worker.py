@@ -14,10 +14,7 @@ from the params dict to the converter functions.
 import logging
 import os
 
-try:
-    from PySide6.QtCore import QThread, Signal
-except ImportError:
-    from PyQt6.QtCore import QThread, pyqtSignal as Signal
+from .._qt import QThread, Signal
 
 from .technique_detector import detect_technique
 

@@ -23,20 +23,11 @@ Adding new parameters later
 3. Pass the value through ReductionWorker to the converter function.
 """
 
-try:
-    from PySide6.QtWidgets import (
-        QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-        QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame, QCheckBox,
-    )
-    from PySide6.QtCore import Signal
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-        QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame, QCheckBox,
-    )
-    from PyQt6.QtCore import pyqtSignal as Signal
+from .._qt import (
+    QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
+    QFrame, QCheckBox, Signal,
+)
 
 
 # Must match the SelectedFunction branch names in matilda.desmearing.extendData

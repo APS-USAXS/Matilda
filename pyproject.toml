@@ -63,11 +63,11 @@ Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]
-# GUI tools use PySide6 (preferred) or PyQt6 as fallback + pyqtgraph for plotting.
+# GUI tools use PySide6 + pyqtgraph for plotting.  Both bindings are reached
+# through the single matilda/gui/_qt.py shim, which falls back to PyQt6 — so a
+# PyQt6-only environment still runs, but this extra never installs it.
 # IMPORTANT: install only ONE of PySide6 or PyQt6 — having both on the same
 # environment causes Qt platform-plugin conflicts on macOS ("cocoa not found").
-# PySide6 is listed here as the default.  Users who prefer PyQt6 should install
-# it manually and NOT use this extras group.
 # matplotlib is intentionally NOT listed here: it is a core headless dep.
 gui = [
     "PySide6>=6.4,<6.8",  # 6.8+ requires GLIBC 2.32; RHEL 8 only has GLIBC 2.28

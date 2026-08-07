@@ -53,6 +53,7 @@ matilda.py  ── 15-second polling loop
 | `matilda/supportFunctions.py` | Shared helpers; re-exports HDF5 helpers (`F401` allowed) |
 | `matilda/supportNikaFunctions.py` | Nika-derived 2-D routines |
 | `matilda/plotData.py` | matplotlib JPEG plots (target for pyqtgraph replacement) |
+| `matilda/gui/_qt.py` | Single Qt import point for `gui/` — import Qt names from here |
 | `matilda/gui/data_reduction/` | Interactive reduction GUI |
 | `matilda/gui/sample_plate_setup.py` | Sample-plate editor |
 
@@ -68,10 +69,17 @@ config filenames `pyirena_config.json` / `merge_config.json`). See
    without checking the beamline machine first.
 2. **PySide6, never PyQt6.** The two in one environment break Qt
    platform-plugin resolution (on macOS: "cocoa not found"). The `[gui]` extra
-   installs PySide6 only.
+   installs PySide6 only. Qt enters the package through exactly one file,
+   `matilda/gui/_qt.py` (PySide6, PyQt6 fallback, `Signal` normalised); GUI
+   modules import their Qt names from it and never from a binding directly.
 3. **The daemon must stay headless.** `matplotlib` is a core dependency and is
    used from the daemon path; Qt and `pyepics` live in the `[gui]` extra so a
-   server install can omit them.
+   server install can omit them. Nothing on the reduction path may import
+   `matilda.gui`.
+
+   Invariants 2 and 3 are enforced by `tests/test_gui_qt_shim.py`, which scans
+   source rather than imports — it fails on a new direct binding import even
+   where Qt is not installed.
 4. pynika and pyirena are invoked as **subprocesses via `conda run`**, not
    imported. They have their own environments on purpose — do not "simplify"
    this into an import.

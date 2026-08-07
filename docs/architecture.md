@@ -133,6 +133,13 @@ Key functions: `plotUSAXSResults`, `plotSWAXSResults`
 
 ### GUI subpackage
 
+**`matilda/gui/_qt.py`**
+Single Qt import point for everything under `matilda/gui/`. PySide6, with a
+PyQt6 fallback for environments that only have that binding; `Signal` is
+normalised across the two. GUI modules do `from .._qt import QWidget, Qt,
+Signal` — a direct `from PySide6… import` in a panel is a test failure
+(`tests/test_gui_qt_shim.py`), as is any Qt import on the daemon path.
+
 **`matilda/gui/sample_plate_setup.py`**
 Sample Plate Setup GUI — replaces Igor Pro "Setup Sample Plates".
 
@@ -230,6 +237,7 @@ Matilda/
 │   ├── plotData.py             # Headless JPEG plot export
 │   └── gui/
 │       ├── __init__.py
+│       ├── _qt.py                  # Single Qt import point (PySide6)
 │       ├── sample_plate_setup.py   # Sample Plate Setup GUI
 │       └── data_reduction/         # matilda-gui data reduction application
 ├── tests/

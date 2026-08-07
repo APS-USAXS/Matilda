@@ -15,6 +15,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `gp_kernel`, the reduction GUI exposes them. See `docs/desmearing-methods.md`.
 
 ### Changed
+- **Single Qt import point, `matilda/gui/_qt.py`** (house standard, matches
+  pyirena and MailToVault). Nine `try: from PySide6 … except ImportError: from
+  PyQt6 …` blocks across the GUI package — plus two inline ones in the middle
+  of functions — collapse into one shim that also normalises `Signal`
+  (`pyqtSignal` under PyQt6). GUI modules now do `from .._qt import QWidget, Qt,
+  Signal`; changing binding is a one-file edit. Behaviour is unchanged: PySide6
+  first, PyQt6 fallback, same names. `tests/test_gui_qt_shim.py` fails on a new
+  direct binding import, and on any Qt or `matilda.gui` import from the daemon
+  path — by scanning source, so it works on a machine with no Qt installed.
 - **Build backend is `setuptools>=77` with a static `version`** in
   `pyproject.toml`, replacing `hatchling` + `hatch-vcs`. This matches the house
   standard used by pyirena/MailToVault and removes a real failure mode: the

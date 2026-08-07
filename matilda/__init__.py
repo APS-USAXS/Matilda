@@ -94,8 +94,13 @@ matilda/plotData.py
 
 GUI subpackage (planned — matilda/gui/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matilda/gui/_qt.py
+    Single Qt import point for the whole gui/ subpackage (PySide6, PyQt6
+    fallback).  GUI modules import Qt names from here, never from PySide6
+    directly.
+
 matilda/gui/__init__.py
-    Placeholder.  Future PyQt6 / pyqtgraph GUI tools:
+    Placeholder.  Future PySide6 / pyqtgraph GUI tools:
     - reduction_gui  : interactive 2-D → 1-D reduction with parameter control
     - survey_tool    : scan browser / overview
     - analysis_gui   : pyirena analysis launcher

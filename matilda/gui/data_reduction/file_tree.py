@@ -16,20 +16,11 @@ Blank assignment rules:
 import os
 import re
 
-try:
-    from PySide6.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-        QPushButton, QLabel, QLineEdit, QComboBox, QMenu,
-    )
-    from PySide6.QtCore import Qt, Signal
-    from PySide6.QtGui import QColor, QBrush
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-        QPushButton, QLabel, QLineEdit, QComboBox, QMenu,
-    )
-    from PyQt6.QtCore import Qt, pyqtSignal as Signal
-    from PyQt6.QtGui import QColor, QBrush
+from .._qt import (
+    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
+    QPushButton, QLabel, QLineEdit, QComboBox, QMenu,
+    Qt, Signal, QColor, QBrush,
+)
 
 from .technique_detector import detect_technique
 

@@ -5,6 +5,12 @@ saxs.jpg
 waxs.jpg
 __pycache__
 *.pyc
+
+# setuptools build artefacts (the old hatchling backend built in a temp dir)
+build/
+dist/
+*.egg-info/
+
 matilda-manage.log
 matilda-manage.pid
 matilda.log

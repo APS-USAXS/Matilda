@@ -43,7 +43,7 @@ smooth_r_data()                 — optional smoothing
 getBlankFlyscan()               — load and process blank scan
 normalizeByTransmission()       — apply transmission correction
 calibrateAndSubtractFlyscan()   — subtract blank, apply K-factor / Omega
-desmearData()                   — Lake/Strobl desmearing (slit-smearing correction)
+desmear_dispatch()              — slit-smearing correction (Lake/Strobl or GP method)
 saveNXcanSAS() / readMyNXcanSAS() — cache results in the original HDF5 file
 
 Notes
@@ -66,7 +66,6 @@ from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
 from .supportFunctions import empty_calibrated_data
-from .desmearing import desmearData
 from .desmearing_methods import desmear_dispatch
 
 

@@ -86,11 +86,16 @@ config filenames `pyirena_config.json` / `merge_config.json`). See
 Single-letter physics names (`I`, `Q`, `l`) are idiomatic — `E741` is disabled
 for that reason, don't rename them.
 
-**Code.** Python ≥3.11. `ruff` with `select = ["E4","E7","E9","F","B006"]` —
-correctness rules only; style rules are deliberately off for now.
-`line-length = 200` is a **legacy accommodation**, annotated as such in
-`pyproject.toml`. New code should still target 100 and the ceiling should come
-down as legacy files get rewritten. Version comes from git tags via `hatch-vcs`.
+**Code.** Python ≥3.11 — a deliberate deviation from the ≥3.10 house floor,
+reasoned in `pyproject.toml` (server and CI are 3.11/3.12). `ruff` with
+`select = ["E4","E7","E9","F","B006"]` — correctness rules only; style rules
+are deliberately off for now. `line-length = 200` is a **legacy
+accommodation**, annotated as such in `pyproject.toml`. New code should still
+target 100 and the ceiling should come down as legacy files get rewritten.
+
+Build is `setuptools>=77` with a **static `version` in `pyproject.toml`** — that
+string is what `hdf5code.py` stamps into every NXcanSAS file, so bump it in the
+same commit that earns the bump and tag the release `v<version>`.
 
 **Testing.** New reduction math needs a test in `tests/`. `test_smoke_reduction.py`
 is the end-to-end guard — keep it passing. Tests must not need Tiled or a display.
@@ -107,7 +112,7 @@ is the end-to-end guard — keep it passing. Tests must not need Tiled or a disp
 | Working on sample plates | `docs/sample-plate-setup.md` |
 | Deploying or debugging the daemon | `docs/service.md`, `docs/operations.md`, `serv_matilda.sh`, `matilda_server.service` |
 | Installing | `docs/installation.md` |
-| Looking for planned work | `IMPROVEMENT_PLAN.md` |
+| Looking for planned work | `PLAN.md` |
 
 `ControlData/`, `TestData/` and `IgorExample/` are fixtures and references, not
 shipped code; `CodeFragments`, `IgorExample` and `docs` are excluded from ruff.

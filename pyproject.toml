@@ -1,20 +1,27 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs"
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
 
 
 [project]
 name = "Matilda"
-dynamic = ["version"]
+# Static version is authoritative (house standard across the USAXS Python
+# packages).  It was previously derived from git tags via hatch-vcs, which
+# also meant a shallow CI checkout or a tarball install reported a bogus
+# version into every NXcanSAS file written by hdf5code.py.
+# Bump this here, then tag the release with the matching v<version>.
+version = "0.3.0.dev0"
 description = "Live data processing package for USAXS/SAXS/WAXS instrument"
 readme = "README.md"
 authors = [
     { name = "Jan Ilavsky", email = "ilavsky@anl.gov" },
 ]
-license = { file = "LICENSE.txt" }
+# Custom UChicago Argonne / BESSY agreement — no SPDX identifier applies, so
+# the file is shipped as-is and the license is declared via the classifier.
+license-files = ["LICENSE.txt"]
+# Deviation from the >=3.10 house floor: the beamline server and every
+# developer env run 3.12, and the CI matrix only covers 3.11/3.12, so 3.10
+# would be an untested claim.  Do not lower it without adding 3.10 to CI.
 requires-python = ">=3.11"
 keywords = [
     "SAXS", "USAXS", "WAXS", "small-angle X-ray scattering",
@@ -94,10 +101,11 @@ matilda = "matilda.matilda:main"
 matilda-sample-plates = "matilda.gui.sample_plate_setup:run_sample_plate_setup"
 matilda-gui = "matilda.gui.data_reduction:main"
 
-[tool.hatch.build.targets.wheel]
-# Package matilda/ and its subpackages (gui/, reduction/).
-# tests/ is intentionally excluded from the wheel.
-packages = ["matilda"]
+[tool.setuptools.packages.find]
+# Package matilda/ and its subpackages (gui/, gui/data_reduction/, reduction/).
+# tests/, docs/, ControlData/, TestData/ and IgorExample/ stay out of the wheel.
+include = ["matilda*"]
+namespaces = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -107,7 +115,7 @@ python_files = ["test_*.py"]
 
 [tool.ruff]
 # Scratch/example folders are not linted.
-extend-exclude = ["CodeFragments", "IgorExample", "docs"]
+extend-exclude = ["CodeFragments", "IgorExample", "docs", "build", "dist"]
 line-length = 200          # legacy code has long lines; do not fight it yet
 
 [tool.ruff.lint]

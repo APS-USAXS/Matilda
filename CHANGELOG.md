@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — 0.3.0.dev0
+
+### Added
+- **Selectable desmearing methods** (`desmearing_methods.py`): `desmear_dispatch()`
+  offers `lake` (default, unchanged behaviour), `gp` (Huang Gaussian-process,
+  Matérn/RBF, resolution-aware prior, posterior 1σ returned as `DSM_Error`) and
+  `gp_lake_mean`; the converters take `desmear_method` / `gp_length_scale` /
+  `gp_kernel`, the reduction GUI exposes them. See `docs/desmearing-methods.md`.
+
+### Changed
+- **Build backend is `setuptools>=77` with a static `version`** in
+  `pyproject.toml`, replacing `hatchling` + `hatch-vcs`. This matches the house
+  standard used by pyirena/MailToVault and removes a real failure mode: the
+  version string is stamped into every NXcanSAS file by `hdf5code.py`, and a
+  git-derived version reported garbage from a shallow CI checkout or a source
+  tarball with no tags. Bump `version` in `pyproject.toml`, then tag `v<version>`.
+- Wheel contents now come from `[tool.setuptools.packages.find]`
+  (`include = ["matilda*"]`); `LICENSE.txt` ships via PEP 639 `license-files`.
+- `IMPROVEMENT_PLAN.md` renamed to `PLAN.md` — the plan-file name used across
+  the other USAXS Python repos.
+- The `>=3.11` floor (house baseline is `>=3.10`) is now annotated in
+  `pyproject.toml` with the reason: server and CI run 3.11/3.12 only.
+- `build/`, `dist/` and `*.egg-info/` are gitignored and excluded from ruff —
+  setuptools leaves them in the tree where hatchling did not.
+
+### Fixed
+- Dead `from .desmearing import desmearData` imports in `convertFlyscan.py` and
+  `convertUSAXS.py`, left over when the dispatcher replaced the direct call.
+  These were failing `ruff check` (F401) in CI. Module docstrings updated to
+  name `desmear_dispatch()`.
+
+---
+
 ## [0.2.0] — 2026-07-10
 
 ### Added

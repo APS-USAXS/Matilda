@@ -16,7 +16,7 @@ Data flow
 importFlyscan() from supportFunctions    — read raw arrays (step and fly share format)
 calculatePD_Fly() / beamCenterCorrection()
 calibrateAndSubtractFlyscan()
-desmearData()
+desmear_dispatch()
 saveNXcanSAS() / readMyNXcanSAS()         — cache in HDF5
 
 Notes
@@ -45,7 +45,6 @@ from .hdf5code import saveNXcanSAS, readMyNXcanSAS
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import empty_calibrated_data
 from .supportFunctions import normalizeByTransmission
-from .desmearing import desmearData
 from .desmearing_methods import desmear_dispatch
 from .plotData import plotUSAXSResults
 

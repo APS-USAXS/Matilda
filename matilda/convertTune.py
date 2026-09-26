@@ -54,12 +54,21 @@ TUNE_PLAN_NAMES = ("tune_ar", "tune_mr", "tune_a2rp")
 NumberOfDaysToLookBackTunes = 1
 
 
+# Column-name prefixes that are never the tuning signal.  ``scaler0*`` are the
+# old scaler's own channels; ``fx4_*`` / ``fx42_*`` are the FX4 electrometers'
+# housekeeping outputs (sums, beam positions, scales, offsets), of which there
+# are ~80 per run because the whole device is read at every point.  The signal
+# itself is registered under its USAXS name — UPD, I0, I00, TRD — on both
+# counting chains.
+_NON_SIGNAL_PREFIXES = ("scaler0", "fx4_", "fx42_")
+
+
 def _derive_detector_key(data, motor, detector):
-    """Return the data-dict key holding the detector (y-axis) counts.
+    """Return the data-dict key holding the detector (y-axis) signal.
 
     Prefers the detector name supplied by the metadata.  Falls back to the
     first array column that is not the motor, its ``_user_setpoint``, or a
-    ``scaler0*`` channel.
+    known housekeeping channel.
 
     Parameters
     ----------
@@ -83,7 +92,7 @@ def _derive_detector_key(data, motor, detector):
             continue
         if key.endswith("_user_setpoint"):
             continue
-        if key.startswith("scaler0"):
+        if key.startswith(_NON_SIGNAL_PREFIXES):
             continue
         return key
     return None
@@ -115,9 +124,9 @@ def downloadTuneData(uid, motor, detector):
     # Resolve the x-axis key: prefer metadata motor, else look for a readback.
     motor_key = motor if (motor and motor in data) else None
     if motor_key is None:
-        # last-resort: a column that is neither a setpoint nor a scaler channel
+        # last-resort: a column that is neither a setpoint nor housekeeping
         for key in data:
-            if not key.endswith("_user_setpoint") and not key.startswith("scaler0"):
+            if not key.endswith("_user_setpoint") and not key.startswith(_NON_SIGNAL_PREFIXES):
                 motor_key = key
                 break
 

@@ -5,6 +5,74 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added — FX4 counting chain
+
+The 12-ID-E counting chain changed on 2026-09-26 from Femto amplifier + V/F
+converter + Struck scaler to **FX4 electrometers**. All four data formats
+changed with it. Matilda now reads both chains; which one produced a file is
+taken from the `counting_chain` marker each format carries, never guessed
+from field names (`UPD` and `I0` in the step-scan file kept their names and
+changed their units). Reference: `bits_usaxs/docs/FX4_data_formats.md`.
+
+- **`matilda/fx4support.py`** (new): `detect_counting_chain()` / `is_fx4()`
+  and the FX4 arithmetic helpers (`range_indexed_array`, `mean_of_samples`,
+  `ratio_error`, `warn_ring_overflows`). Chain detection covers all four
+  marker locations, including the fly scan's — which `saveFlyData.xml` writes
+  as an *attribute* of `/entry/program_name`, not as the dataset the format
+  document describes. Both spellings are accepted.
+- **Fly scan** (`supportFunctions.importFlyscan`, `calculatePD_Fly`,
+  `calculatePDErrorFly`): FX4 files are read from `upd_current` / `I0_current`
+  (mean pA over each PSO interval). `I(q) = (upd_current − dark) / I0_current`
+  — no gain term and no dwell divisor. Uncertainties come from the recorded
+  `upd_sigma` / `I0_sigma` divided by √N (N = total/mean), combined with the
+  dark-current error and propagated through the ratio. `ring_overflows` and
+  `ring_overflows_I0` are checked and a non-zero value is reported.
+- **Step scan** (`convertUSAXS.importStepScan`, `CorrectUPDGainsStep`,
+  `createUPDGainsAndBkgErrArrays`, `calculatePDErrorStep`): FX4 `UPD` / `I0`
+  are picoamps; gains are 1, dark current is looked up per point from
+  `/entry/data/fx4_autorange_lurange` against the FX4 sequence program's
+  `fx4_autorange_ranges_range*_background`. There is no `seconds` column on
+  this chain, so the per-point count time is reconstructed from `plan_args`
+  and `useDynamicTime` (reporting only — nothing divides by it).
+- **SAXS / WAXS** (`convertSWAXS.calibrateAD2DData`): the monitor is
+  `I0_cts_gated` (equivalently `/entry/control/integral`) with gain 1, not the
+  stale `I0_cts` / `I0_gain` that FX4 frames still carry. WAXS transmission
+  uses `TR_current` against `I0_current`; `TR_cts_gated` is deliberately
+  ignored — only I0 is gated, so that field holds the leftover total of the
+  0.05 s autoscale read rather than the exposure.
+- Reducing an FX4 frame against a scaler-chain blank (or vice versa) now
+  raises instead of silently mixing counts with picoamps.
+- **`TestData/FX4Set/`**: real commissioning data (glassy carbon SRM 3600 and
+  blank) for the step scan, SAXS and WAXS, with the known quirks of those
+  particular files documented. No FX4 fly-scan file exists yet; that branch is
+  covered by a synthetic file in `tests/test_fx4support.py`.
+- 25 new tests. The legacy scaler-chain reduction is bit-for-bit unchanged.
+
+### Known limitations of the FX4 path
+
+- **SAXS/WAXS absolute intensity is not calibrated.** `I_scaling` was
+  determined against the old `I0_cts/I0_gain` monitor; the FX4 monitor is a
+  different quantity, so FX4 frames come out roughly ten orders of magnitude
+  low. The curve *shape* is correct (diode/I0 is a ratio). Set
+  `convertSWAXS.FX4_I_SCALING` from a standard reference material. A warning
+  is logged on every FX4 frame until that is done. USAXS is unaffected — its
+  K-factor is derived from the blank's own peak.
+- **FX4 step-scan uncertainties are modelled, not measured.** The uascan file
+  records no per-point sigma for the currents, so
+  `fx4support.FX4_RELATIVE_CURRENT_ERROR` (1%) stands in. Error bars only.
+- **The FX4 fly scan records the amplifier range once, after the scan.** There
+  is no per-point range, so one dark current is subtracted throughout and the
+  amplifier dead-time masking the scaler chain did from
+  `changes_DDPCA300_mcsChan` has no equivalent.
+- The deployed `saveFlyData.xml` v2.0 writes no `/entry/metadata` group (an
+  over-long XML comment swallows the tag). Matilda falls back to reading those
+  fields from `/entry/flyScan`, and raises a specific error if the geometry
+  fields are missing entirely.
+
+---
+
 ## [0.2.0] — 2026-07-10
 
 ### Added

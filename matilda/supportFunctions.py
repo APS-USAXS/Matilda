@@ -16,13 +16,23 @@ from scipy.optimize import minimize
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
 # canonical copies of the dict helpers live in hdf5code; re-exported here
 # because convertUSAXS/convertSWAXS historically import them from this module
-from .hdf5code import read_group_to_dict, filter_nested_dict
+from .hdf5code import read_group_to_dict, filter_nested_dict, USAXS_METADATA_KEYS
+from .fx4support import (CHAIN_FX4, CHAIN_SCALER, FX4_RELATIVE_CURRENT_ERROR,
+                         detect_counting_chain, lookup_many, mean_of_samples,
+                         range_indexed_array, ratio_error, warn_ring_overflows)
 
 #this is to enable graphs in R data clacualtion for debugging. 
 debugme = 0
 #recalculateAllData = False
 
 MinQMinFindRatio = 1.05
+
+# CONFIRMED 2026-07-08 (JIL): the flyscan MCA gets a dedicated 1e6 Hz clock
+# (mca1 time base); step scans use the Joerger scaler internal 1e7 Hz clock
+# (see convertUSAXS).  Both are correct for their geometry — do not unify.
+# On the FX4 chain there is no clock to divide by at all: the electrometer
+# reports a mean current, so importFlyscan supplies TimeInSec directly.
+FLYSCAN_MCA_CLOCK_HZ = 1e6
 
 
 def empty_calibrated_data():
@@ -50,75 +60,208 @@ def empty_calibrated_data():
 ## support stuff here
 
 
-## importFlyscan loads data from flyscan NX file. It should be same for QR pass as well as for calibrated data processing. 
+## importFlyscan loads data from flyscan NX file. It should be same for QR pass as well as for calibrated data processing.
 def importFlyscan(path, filename):
-    # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
+    """Read a USAXS fly-scan NeXus file into the RawData dictionary.
+
+    Handles both counting chains (see fx4support):
+
+    * ``scaler`` — Struck 3820 MCS + Femto amplifiers.  mca1 is the 50 MHz
+      clock, mca2/mca3 are accumulated I0/UPD counts, and the amplifier gain
+      changes recorded in ``changes_DDPCA300_*`` drive the gain lookup and the
+      dead-time masking.
+    * ``FX4``    — FX4 electrometers.  ``upd_current``/``I0_current`` are
+      gain-independent mean picoamps over each PSO interval, so there is no
+      gain array and no dwell divisor.  ``upd_sigma``/``I0_sigma`` and
+      ``upd_total``/``I0_total`` carry the per-interval statistics used for
+      the uncertainties.
+
+    Keys common to both chains: ARangles, TimePerPoint (raw, chain-specific
+    units), TimeInSec (always seconds), Monitor, UPD_array, metadata,
+    instrument, sample, and ``chain``.
+    """
     with h5py.File(os.path.join(path, filename), 'r') as file:
-        #read various data sets
-        # mca1/2/3 always contain exactly the number of collected data points — no padding.
-        # Use mca1 length as ground truth, then align ARangles to it.
-        dataset = file['/entry/flyScan/mca1']
-        TimePerPoint = np.ravel(np.array(dataset))
-        dataset = file['/entry/flyScan/mca2']
-        Monitor = np.ravel(np.array(dataset))
-        dataset = file['/entry/flyScan/mca3']
-        UPD_array = np.ravel(np.array(dataset))
-        num_elements = min(len(TimePerPoint), len(Monitor), len(UPD_array))
+        if detect_counting_chain(file) == CHAIN_FX4:
+            return _importFlyscanFX4(file, filename)
+        return _importFlyscanScaler(file, filename)
 
-        # AR_PulsePositions is always 8k-padded with zeros and has one extra leading point.
-        # Strip the leading extra point and trailing zero-padding, then clip to num_elements.
-        dataset = file['/entry/flyScan/AR_PulsePositions']
-        ARangles = np.ravel(np.array(dataset))
-        ARangles = ARangles[1:]                      # skip leading extra point
-        ARangles = np.trim_zeros(ARangles, 'b')      # strip trailing zero-padding
-        num_elements = min(num_elements, len(ARangles))
 
-        # Trim all arrays to the agreed-upon length
-        ARangles     = ARangles[:num_elements]
-        TimePerPoint = TimePerPoint[:num_elements]
-        Monitor      = Monitor[:num_elements]
-        UPD_array    = UPD_array[:num_elements]
-        #Arrays for UPD gain changes
-        dataset = file['/entry/flyScan/changes_DDPCA300_ampGain'] 
-        AmpGain = np.ravel(np.array(dataset))
-        dataset = file['/entry/flyScan/changes_DDPCA300_ampReqGain'] 
-        AmpReqGain = np.ravel(np.array(dataset))
-        dataset = file['/entry/flyScan/changes_DDPCA300_mcsChan'] 
-        Channel = np.ravel(np.array(dataset))            
-        dataset = file['/entry/flyScan/mca_clock_frequency'] 
-        vTof = np.full_like(np.ravel(np.array(dataset)), 1e6, dtype=float)
-        #vTof = 1e6  overwrite, the mca_clock_frequency (5e7) value is simply wrong.     
-        #metadata
-        keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain','detector_distance',
-                        'timeStamp','I0AmpGain',
-                        'trans_pin_counts','trans_pin_gain','trans_pin_time','trans_I0_counts','trans_I0_gain',
-                        'UPDsize', 'trans_I0_counts', 'trans_I0_gain', 'upd_bkg0', 'upd_bkg1','upd_bkg2','upd_bkg3',
-                        'upd_bkgErr0','upd_bkgErr1','upd_bkgErr2','upd_bkgErr3','upd_bkgErr4','upd_bkg_err0',
-                        'upd_bkg4','DDPCA300_gain0','DDPCA300_gain1','DDPCA300_gain2','DDPCA300_gain3','DDPCA300_gain4',
-                        'upd_amp_change_mask_time0','upd_amp_change_mask_time1','upd_amp_change_mask_time2','upd_amp_change_mask_time3','upd_amp_change_mask_time4',
-                    ]
-        metadata_group = file['/entry/metadata']
-        metadata_dict = read_group_to_dict(metadata_group)
-        metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
-        # we need this key to be there also... COpy of the other one. 
-        I0Gain=metadata_dict["I0AmpGain"]   
-        metadata_dict["I0Gain"]=I0Gain
-        #Instrument
-        keys_to_keep = ['monochromator', 'energy', 'wavelength']
-        instrument_group = file['/entry/instrument']
-        instrument_dict = read_group_to_dict(instrument_group)
-        instrument_dict = filter_nested_dict(instrument_dict, keys_to_keep)
-        # sample
-        sample_group = file['/entry/sample']
-        sample_dict = read_group_to_dict(sample_group)
+def _importFlyscanFX4(file, filename):
+    """Read the FX4 (picoamp) fly-scan layout — see importFlyscan."""
+    fly = file['/entry/flyScan']
+    # upd_current / I0_current are already means over each PSO interval, so
+    # they are used point by point with no gain and no timing correction.
+    UPD_array = np.ravel(np.array(fly['upd_current']))
+    Monitor = np.ravel(np.array(fly['I0_current']))
+    num_elements = min(len(UPD_array), len(Monitor))
+
+    # AR_PulsePositions is 8k-padded with zeros and has one extra leading
+    # point — identical handling to the scaler chain.
+    ARangles = np.ravel(np.array(fly['AR_PulsePositions']))
+    ARangles = ARangles[1:]
+    ARangles = np.trim_zeros(ARangles, 'b')
+    num_elements = min(num_elements, len(ARangles))
+
+    def _fly_array(name):
+        if name not in fly:
+            return None
+        return np.ravel(np.array(fly[name]))[:num_elements]
+
+    ARangles = ARangles[:num_elements]
+    UPD_array = UPD_array[:num_elements]
+    Monitor = Monitor[:num_elements]
+    UPD_sigma = _fly_array('upd_sigma')
+    I0_sigma = _fly_array('I0_sigma')
+    UPD_total = _fly_array('upd_total')
+    I0_total = _fly_array('I0_total')
+
+    # channel_time is derived by saveFlyData (N = I0_total/I0_current,
+    # dt = N * sample_time).  It is a diagnostic, never a normalisation term,
+    # but it is the per-point measurement time the smoothing needs.
+    sample_time = lookup_many([fly], 'sample_time', 0.0) or 0.0
+    TimeInSec = _fly_array('channel_time')
+    if TimeInSec is None or len(TimeInSec) < num_elements:
+        samples = mean_of_samples(I0_total, Monitor)
+        if samples is not None and sample_time:
+            TimeInSec = samples * float(sample_time)
+        else:
+            logging.warning(f"{filename}: no channel_time and no usable I0_total; "
+                            "assuming a uniform 1 ms interval for smoothing only.")
+            TimeInSec = np.full(num_elements, 1e-3)
+    TimeInSec = np.asarray(TimeInSec, dtype=float)[:num_elements]
+
+    warn_ring_overflows({'ring_overflows': lookup_many([fly], 'ring_overflows'),
+                         'ring_overflows_I0': lookup_many([fly], 'ring_overflows_I0')},
+                        filename)
+
+    # Metadata.  The FX4 saveFlyData configuration records the counting-chain
+    # fields inside /entry/flyScan, and some deployments write no
+    # /entry/metadata group at all, so both locations are searched.
+    #
+    # Precedence matters and differs by field.  /entry/metadata can carry
+    # Femto-era copies of upd_bkg* / upd_bkgErr* (from usxLAX:pd01:seq02) that
+    # are stale on this chain, so for the counting-chain fields /entry/flyScan
+    # (usxFX4:FX4:seq01) wins.  For the geometry and transmission fields there
+    # is no FX4 counterpart and /entry/metadata is the real source.
+    metadata_group = file['/entry/metadata'] if '/entry/metadata' in file else None
+    if metadata_group is None:
+        logging.warning(f"{filename}: no /entry/metadata group; reading fly-scan "
+                        "metadata from /entry/flyScan instead.")
+    chain_fields = ({f'upd_bkg{i}' for i in range(5)}
+                    | {f'upd_bkgErr{i}' for i in range(5)}
+                    | {f'upd_amp_change_mask_time{i}' for i in range(5)}
+                    | {'upd_lurange', 'sample_time', 'values_per_read',
+                       'ring_overflows', 'ring_overflows_I0', 'counting_chain'})
+    fx4_first = [fly, metadata_group]
+    metadata_first = [metadata_group, fly]
+    metadata_dict = {}
+    for key in USAXS_METADATA_KEYS:
+        sources = fx4_first if key in chain_fields else metadata_first
+        value = lookup_many(sources, key)
+        if value is not None:
+            metadata_dict[key] = value
+    # FX4 readings are gain-independent: I0 is already pA, so the I0 gain that
+    # the scaler chain divided out is exactly 1 here.
+    metadata_dict['I0AmpGain'] = 1.0
+    metadata_dict['I0Gain'] = 1.0
+
+    # The autoranger's range is recorded once, after the scan — there is no
+    # per-point range in the FX4 fly-scan file.  It only selects the dark
+    # current, which is why a single value is still useful.
+    range_index = lookup_many(fx4_first, 'upd_lurange')
+
+    instrument_dict = filter_nested_dict(read_group_to_dict(file['/entry/instrument']),
+                                         ['monochromator', 'source', 'energy',
+                                          'wavelength', 'incident_wavelength'])
+    sample_dict = read_group_to_dict(file['/entry/sample'])
+
+    check_arrays_same_length(ARangles, TimeInSec, Monitor, UPD_array)
+    return {"filename": os.path.splitext(filename)[0],
+            "chain": CHAIN_FX4,
+            "ARangles": ARangles,
+            "TimePerPoint": TimeInSec,      # already seconds on this chain
+            "TimeInSec": TimeInSec,
+            "Monitor": Monitor,
+            "UPD_array": UPD_array,
+            "UPD_sigma": UPD_sigma,
+            "I0_sigma": I0_sigma,
+            "UPD_total": UPD_total,
+            "I0_total": I0_total,
+            "RangeIndex": range_index,
+            "SampleTime": sample_time,
+            "AmpGain": None,
+            "Channel": None,
+            "VToFFactor": None,
+            "AmpReqGain": None,
+            "metadata": metadata_dict,
+            "instrument": instrument_dict,
+            "sample": sample_dict,
+            }
+
+
+def _importFlyscanScaler(file, filename):
+    """Read the legacy Struck-scaler (counts) fly-scan layout."""
+    #read various data sets
+    # mca1/2/3 always contain exactly the number of collected data points — no padding.
+    # Use mca1 length as ground truth, then align ARangles to it.
+    dataset = file['/entry/flyScan/mca1']
+    TimePerPoint = np.ravel(np.array(dataset))
+    dataset = file['/entry/flyScan/mca2']
+    Monitor = np.ravel(np.array(dataset))
+    dataset = file['/entry/flyScan/mca3']
+    UPD_array = np.ravel(np.array(dataset))
+    num_elements = min(len(TimePerPoint), len(Monitor), len(UPD_array))
+
+    # AR_PulsePositions is always 8k-padded with zeros and has one extra leading point.
+    # Strip the leading extra point and trailing zero-padding, then clip to num_elements.
+    dataset = file['/entry/flyScan/AR_PulsePositions']
+    ARangles = np.ravel(np.array(dataset))
+    ARangles = ARangles[1:]                      # skip leading extra point
+    ARangles = np.trim_zeros(ARangles, 'b')      # strip trailing zero-padding
+    num_elements = min(num_elements, len(ARangles))
+
+    # Trim all arrays to the agreed-upon length
+    ARangles     = ARangles[:num_elements]
+    TimePerPoint = TimePerPoint[:num_elements]
+    Monitor      = Monitor[:num_elements]
+    UPD_array    = UPD_array[:num_elements]
+    #Arrays for UPD gain changes
+    dataset = file['/entry/flyScan/changes_DDPCA300_ampGain']
+    AmpGain = np.ravel(np.array(dataset))
+    dataset = file['/entry/flyScan/changes_DDPCA300_ampReqGain']
+    AmpReqGain = np.ravel(np.array(dataset))
+    dataset = file['/entry/flyScan/changes_DDPCA300_mcsChan']
+    Channel = np.ravel(np.array(dataset))
+    dataset = file['/entry/flyScan/mca_clock_frequency']
+    vTof = np.full_like(np.ravel(np.array(dataset)), 1e6, dtype=float)
+    #vTof = 1e6  overwrite, the mca_clock_frequency (5e7) value is simply wrong.
+    #metadata
+    metadata_group = file['/entry/metadata']
+    metadata_dict = read_group_to_dict(metadata_group)
+    metadata_dict = filter_nested_dict(metadata_dict, USAXS_METADATA_KEYS)
+    # we need this key to be there also... COpy of the other one.
+    I0Gain=metadata_dict["I0AmpGain"]
+    metadata_dict["I0Gain"]=I0Gain
+    #Instrument
+    keys_to_keep = ['monochromator', 'energy', 'wavelength']
+    instrument_group = file['/entry/instrument']
+    instrument_dict = read_group_to_dict(instrument_group)
+    instrument_dict = filter_nested_dict(instrument_dict, keys_to_keep)
+    # sample
+    sample_group = file['/entry/sample']
+    sample_dict = read_group_to_dict(sample_group)
 
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
+    # mca1 counts a dedicated 1 MHz clock; TimeInSec is the chain-independent
+    # measurement time the rest of the pipeline works in.
     #Package these results into dictionary
     data_dict = {"filename": os.path.splitext(filename)[0],
-                "ARangles":ARangles, 
-                "TimePerPoint": TimePerPoint, 
-                "Monitor":Monitor, 
+                "chain": CHAIN_SCALER,
+                "ARangles":ARangles,
+                "TimePerPoint": TimePerPoint,
+                "TimeInSec": TimePerPoint / FLYSCAN_MCA_CLOCK_HZ,
+                "Monitor":Monitor,
                 "UPD_array": UPD_array,
                 "AmpGain": AmpGain,
                 "Channel": Channel,
@@ -128,7 +271,7 @@ def importFlyscan(path, filename):
                 "instrument": instrument_dict,
                 "sample": sample_dict,
                 }
-    
+
     return data_dict
 
 # this finds the best blank scan for any scan.
@@ -202,10 +345,9 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
             else:
                 Blank = dict()
                 Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
-                BlTransCounts = Blank['RawData']['metadata']['trans_pin_counts']
-                BlTransGain = Blank['RawData']['metadata']['trans_pin_gain']
-                BlI0Counts = Blank['RawData']['metadata']['trans_I0_counts']
-                BlI0Gain = Blank['RawData']['metadata']['trans_I0_gain']
+                (BlTransCounts, BlTransGain,
+                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData']['metadata'],
+                                                           blankFilename)
                 Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
                 Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
                 Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
@@ -218,8 +360,8 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                                                         Blank["BlankData"]["Q"],
                                                         Blank["BlankData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
                                                         Blank["BlankData"]["Error"],
-                                                        Blank["RawData"]["TimePerPoint"],
-                                                        replaceNans=True ))
+                                                        Blank["RawData"]["TimeInSec"],
+                                                        replaceNans=True, time_base=1.0 ))
                 # we need to return just the BlankData part 
                 BlankData=dict()
                 BlankData=Blank["BlankData"]
@@ -227,6 +369,25 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                 save_dict_to_hdf5(BlankData, location, hdf_file)
                 logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
                 return BlankData
+
+def transmissionTerms(metadata_dict, filename):
+    """Return (pin_counts, pin_gain, I0_counts, I0_gain) for a USAXS scan.
+
+    On the FX4 chain the gains are recorded as exactly 1 and the counts are
+    picoamps, so the ratio used by calibrateAndSubtractFlyscan is unchanged.
+    Some FX4 fly-scan files are written without these fields at all (the
+    saveFlyData configuration can drop /entry/metadata); rather than fail the
+    whole reduction, fall back to unity counts and gains — which makes the
+    measured transmission 1.0 — and say so loudly.
+    """
+    names = ('trans_pin_counts', 'trans_pin_gain', 'trans_I0_counts', 'trans_I0_gain')
+    missing = [n for n in names if metadata_dict.get(n) is None]
+    if missing:
+        logging.warning(f"{filename}: transmission fields {missing} are missing; "
+                        "assuming transmission = 1.0. Absolute calibration and "
+                        "the MSAXS correction will be wrong for this scan.")
+    return tuple(float(metadata_dict.get(n, 1.0)) for n in names)
+
 
 def normalizeByTransmission(Sample):
     # This is a simple normalization of the Sample Intensity by transmission. 
@@ -260,10 +421,9 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     FWHMBlank = Sample["BlankData"]["FWHM"]
     wavelength =  Sample["reducedData"]["wavelength"]
     PeakToPeakTransmission =  Sample["reducedData"]["PeakToPeakTransmission"]
-    SaTransCounts = Sample['RawData']['metadata']['trans_pin_counts']
-    SaTransGain = Sample['RawData']['metadata']['trans_pin_gain']
-    SaI0Counts = Sample['RawData']['metadata']['trans_I0_counts']
-    SaI0Gain = Sample['RawData']['metadata']['trans_I0_gain'] 
+    (SaTransCounts, SaTransGain,
+     SaI0Counts, SaI0Gain) = transmissionTerms(Sample['RawData']['metadata'],
+                                               Sample['RawData'].get('filename', '?'))
     BlTransCounts = Sample['BlankData']['BlTransCounts']
     BlTransGain = Sample['BlankData']['BlTransGain']
     BlI0Counts = Sample['BlankData']['BlI0Counts']
@@ -350,8 +510,16 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         SMR_Int = np.array([])
         SMR_Error = np.array([])
     # now calibration... 
-    SDD = Sample["RawData"]["metadata"]['detector_distance']
-    UPDSize =  Sample["RawData"]["metadata"]['UPDsize']
+    metadata_dict = Sample["RawData"]["metadata"]
+    for key in ('detector_distance', 'UPDsize'):
+        if metadata_dict.get(key) is None:
+            raise KeyError(
+                f"{Sample['RawData'].get('filename', '?')}: '{key}' is missing from the "
+                "scan metadata, so the USAXS geometry (slit length, Omega factor) "
+                "cannot be computed. For FX4 fly scans check that saveFlyData.xml "
+                "still writes the /entry/metadata group.")
+    SDD = metadata_dict['detector_distance']
+    UPDSize = metadata_dict['UPDsize']
     if use_mu and mu is not None and mu > 0:
         # Calculate thickness from measured transmission: t = -ln(T) / mu
         if MeasuredTransmission > 0 and MeasuredTransmission < 1:
@@ -403,15 +571,54 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
 
 
 def calculatePDErrorFly(Sample, isBlank=False):
+    """Uncertainty of the normalised fly-scan signal, for either chain."""
+    if Sample["RawData"].get("chain") == CHAIN_FX4:
+        return _calculatePDErrorFlyFX4(Sample, isBlank=isBlank)
+    return _calculatePDErrorFlyScaler(Sample, isBlank=isBlank)
+
+
+def _calculatePDErrorFlyFX4(Sample, isBlank=False):
+    """FX4 fly scan: propagate the electrometers' own per-interval statistics.
+
+    ``upd_sigma`` / ``I0_sigma`` are the spread of the samples WITHIN each PSO
+    interval, not the error of the mean, so each is divided by sqrt(N) with
+    N = total/mean.  The UPD term is then combined in quadrature with the dark
+    current's measured error, and the two channels are propagated through the
+    ratio.  When the sigma arrays are absent the flat
+    FX4_RELATIVE_CURRENT_ERROR is used instead.
+    """
+    raw = Sample["RawData"]
+    UPD_array = np.asarray(raw["UPD_array"], dtype=float)
+    Monitor = np.asarray(raw["Monitor"], dtype=float)
+    block = Sample["BlankData"] if isBlank else Sample["reducedData"]
+    updBkg = np.asarray(block.get("UPD_bkg", 0.0), dtype=float)
+    updBkgErr = np.asarray(block.get("UPD_bkgErr", 0.0), dtype=float)
+
+    def _sigma_of_mean(sigma, total, mean, label):
+        if sigma is None:
+            logging.info(f"FX4 fly scan: no {label}; using a flat "
+                         f"{FX4_RELATIVE_CURRENT_ERROR:.1%} relative uncertainty.")
+            return FX4_RELATIVE_CURRENT_ERROR * np.abs(mean)
+        samples = mean_of_samples(total, mean)
+        if samples is None:
+            samples = np.ones_like(mean)
+        return np.asarray(sigma, dtype=float) / np.sqrt(samples)
+
+    sigma_upd = _sigma_of_mean(raw.get("UPD_sigma"), raw.get("UPD_total"),
+                               UPD_array, "upd_sigma")
+    sigma_i0 = _sigma_of_mean(raw.get("I0_sigma"), raw.get("I0_total"),
+                              Monitor, "I0_sigma")
+    sigma_upd = np.sqrt(sigma_upd**2 + updBkgErr**2)
+
+    Error = ratio_error(UPD_array - updBkg, sigma_upd, Monitor, sigma_i0)
+    return {"Error": Error}
+
+
+def _calculatePDErrorFlyScaler(Sample, isBlank=False):
     #OK, another incarnation of the error calculations...
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
-    MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    # CONFIRMED 2026-07-08 (JIL): flyscan MCA gets a dedicated 1e6 Hz clock;
-    # step scans use the Joerger scaler internal 1e7 Hz clock (convertUSAXS).
-    # Both are correct for their geometry — do not unify.
-    Frequency=1e6   # flyscan MCA clock (mca1 time base)
-    MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
+    MeasTime = Sample["RawData"]["TimeInSec"]    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
         UPD_bkgErr = Sample["BlankData"]["UPD_bkgErr"]    
@@ -464,6 +671,74 @@ def _parse_filename_info(filename):
 
  
 def calculatePD_Fly(data_dict):
+    """Normalised fly-scan detector signal, for either counting chain."""
+    if data_dict["RawData"].get("chain") == CHAIN_FX4:
+        return _calculatePD_FlyFX4(data_dict)
+    return _calculatePD_FlyScaler(data_dict)
+
+
+def _calculatePD_FlyFX4(data_dict):
+    """FX4 fly scan: I = (upd_current - dark) / I0_current.
+
+    No gain term (the reading is gain-independent) and no dwell term
+    (TSMeanValue is already an average over the PSO interval, and both
+    electrometers share the same gate).
+
+    The FX4 fly-scan file records the autoranger's range only once, after the
+    scan, so there is no per-point range: the dark current for that single
+    range is subtracted everywhere, and the amplifier dead-time masking the
+    scaler chain did from ``changes_DDPCA300_mcsChan`` has no equivalent here.
+    """
+    raw = data_dict["RawData"]
+    metadata_dict = raw["metadata"]
+    UPD_array = raw["UPD_array"]
+    Monitor = raw["Monitor"]
+    num_elements = UPD_array.size
+
+    bkg_table = {i: metadata_dict[f'upd_bkg{i}']
+                 for i in range(5) if f'upd_bkg{i}' in metadata_dict}
+    bkgErr_table = {i: metadata_dict[f'upd_bkgErr{i}']
+                    for i in range(5) if f'upd_bkgErr{i}' in metadata_dict}
+    range_index = raw.get("RangeIndex")
+    if range_index is None:
+        logging.info("FX4 fly scan: no upd_lurange recorded; no dark-current "
+                     "subtraction applied.")
+    updBkg = range_indexed_array(range_index, bkg_table, num_elements)
+    updBkgErr = range_indexed_array(range_index, bkgErr_table, num_elements)
+    # Range index kept per point so the downstream smoothing sees a constant
+    # range (it then always takes the plain trapezoid-average branch).
+    GainsIndx = range_indexed_array(range_index, {i: i for i in range(5)},
+                                    num_elements, default=np.nan)
+
+    PD_Intensity = (UPD_array - updBkg) / Monitor
+    PD_Intensity = _fixNegativeFlyIntensities(PD_Intensity)
+
+    return {"Intensity": PD_Intensity,
+            "Error": 0.01 * PD_Intensity,   # placeholder, see calculatePDErrorFly
+            "UPD_gainsIndx": GainsIndx,
+            "UPD_gains": np.ones(num_elements),   # gain-independent chain
+            "UPD_bkg": updBkg,
+            "UPD_bkgErr": updBkgErr}
+
+
+def _fixNegativeFlyIntensities(PD_Intensity):
+    """Igor IN3_FixNegativeIntensities: lift an over-subtracted background.
+
+    Minimum is taken over the last 80% of the points so the rocking-curve
+    peak at the start cannot dominate.
+    """
+    startIndex = int(np.round(0.2 * len(PD_Intensity)))
+    MinIntensity = np.nanmin(PD_Intensity[startIndex:-1])
+    if MinIntensity < 0:
+        maxIntensity = np.nanmax(PD_Intensity)
+        PD_Intensity = PD_Intensity + 1.1*np.abs(MinIntensity) + 0.3e-10*maxIntensity
+        #		WaveIn += Indra_PDIntBackFixScaleVmin * abs(V_min) + MaxValue * Indra_PDIntBackFixScaleVmax
+        #Constant Indra_PDIntBackFixScaleVmin     = 1.1
+        #Constant Indra_PDIntBackFixScaleVmax     = 0.3e-10
+    return PD_Intensity
+
+
+def _calculatePD_FlyScaler(data_dict):
         # create the gains array and corrects UPD for it.
         # Masks deadtimes and range changes
         # get the needed data from dictionary
@@ -536,9 +811,9 @@ def calculatePD_Fly(data_dict):
             updBkgErrName = 'upd_bkg_err'+str(int(GainsIndx[i]))     #typo in Flyscan schema below 1.3 (before June 2025)
             updBkgErr[i] =  metadata_dict[updBkgErrName]
 
-        #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change. 
-    Frequency= 1e6      # flyscan MCA clock, confirmed 2026-07-08 (JIL); step scans use 1e7 Joerger clock instead
-    TimeInSec = TimePerPoint/Frequency
+        #mask amplifier dead times. This is done by comparing table fo deadtimes from metadata with times after range change.
+    Frequency = FLYSCAN_MCA_CLOCK_HZ
+    TimeInSec = data_dict["RawData"]["TimeInSec"]
     Totaltime= sum(TimeInSec)
     logging.debug(f"Total measurement time: {Totaltime} s")
     n_pts = len(TimeInSec)
@@ -557,18 +832,10 @@ def calculatePD_Fly(data_dict):
 
         #Correct UPD for gains and monitor counts and amplifier gain. 
         # Frequency=1e6  #this is to keep in sync with Igor code. 
-    PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0Gain)  
+    PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0Gain)
     # Igor fixes negative intensities here by removing oversubtraction...
-    # Need to find minimum value over last 80% of data points, avoiding start of data.
-    startIndex = int(np.round(0.2 * len(PD_Intensity)))
-    MinIntensity = np.nanmin(PD_Intensity[startIndex:-1])
-    if MinIntensity < 0:
-        maxIntensity = np.nanmax(PD_Intensity)
-        PD_Intensity = PD_Intensity + 1.1*np.abs(MinIntensity) + 0.3e-10*maxIntensity
-        #		WaveIn += Indra_PDIntBackFixScaleVmin * abs(V_min) + MaxValue * Indra_PDIntBackFixScaleVmax
-        #Constant Indra_PDIntBackFixScaleVmin     = 1.1
-        #Constant Indra_PDIntBackFixScaleVmax     = 0.3e-10
-        
+    PD_Intensity = _fixNegativeFlyIntensities(PD_Intensity)
+
     if debugme:
         import matplotlib.pyplot as plt  # lazy import — only needed for debug plots
         plt.figure()
@@ -625,6 +892,35 @@ def rebinData(data_dict,num_points=200, isSMRData=False):
                 "Error":S_arrayNew  
                 }
     return results
+
+def _wavelengthFromInstrument(instrument_dict):
+    """Incident wavelength in Angstrom from the NXinstrument dictionary.
+
+    The FX4 saveFlyData configuration writes the wavelength once, under
+    /entry/instrument/source/incident_wavelength, and hard-links
+    monochromator/wavelength to it; older files carry it directly on the
+    monochromator.  Energy is the last resort.
+    """
+    mono = instrument_dict.get("monochromator", {}) if isinstance(instrument_dict, dict) else {}
+    source = instrument_dict.get("source", {}) if isinstance(instrument_dict, dict) else {}
+    for candidate in (mono.get("wavelength") if isinstance(mono, dict) else None,
+                      instrument_dict.get("wavelength"),
+                      source.get("incident_wavelength") if isinstance(source, dict) else None):
+        if candidate is not None:
+            return float(np.ravel(candidate)[0])
+    energy = mono.get("energy") if isinstance(mono, dict) else None
+    if energy is None:
+        energy = instrument_dict.get("energy")
+    if energy is not None:
+        energy = float(np.ravel(energy)[0])
+        if energy > 0:
+            logging.warning("No wavelength in the file; deriving it from the "
+                            f"monochromator energy ({energy:g} keV).")
+            return 12.398419843320026 / energy       # hc in keV.Angstrom
+    raise KeyError("Could not find the incident wavelength in the instrument group "
+                   "(tried monochromator/wavelength, wavelength, "
+                   "source/incident_wavelength, monochromator/energy).")
+
 
 ## Common steps go here
 def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
@@ -755,13 +1051,7 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
         #Make wave vector
     Q_array = np.full(UPD_array.shape, 0)
         #AR_center = metadata_dict["AR_center"]
-    try:
-        # Try to get the value using the first key
-        wavelength = instrument_dict["monochromator"]["wavelength"]
-    except KeyError:
-        #print(instrument_dict)
-        # If the first key doesn't exist, try the second key
-        wavelength = instrument_dict["wavelength"]
+    wavelength = _wavelengthFromInstrument(instrument_dict)
 
     Q_array = -1*(4*np.pi*np.sin(np.radians(ARangles-x0)/2)/wavelength)
         #Q_array = (4*np.pi*np.sin(np.radians(ARangles-x0)/2)/wavelength)
@@ -778,12 +1068,18 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
     return results
 
 
-def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time, replaceNans=True):
+def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
+                  replaceNans=True, time_base=FLYSCAN_MCA_CLOCK_HZ):
     """Smooth flyscan R data per amplifier range.
 
     UPD_gainsIndx is the amplifier RANGE INDEX (0-4, from
-    changes_DDPCA300_ampGain; NaN at masked points) — NOT the gain value.
-    Each range has its own minimum smoothing time in rwave_smooth_times.
+    changes_DDPCA300_ampGain on the scaler chain, from upd_lurange on the FX4
+    chain; NaN at masked points) — NOT the gain value.  Each range has its own
+    minimum smoothing time in rwave_smooth_times.
+
+    *meas_time* is divided by *time_base* to get seconds.  The scaler chain
+    passes mca1 clock counts (time_base = 1e6 Hz); the FX4 chain passes
+    channel_time, already in seconds, with time_base = 1.
     """
     # Smoothing times for different ranges, indexed by range 0-4
     rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
@@ -806,7 +1102,7 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time, replace
 
 
     smooth_intensity = np.copy(temp_int_log)
-    meas_time_sec = meas_time/1e6       # convert mca1 counts to seconds; 1e6 Hz flyscan MCA clock (confirmed 2026-07-08)
+    meas_time_sec = np.asarray(meas_time, dtype=float)/time_base
 
     def linear_fit(x, a, b):
         return a + b * x

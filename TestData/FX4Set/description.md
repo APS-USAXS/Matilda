@@ -1,23 +1,31 @@
-# FX4 commissioning data — 2026-09-26
+# FX4 commissioning data — 2026-09-26 / 27
 
-First data from the FX4 electrometer counting chain, taken during the
-hardware commissioning session on 2026-09-26 (glassy carbon SRM 3600 and its
-blank).  Source:
-`/share1/USAXS_data/2026-09/09_26_Ilavsky/Commissioning`.
+First data from the FX4 electrometer counting chain, taken during the hardware
+commissioning session (glassy carbon SRM 3600 and its blank).  All four
+formats are represented.
 
-| folder | format | `counting_chain` marker |
-|---|---|---|
-| `usaxs/` | step scan (uascan), NXWriterUascan | `/entry/instrument/bluesky/metadata/counting_chain` |
-| `saxs/`  | Pilatus frame | `/entry/counting_chain` |
-| `waxs/`  | Eiger frame | `/entry/counting_chain` |
+| folder | format | source | `counting_chain` marker |
+| --- | --- | --- | --- |
+| `flyscan/` | fly scan, saveFlyData v2.0 | `09_26_Ilavsky/FlyScanning/FlyScanning_usaxs` (2026-09-27) | `/entry/program_name@counting_chain` |
+| `usaxs/` | step scan (uascan), NXWriterUascan | `09_26_Ilavsky/Commissioning` | `/entry/instrument/bluesky/metadata/counting_chain` |
+| `saxs/` | Pilatus frame | `09_26_Ilavsky/Commissioning` | `/entry/counting_chain` |
+| `waxs/` | Eiger frame | `09_26_Ilavsky/Commissioning` | `/entry/counting_chain` |
 
 Detector values are gain-independent picoamps.  See
 `bits_usaxs/docs/FX4_data_formats.md` and `matilda/fx4support.py`.
 
-**There is no FX4 fly-scan file here** — stage 8 of the commissioning runbook
-had not run when these were taken.  The fly-scan FX4 branch is covered by a
-synthetic file built in `tests/test_fx4support.py`; replace that with a real
-file when one exists.
+The fly-scan files have had the groups a previous Matilda run wrote
+(`QRS_data`, `Blank_data`, the NXcanSAS subentries) stripped, so they are the
+raw writer output.
+
+## The fly scan reduces correctly
+
+`GC_SRM3600_0131` against `Blank_0130` gives transmission 0.936 and an
+absolute plateau of 29.8 cm²/cm³ over 0.01 < q < 0.1, against a certified
+SRM 3600 value near 30.  A repeat pair (`_R_0132` / `_R_0133`, not bundled)
+agrees to ~1% over the same range.  USAXS absolute calibration therefore
+carried across the conversion unchanged, as expected — the K-factor is
+derived from the blank's own peak, not from a stored constant.
 
 ## Known quirks of these particular files
 

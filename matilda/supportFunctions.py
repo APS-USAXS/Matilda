@@ -346,8 +346,7 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                 Blank = dict()
                 Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
                 (BlTransCounts, BlTransGain,
-                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData']['metadata'],
-                                                           blankFilename)
+                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
                 Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
                 Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
                 Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
@@ -370,23 +369,52 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                 logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
                 return BlankData
 
-def transmissionTerms(metadata_dict, filename):
+def transmissionTerms(raw_data):
     """Return (pin_counts, pin_gain, I0_counts, I0_gain) for a USAXS scan.
 
-    On the FX4 chain the gains are recorded as exactly 1 and the counts are
-    picoamps, so the ratio used by calibrateAndSubtractFlyscan is unchanged.
-    Some FX4 fly-scan files are written without these fields at all (the
-    saveFlyData configuration can drop /entry/metadata); rather than fail the
-    whole reduction, fall back to unity counts and gains — which makes the
-    measured transmission 1.0 — and say so loudly.
+    Only the ratio (pin/pin_gain)/(I0/I0_gain) is used, in
+    calibrateAndSubtractFlyscan, and only relative to the blank's.
+
+    On the FX4 chain the diode and I0 readings are gain-independent picoamps,
+    so there is no gain to divide by and ``saveFlyData.xml`` v2.0 stops
+    recording ``trans_pin_gain`` / ``trans_I0_gain`` altogether.  Their
+    absence is normal, not a problem: both gains are 1 by construction.  (The
+    FX4 step-scan writer still emits them, as exactly 1.0.)
+
+    A missing *count* is a real problem — the transmission cannot be measured
+    at all — so that falls back to T = 1.0 with a warning.
     """
-    names = ('trans_pin_counts', 'trans_pin_gain', 'trans_I0_counts', 'trans_I0_gain')
-    missing = [n for n in names if metadata_dict.get(n) is None]
-    if missing:
-        logging.warning(f"{filename}: transmission fields {missing} are missing; "
+    metadata_dict = raw_data["metadata"]
+    filename = raw_data.get("filename", "?")
+    counts = ('trans_pin_counts', 'trans_I0_counts')
+    gains = ('trans_pin_gain', 'trans_I0_gain')
+
+    missing_counts = [n for n in counts if metadata_dict.get(n) is None]
+    if missing_counts:
+        logging.warning(f"{filename}: transmission fields {missing_counts} are missing; "
                         "assuming transmission = 1.0. Absolute calibration and "
                         "the MSAXS correction will be wrong for this scan.")
-    return tuple(float(metadata_dict.get(n, 1.0)) for n in names)
+        return (1.0, 1.0, 1.0, 1.0)
+
+    pin_counts, I0_counts = (float(metadata_dict[n]) for n in counts)
+
+    if raw_data.get("chain") == CHAIN_FX4:
+        for name in gains:
+            recorded = metadata_dict.get(name)
+            if recorded is not None and not np.isclose(float(recorded), 1.0):
+                logging.warning(f"{filename}: FX4 scan records {name} = "
+                                f"{float(recorded):g}, but FX4 readings are "
+                                "gain-independent. Using 1.0.")
+        return (pin_counts, 1.0, I0_counts, 1.0)
+
+    missing_gains = [n for n in gains if metadata_dict.get(n) is None]
+    if missing_gains:
+        logging.warning(f"{filename}: transmission gains {missing_gains} are missing "
+                        "on a scaler-chain scan; assuming 1.0. The measured "
+                        "transmission will be wrong unless the amplifiers really "
+                        "were at unity gain.")
+    pin_gain, I0_gain = (float(metadata_dict.get(n, 1.0)) for n in gains)
+    return (pin_counts, pin_gain, I0_counts, I0_gain)
 
 
 def normalizeByTransmission(Sample):
@@ -422,8 +450,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     wavelength =  Sample["reducedData"]["wavelength"]
     PeakToPeakTransmission =  Sample["reducedData"]["PeakToPeakTransmission"]
     (SaTransCounts, SaTransGain,
-     SaI0Counts, SaI0Gain) = transmissionTerms(Sample['RawData']['metadata'],
-                                               Sample['RawData'].get('filename', '?'))
+     SaI0Counts, SaI0Gain) = transmissionTerms(Sample['RawData'])
     BlTransCounts = Sample['BlankData']['BlTransCounts']
     BlTransGain = Sample['BlankData']['BlTransGain']
     BlI0Counts = Sample['BlankData']['BlI0Counts']
@@ -586,6 +613,13 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
     current's measured error, and the two channels are propagated through the
     ratio.  When the sigma arrays are absent the flat
     FX4_RELATIVE_CURRENT_ERROR is used instead.
+
+    Known to be optimistic.  On the first commissioning fly scans this
+    estimate came out 3-4x below the observed point-to-point scatter of I(q),
+    consistently across the q range.  sqrt(N) assumes the FX4's samples are
+    independent; they are averages of ValuesPerRead raw readings behind an
+    analogue filter, so the effective N is smaller than the nominal one.
+    Calibrate the factor against repeat scans before relying on these bars.
     """
     raw = Sample["RawData"]
     UPD_array = np.asarray(raw["UPD_array"], dtype=float)
@@ -595,14 +629,26 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
     updBkgErr = np.asarray(block.get("UPD_bkgErr", 0.0), dtype=float)
 
     def _sigma_of_mean(sigma, total, mean, label):
+        # Flat relative error, used where the electrometer gives us nothing.
+        fallback = FX4_RELATIVE_CURRENT_ERROR * np.abs(mean)
         if sigma is None:
             logging.info(f"FX4 fly scan: no {label}; using a flat "
                          f"{FX4_RELATIVE_CURRENT_ERROR:.1%} relative uncertainty.")
-            return FX4_RELATIVE_CURRENT_ERROR * np.abs(mean)
+            return fallback
         samples = mean_of_samples(total, mean)
         if samples is None:
             samples = np.ones_like(mean)
-        return np.asarray(sigma, dtype=float) / np.sqrt(samples)
+        out = np.asarray(sigma, dtype=float) / np.sqrt(samples)
+        # Real files carry a few NaNs in the sigma arrays (seen on the first
+        # commissioning fly scans).  Without this they would propagate to a
+        # zero error, which reads as an infinitely well known point.
+        bad = ~np.isfinite(out)
+        if bad.any():
+            logging.info(f"FX4 fly scan: {int(bad.sum())} non-finite values in "
+                         f"{label}; using the {FX4_RELATIVE_CURRENT_ERROR:.1%} "
+                         "relative fallback at those points.")
+            out = np.where(bad, fallback, out)
+        return out
 
     sigma_upd = _sigma_of_mean(raw.get("UPD_sigma"), raw.get("UPD_total"),
                                UPD_array, "upd_sigma")

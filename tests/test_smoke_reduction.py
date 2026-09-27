@@ -28,6 +28,8 @@ SAXS_BLANK = ("TestSet/SAXS", "HeaterBlank_0060.hdf")
 # See TestData/FX4Set/description.md for the known quirks of these files —
 # notably the unphysical transmission, which is why the FX4 tests below check
 # the reduction runs and stays finite rather than checking T < 1.
+FX4_FLY_SAMPLE = ("FX4Set/flyscan", "GC_SRM3600_0131.h5")
+FX4_FLY_BLANK = ("FX4Set/flyscan", "Blank_0130.h5")
 FX4_STEP_SAMPLE = ("FX4Set/usaxs", "GC_SRM3600_0044.h5")
 FX4_STEP_BLANK = ("FX4Set/usaxs", "Blank_0043.h5")
 FX4_SAXS_SAMPLE = ("FX4Set/saxs", "GC_SRM3600_0044.hdf")
@@ -106,6 +108,26 @@ def test_saxs_end_to_end(testdata_dir, tmp_path):
 
 
 # ── FX4 counting chain ───────────────────────────────────────────────────────
+
+def test_fx4_flyscan_end_to_end(testdata_dir, tmp_path):
+    from matilda.convertFlyscan import processFlyscan
+    sample_name, blank_name = _stage(testdata_dir, tmp_path,
+                                     FX4_FLY_SAMPLE, FX4_FLY_BLANK)
+    S = processFlyscan(str(tmp_path), sample_name,
+                       blankPath=str(tmp_path), blankFilename=blank_name,
+                       recalculateAllData=True)
+    assert S["RawData"]["chain"] == "FX4"
+    _assert_calibrated(S)
+    # transmission comes from trans_*_counts alone: this chain records no
+    # trans_*_gain, and defaulting those to 1 must not break the double ratio
+    T = S["CalibratedData"]["MeasuredTransmission"]
+    assert 0.90 < T < 0.97, f"glassy carbon transmission {T} off the measured 0.936"
+    # absolute scale: SRM 3600 sits near 30 cm2/cm3 across its plateau
+    Q = np.asarray(S["CalibratedData"]["Q"])
+    I = np.asarray(S["CalibratedData"]["Intensity"])
+    plateau = I[(Q > 0.01) & (Q < 0.1)]
+    assert 10 < np.median(plateau) < 100, f"SRM 3600 plateau at {np.median(plateau)}"
+
 
 def test_fx4_stepscan_end_to_end(testdata_dir, tmp_path):
     from matilda.convertUSAXS import processStepscan

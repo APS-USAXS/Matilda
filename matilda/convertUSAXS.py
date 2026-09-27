@@ -205,8 +205,7 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
                 Blank = dict()
                 Blank["RawData"]=importStepScan(blankPath, blankFilename)         #import data
                 (BlTransCounts, BlTransGain,
-                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData']['metadata'],
-                                                           blankFilename)
+                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
                 Blank["BlankData"]= (createUPDGainsAndBkgErrArrays(Blank))  
                 Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
                 Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                

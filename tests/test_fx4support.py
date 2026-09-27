@@ -1,11 +1,15 @@
 """Tests for FX4 counting-chain detection and the FX4 reduction branches.
 
 The FX4 electrometers replaced the Femto + V/F + Struck chain on 2026-09-26.
-Real FX4 step-scan / SAXS / WAXS files exist; the FX4 fly scan had not been
-commissioned when this was written, so that branch is exercised against a
-synthetic file built to the deployed ADconfigs/Flyscan_config/saveFlyData.xml
-layout — including the case where that configuration writes no
-``/entry/metadata`` group at all.
+Real files of all four formats live in TestData/FX4Set and are reduced
+end-to-end by tests/test_smoke_reduction.py.
+
+The synthetic fly scan here complements them: it is built to the
+ADconfigs/Flyscan_config/saveFlyData.xml v2.0 layout and is parameterised over
+things the real files cannot exercise — a known transmission to recover, and
+the variant where the configuration writes no ``/entry/metadata`` group at all
+(the state the first deployed v2.0 XML was in, before the comment that
+swallowed the group tag was fixed on 2026-09-27).
 """
 
 import h5py
@@ -202,10 +206,10 @@ def _synthetic_fx4_flyscan(path, transmission=1.0, excess=0.0,
         md["UPDsize"] = 4.95
         md["AR_center"] = AR_CENTER
         md["timeStamp"] = b"2026-09-27 09:00:00"
-        md["trans_pin_counts"] = 1.2e7
-        md["trans_pin_gain"] = 1.0
+        # pA, and no trans_*_gain: saveFlyData.xml v2.0 stopped recording the
+        # gains because the FX4 reading is gain-independent.
+        md["trans_pin_counts"] = 1.2e7 * transmission
         md["trans_I0_counts"] = 6.6e4
-        md["trans_I0_gain"] = 1.0
 
         f["/entry/instrument/source/incident_wavelength"] = WAVELENGTH
         f["/entry/instrument/monochromator/wavelength"] = WAVELENGTH
@@ -294,6 +298,73 @@ def test_fx4_flyscan_full_reduction(fx4_flyscan_pair):
     assert len(calibrated["Q"]) > 50
     assert np.all(np.isfinite(calibrated["Intensity"]))
     assert calibrated["units"] == "[cm2/cm3]"
+
+
+# ── transmission terms ───────────────────────────────────────────────────────
+
+def test_fx4_missing_transmission_gains_are_not_a_problem(caplog):
+    """saveFlyData v2.0 stops recording trans_*_gain — the reading is
+    gain-independent, so both gains are 1 and nothing should be warned about."""
+    from matilda.supportFunctions import transmissionTerms
+    raw = {"chain": CHAIN_FX4, "filename": "GC_SRM3600_0131",
+           "metadata": {"trans_pin_counts": 6.624e7, "trans_I0_counts": 2.689e5}}
+    with caplog.at_level("WARNING"):
+        pin, pin_gain, i0, i0_gain = transmissionTerms(raw)
+    assert (pin, pin_gain, i0, i0_gain) == (6.624e7, 1.0, 2.689e5, 1.0)
+    assert caplog.text == ""
+
+
+def test_fx4_ignores_a_non_unity_recorded_gain(caplog):
+    from matilda.supportFunctions import transmissionTerms
+    raw = {"chain": CHAIN_FX4, "filename": "x_0001",
+           "metadata": {"trans_pin_counts": 1e7, "trans_I0_counts": 1e5,
+                        "trans_pin_gain": 1e8, "trans_I0_gain": 1.0}}
+    with caplog.at_level("WARNING"):
+        _, pin_gain, _, i0_gain = transmissionTerms(raw)
+    assert (pin_gain, i0_gain) == (1.0, 1.0)
+    assert "gain-independent" in caplog.text
+
+
+def test_missing_transmission_counts_still_warns(caplog):
+    from matilda.supportFunctions import transmissionTerms
+    raw = {"chain": CHAIN_FX4, "filename": "x_0001",
+           "metadata": {"trans_I0_counts": 2.689e5}}
+    with caplog.at_level("WARNING"):
+        assert transmissionTerms(raw) == (1.0, 1.0, 1.0, 1.0)
+    assert "trans_pin_counts" in caplog.text
+
+
+def test_scaler_chain_still_divides_by_the_gains():
+    from matilda.supportFunctions import transmissionTerms
+    raw = {"chain": CHAIN_SCALER, "filename": "old_0001",
+           "metadata": {"trans_pin_counts": 1e7, "trans_pin_gain": 1e8,
+                        "trans_I0_counts": 1e5, "trans_I0_gain": 1e6}}
+    assert transmissionTerms(raw) == (1e7, 1e8, 1e5, 1e6)
+
+
+def test_fx4_flyscan_transmission_survives_the_pipeline(fx4_flyscan_pair):
+    """The sample/blank double ratio must recover the simulated transmission."""
+    from matilda.convertFlyscan import processFlyscan
+    Sample = processFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5",
+                            blankPath=str(fx4_flyscan_pair),
+                            blankFilename="Blank_0001.h5",
+                            recalculateAllData=True)
+    assert Sample["CalibratedData"]["MeasuredTransmission"] == pytest.approx(0.75)
+
+
+def test_fx4_flyscan_errors_are_finite_when_sigma_has_nans(fx4_flyscan_pair):
+    """Real FX4 files carry a few NaNs in upd_sigma; a NaN there must not
+    become a zero error, which would read as a perfectly known point."""
+    from matilda.supportFunctions import (importFlyscan, calculatePD_Fly,
+                                          calculatePDErrorFly)
+    path = fx4_flyscan_pair / "Sample_0002.h5"
+    with h5py.File(path, "a") as f:
+        f["/entry/flyScan/upd_sigma"][3:9] = np.nan
+    Sample = {"RawData": importFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5")}
+    Sample["reducedData"] = calculatePD_Fly(Sample)
+    error = calculatePDErrorFly(Sample)["Error"]
+    assert np.all(np.isfinite(error))
+    assert np.all(error[3:9] > 0)
 
 
 # ── FX4 step scan ────────────────────────────────────────────────────────────

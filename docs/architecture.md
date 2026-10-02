@@ -92,6 +92,11 @@ left for calibration against a standard reference material:
 `convertSWAXS.FX4_I_SCALING` (SAXS/WAXS absolute intensity) and
 `fx4support.FX4_RELATIVE_CURRENT_ERROR` (step-scan error bars).
 
+For the full per-technique description of the FX4 reduction — dataset paths,
+arrays, formulas, transmission terms and validation numbers, written so the
+Igor Pro reduction can follow the same path — see
+[`fx4-reduction-guide.md`](fx4-reduction-guide.md).
+
 ---
 
 ### Data reduction

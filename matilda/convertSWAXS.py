@@ -27,10 +27,44 @@ import h5py
 import os
 import logging
 
+from .fx4support import (CHAIN_FX4, CHAIN_SCALER, detect_counting_chain,
+                         warn_ring_overflows)
 from .supportFunctions import read_group_to_dict, filter_nested_dict
 from .supportNikaFunctions import convert_Nika_to_Fit2D
 from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from .hdf5code import writeThicknessOverride
+from .hdf5code import writeThicknessOverride, AD_METADATA_KEYS
+
+# ── FX4 absolute scale ────────────────────────────────────────────────────────
+# I_scaling (/entry/Metadata/I_scaling) is the SAXS/WAXS absolute-intensity
+# constant.  Its value was determined against the OLD monitor, I0_cts/I0_gain
+# — a V/F count divided by a Femto gain.  The FX4 chain normalises by
+# I0_cts_gated instead, a sum of picoamp samples, which is a completely
+# different unit: on a commissioning frame I0_cts/I0_gain = 1.3e-2 while
+# I0_cts_gated = 1.1e8.  The recorded I_scaling therefore under-scales FX4
+# frames by ~10 orders of magnitude.
+#
+# The curve SHAPE is unaffected — diode/I0 is a ratio and the error is common
+# to every pixel — so only the absolute level is wrong.  Set this constant to
+# the value determined from a standard reference material (glassy carbon
+# SRM 3600); until then FX4 frames are reduced with the recorded I_scaling and
+# a warning, i.e. correct in shape, provisional in absolute level.
+FX4_I_SCALING = None
+
+
+def _correction_factor(metadata_dict, chain, filename):
+    """Absolute-intensity constant for one area-detector frame."""
+    corrFactor = metadata_dict["I_scaling"]
+    if chain != CHAIN_FX4:
+        return corrFactor
+    if FX4_I_SCALING is not None:
+        return FX4_I_SCALING
+    logging.warning(
+        f"{filename}: FX4 frame reduced with the recorded I_scaling "
+        f"({float(np.ravel(corrFactor)[0]):.3g}), which was calibrated against the old "
+        "I0_cts/I0_gain monitor. The curve shape is right but the ABSOLUTE LEVEL is "
+        "not; set convertSWAXS.FX4_I_SCALING from a standard reference material.")
+    return corrFactor
+
 
 # ── Integrator cache ──────────────────────────────────────────────────────────
 # pyFAI builds internal lookup tables on the first integrate1d() call for a
@@ -304,13 +338,7 @@ def ImportAndReduceAD(path, filename, recalculateAllData=False):
             instrument_dict = read_group_to_dict(instrument_group)
             del instrument_dict['detector']['data'] #this is original of 2-d data, we do not need to cary it here second time. 
             #metadata
-            keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_gated',
-                            'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrI0gain','Pin_TrPD','Pin_TrPDgain',
-                            'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
-                            'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
-                            'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
-                            'scaler_freq', 'StartTime',      # StartTime needed by _build_mask (SAXS year branch)
-                        ]
+            keys_to_keep = AD_METADATA_KEYS
             metadata_group = hdf_file['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
@@ -362,14 +390,7 @@ def importADData(path, filename):
             instrument_dict = read_group_to_dict(instrument_group)
             del instrument_dict['detector']['data']
             #metadata
-            keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_cts_gated',
-                            'TR_cts_gated','TR_cts','TR_gain','I0_Sample',
-                            'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrPD','Pin_TrPDgain',
-                            'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
-                            'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
-                            'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
-                            'scaler_freq', 'StartTime',                     
-                        ]        
+            keys_to_keep = AD_METADATA_KEYS
             metadata_group = hdf_file['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
@@ -385,11 +406,35 @@ def importADData(path, filename):
             Sample["RawData"]["metadata"] = metadata_dict
             Sample["RawData"]["sample"] = sample_dict
             Sample["RawData"]["control"] = control_dict
+            Sample["RawData"]["chain"] = detect_counting_chain(hdf_file)
+            if Sample["RawData"]["chain"] == CHAIN_FX4:
+                warn_ring_overflows(
+                    {'FX4_RingOverflows': metadata_dict.get('FX4_RingOverflows')},
+                    filename)
             #path different names between SWAXS and USAXS
             Sample["RawData"]["metadata"]["timeStamp"]=Sample["RawData"]["metadata"]["StartTime"]
             #logging.info(f"Finished reading data")
             #logging.info(f"Read data")
             return Sample
+
+def _fx4Monitor(frame):
+    """Gated I0 for one FX4 area-detector frame, as a sum of samples.
+
+    ``I0_cts_gated = I0_current [pA] * Exp_time_gated [s] / FX4_SampleTime [s]``.
+    ``/entry/control/integral`` is a hardlink to it, so either source gives
+    the same number; the Metadata entry is preferred because the control
+    group is not always read.
+    """
+    metadata = frame["RawData"]["metadata"]
+    for key in ("I0_cts_gated",):
+        if metadata.get(key) is not None:
+            return metadata[key]
+    integral = frame["RawData"].get("control", {}).get("integral")
+    if integral is not None:
+        return integral
+    raise KeyError(f"{frame['RawData']['filename']}: FX4 frame has neither "
+                   "I0_cts_gated nor /entry/control/integral; cannot normalise.")
+
 
 def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=None,
                        transmission_override=None):
@@ -407,15 +452,57 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
     blankname = Blank["RawData"]["filename"]
     sampleThickness = thickness_override if thickness_override is not None else Sample["RawData"]["sample"]["thickness"]
     #sampleMeasurementTime=Sample["RawData"]["control"]["preset"]
-    corrFactor=Sample["RawData"]["metadata"]["I_scaling"]
+    corrFactor=_correction_factor(Sample["RawData"]["metadata"],
+                                  Sample["RawData"].get("chain", CHAIN_SCALER),
+                                  Sample["RawData"]["filename"])
     #blankMeasurementTime=Blank["RawData"]["control"]["preset"]
     sample2Ddata=Sample["RawData"]["data"]
     blank2Ddata = Blank["RawData"]["data"]
     metadata_dict = Sample["RawData"]["metadata"]
-    #tranimsisions... 
-    if "pin_ccd_tilt_x" in metadata_dict:                       # this is SAXS
+    usingSAXS = "pin_ccd_tilt_x" in metadata_dict
+    chain = Sample["RawData"].get("chain", CHAIN_SCALER)
+    if chain != Blank["RawData"].get("chain", CHAIN_SCALER):
+        raise ValueError(
+            f"{Sample['RawData']['filename']} was counted with the {chain} chain but "
+            f"the blank {blankname} with "
+            f"{Blank['RawData'].get('chain', CHAIN_SCALER)}. They are not comparable: "
+            "one is in counts, the other in picoamps.")
+    #tranimsisions...
+    if chain == CHAIN_FX4:
+        # Monitor: I0_cts_gated is the sum of FX4 samples over the (software
+        # gated) exposure, and /entry/control/integral is a hardlink to it.
+        # It is gain-independent, so the gain is 1.  I0_cts / I0_gain are
+        # still present in the file but are stale scaler/Femto records.
+        sampleI0     = _fx4Monitor(Sample)
+        blankI0      = _fx4Monitor(Blank)
+        sampleI0gain = blankI0gain = 1.0
+        if usingSAXS:
+            # SAXS transmission still comes from the pin-diode measurement
+            # made before the frame; on the FX4 chain both values are pA and
+            # both gains are recorded as exactly 1.
+            sampleTRDiode     = metadata_dict["Pin_TrPD"]
+            sampleTRDiodeGain = metadata_dict["Pin_TrPDgain"]
+            blankTRDiode      = Blank["RawData"]["metadata"]["Pin_TrPD"]
+            blankTRDiodeGain  = Blank["RawData"]["metadata"]["Pin_TrPDgain"]
+            sampleTRI0     = metadata_dict["Pin_TrI0"]
+            sampleTRI0gain = metadata_dict["Pin_TrI0gain"]
+            blankTRI0      = Blank["RawData"]["metadata"]["Pin_TrI0"]
+            blankTRI0gain  = Blank["RawData"]["metadata"]["Pin_TrI0gain"]
+        else:
+            # WAXS transmission diode.  Use TR_current (pA) — NOT
+            # TR_cts_gated, which is the leftover Total_RBV of whatever fx4
+            # last acquired (in practice the 0.05 s autoscale read), not the
+            # exposure.  Ratio it against I0_current, also a mean in pA, so
+            # the exposure time cancels on both sides.
+            sampleTRDiode     = metadata_dict["TR_current"]
+            blankTRDiode      = Blank["RawData"]["metadata"]["TR_current"]
+            sampleTRI0        = metadata_dict["I0_current"]
+            blankTRI0         = Blank["RawData"]["metadata"]["I0_current"]
+            sampleTRDiodeGain = blankTRDiodeGain = 1.0
+            sampleTRI0gain    = blankTRI0gain = 1.0
+    elif usingSAXS:                                             # this is SAXS
         sampleI0        = Sample["RawData"]["metadata"]["I0_cts"]
-        sampleI0gain    = Sample["RawData"]["metadata"]["I0_gain"]        
+        sampleI0gain    = Sample["RawData"]["metadata"]["I0_gain"]
         blankI0         = Blank["RawData"]["metadata"]["I0_cts"]
         blankI0gain     = Blank["RawData"]["metadata"]["I0_gain"]
         sampleTRDiode     = Sample["RawData"]["metadata"]["Pin_TrPD"]
@@ -428,7 +515,7 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
         blankTRI0gain  = Blank["RawData"]["metadata"]["Pin_TrI0gain"]
     else:                                                       # and this is WAXS
         sampleI0        = Sample["RawData"]["control"]["integral"]
-        sampleI0gain    = Sample["RawData"]["metadata"]["I0_gain"]        
+        sampleI0gain    = Sample["RawData"]["metadata"]["I0_gain"]
         blankI0         = Blank["RawData"]["control"]["integral"]
         blankI0gain     = Blank["RawData"]["metadata"]["I0_gain"]
         sampleTRDiode     = Sample["RawData"]["metadata"]["TR_cts"]
@@ -439,7 +526,7 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
         sampleTRI0gain    = sampleI0gain
         blankTRI0         = blankI0
         blankTRI0gain     = blankI0gain
- 
+
     detector_distance = Sample["RawData"]["instrument"]["detector"]["distance"] 
     pixel_size = Sample["RawData"]["instrument"]["detector"]["x_pixel_size"]
 

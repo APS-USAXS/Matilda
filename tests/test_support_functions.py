@@ -149,9 +149,13 @@ def test_modified_gauss_peak():
 
 
 def test_calculate_pd_fly_returns_both_gain_keys():
-    """Regression for the duplicate-'UPD_gains'-key bug (1.1)."""
+    """Regression for the duplicate-'UPD_gains'-key bug (1.1).
+
+    calculatePD_Fly is now a chain dispatcher; the scaler-chain body that
+    carried the bug lives in _calculatePD_FlyScaler.
+    """
     import inspect
-    src = inspect.getsource(sf.calculatePD_Fly)
+    src = inspect.getsource(sf._calculatePD_FlyScaler)
     assert '"UPD_gainsIndx":GainsIndx' in src
     assert '"UPD_gains":Gains' in src
     assert "AmpReqGain[len(AmpReqGain)-1]" in src   # 1.2 regression guard

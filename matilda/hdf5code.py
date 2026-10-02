@@ -40,6 +40,53 @@ import numpy as np
 import logging
 from importlib.metadata import version as _pkg_version, PackageNotFoundError as _PkgNotFoundError
 
+from .fx4support import is_fx4
+
+
+# /entry/Metadata entries kept from an area-detector (SAXS / WAXS) frame.
+# Both counting chains are covered: the scaler-chain monitor and transmission
+# fields (I0_cts, I0_gain, TR_cts, TR_gain, Pin_Tr*) and the FX4 ones
+# (I0_cts_gated, I0_current, TR_current, Exp_time_gated, FX4_*).
+#
+# On an FX4 frame I0_cts / I0_gain / TR_cts / TR_gain are still written but
+# are STALE — they come from the superseded scaler and Femto records.  They
+# are kept here only so the old chain keeps working; calibrateAD2DData must
+# not read them when counting_chain is "FX4".
+#
+# Lives here rather than in convertSWAXS because readMyNXcanSAS needs it too
+# and convertSWAXS imports this module.
+AD_METADATA_KEYS = [
+    'I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_gated', 'I0_cts_gated',
+    'TR_cts_gated', 'TR_cts', 'TR_gain', 'I0_Sample',
+    'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrPD', 'Pin_TrPDgain',
+    'PresetTime', 'monoE', 'pin_ccd_center_x_pixel', 'pin_ccd_center_y_pixel',
+    'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
+    'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
+    'scaler_freq', 'StartTime',      # StartTime needed by _build_mask (SAXS year branch)
+    # FX4 chain
+    'I0_current', 'I00_current', 'TR_current', 'Exp_time_gated',
+    'FX4_SampleTime', 'FX4_RingOverflows', 'I0_range',
+]
+
+# Metadata keys the USAXS (fly-scan and step-scan) reduction needs.  Shared by
+# both counting chains — FX4 files simply have no amplifier-gain entries.
+USAXS_METADATA_KEYS = [
+    'AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain', 'detector_distance',
+    'timeStamp', 'I0AmpGain',
+    'trans_pin_counts', 'trans_pin_gain', 'trans_pin_time',
+    'trans_I0_counts', 'trans_I0_gain',
+    'UPDsize',
+    'upd_bkg0', 'upd_bkg1', 'upd_bkg2', 'upd_bkg3', 'upd_bkg4',
+    'upd_bkgErr0', 'upd_bkgErr1', 'upd_bkgErr2', 'upd_bkgErr3', 'upd_bkgErr4',
+    'upd_bkg_err0',
+    'DDPCA300_gain0', 'DDPCA300_gain1', 'DDPCA300_gain2', 'DDPCA300_gain3', 'DDPCA300_gain4',
+    'upd_amp_change_mask_time0', 'upd_amp_change_mask_time1', 'upd_amp_change_mask_time2',
+    'upd_amp_change_mask_time3', 'upd_amp_change_mask_time4',
+    # FX4 chain
+    'counting_chain', 'sample_time', 'values_per_read', 'upd_lurange',
+    'ring_overflows', 'ring_overflows_I0',
+]
+
 
 def readGenericNXcanSAS(path, filename):
     """
@@ -764,36 +811,37 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
         #and now we need to read the other groups, which are raw data... 
         if isUSAXS : 
             #metadata
-            keys_to_keep = ['AR_center', 'ARenc_0', 'DCM_energy', 'DCM_theta', 'I0Gain','detector_distance',
-                            'timeStamp','I0AmpGain',
-                            'trans_pin_counts','trans_pin_gain','trans_pin_time','trans_I0_counts','trans_I0_gain',
-                            'UPDsize', 'trans_I0_counts', 'trans_I0_gain', 'upd_bkg0', 'upd_bkg1','upd_bkg2','upd_bkg3',
-                            'upd_bkgErr0','upd_bkgErr1','upd_bkgErr2','upd_bkgErr3','upd_bkgErr4','upd_bkg_err0',
-                            'upd_bkg4','DDPCA300_gain0','DDPCA300_gain1','DDPCA300_gain2','DDPCA300_gain3','DDPCA300_gain4',
-                            'SAD_mm', 'SDD_mm', 'thickness', 'title', 'useSBUSAXS',
-                            'intervals', 'VToFFactor',
-                            'upd_amp_change_mask_time0','upd_amp_change_mask_time1','upd_amp_change_mask_time2','upd_amp_change_mask_time3','upd_amp_change_mask_time4',
-                        ]
-            # Prefer the "classic" location, but fall back to the Bluesky one.
+            keys_to_keep = USAXS_METADATA_KEYS + [
+                'SAD_mm', 'SDD_mm', 'thickness', 'title', 'useSBUSAXS',
+                'intervals', 'VToFFactor',
+            ]
+            # Prefer the "classic" location, fall back to the Bluesky one
+            # (step scans), then to /entry/flyScan: the FX4 saveFlyData
+            # configuration can write the fly-scan metadata fields there
+            # instead of in a metadata group of their own.
+            md_paths = (
+                "/entry/metadata",
+                "/entry/instrument/bluesky/metadata",
+                "/entry/flyScan",
+            )
             metadata_group = None
-            for md_path in (
-                    "/entry/metadata",
-                    "/entry/instrument/bluesky/metadata",
-            ):
+            for md_path in md_paths:
                 if md_path in f:
                     metadata_group = f[md_path]
                     break
             if metadata_group is None:
                 raise KeyError(
                     f"Could not find metadata group in {filename}. "
-                    "Tried: /entry/metadata and /entry/instrument/bluesky/metadata"
+                    f"Tried: {', '.join(md_paths)}"
                 )
 
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
             # we need this key to be there also... Copy of the other one.
-            # Ensure I0AmpGain exists; default to 1e6 if missing.
-            metadata_dict["I0AmpGain"] = metadata_dict.get("I0AmpGain", 1e6)
+            # FX4 readings are gain-independent, so the I0 gain is exactly 1;
+            # on the old chain default to 1e6 when the field is missing.
+            default_I0_gain = 1.0 if is_fx4(f) else 1e6
+            metadata_dict["I0AmpGain"] = metadata_dict.get("I0AmpGain", default_I0_gain)
             metadata_dict["I0Gain"] = metadata_dict["I0AmpGain"]
             #Instrument
             keys_to_keep = ['monochromator', 'energy', 'wavelength']
@@ -818,14 +866,7 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
             except KeyError:
                 pass
             #metadata
-            keys_to_keep = ['I000_cts', 'I00_cts', 'I00_gain', 'I0_cts', 'I0_cts_gated',
-                            'TR_cts_gated','TR_cts','TR_gain','I0_Sample',
-                            'I0_gain', 'I_scaling', 'Pin_TrI0', 'Pin_TrI0gain', 'Pin_TrPD','Pin_TrPDgain',
-                            'PresetTime', 'monoE', 'pin_ccd_center_x_pixel','pin_ccd_center_y_pixel',
-                            'pin_ccd_tilt_x', 'pin_ccd_tilt_y', 'wavelength', 'waxs_ccd_center_x', 'waxs_ccd_center_y',
-                            'waxs_ccd_tilt_x', 'waxs_ccd_tilt_y', 'waxs_ccd_center_x_pixel', 'waxs_ccd_center_y_pixel',
-                            'scaler_freq', 'StartTime',                     
-                        ]        
+            keys_to_keep = AD_METADATA_KEYS
             metadata_group = f['/entry/Metadata']
             metadata_dict = read_group_to_dict(metadata_group)
             metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)

@@ -26,8 +26,7 @@
         "commandCenter.foreground": "#e7e7e7",
         "statusBar.debuggingBackground": "#1857a4",
         "statusBar.debuggingForeground": "#e7e7e7",
-        "statusBar.inactiveBackground": "#1857a4",
-        "tab.activeBackground": "#1f6fd0"
+        "statusBar.inactiveBackground": "#1857a4"
     },
     "peacock.color": "#1857a4",
     "workbench.sash.size": 10,

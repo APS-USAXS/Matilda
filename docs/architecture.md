@@ -55,6 +55,50 @@ Key module-level constants (configure near top of file):
 
 ---
 
+### Counting chains
+
+12-ID-E has had two counting chains. Every reduction path branches on which
+one wrote the file; nothing else about the pipeline differs.
+
+| aspect | **scaler** (until 2026-09-26) | **FX4** (from 2026-09-26) |
+| --- | --- | --- |
+| hardware | Femto amplifier + V/F converter + Struck 3820 | FX4 electrometers |
+| detector value | counts accumulated over a dwell | mean current, picoamps |
+| gain | per-range table, divided out | none — reading is gain-independent |
+| dwell | divided out (1e6 Hz fly MCA / 1e7 Hz Joerger) | none — the value is already a mean |
+| `I(q)` | `(counts − dark·t)/(f·gain) / (I0/I0gain)` | `(upd_current − dark) / I0_current` |
+
+**`matilda/fx4support.py`**
+Chain detection and the FX4-specific arithmetic.
+
+Key functions: `detect_counting_chain`, `is_fx4`, `range_indexed_array`,
+`mean_of_samples`, `ratio_error`, `warn_ring_overflows`
+
+Every format declares `counting_chain`; absent means the old scaler chain.
+That marker is the only correct test — `UPD` and `I0` in the step-scan file
+kept their names across the conversion and changed only their units, and the
+step-scan `program_name@config_version` is the NeXus writer's schema version,
+unrelated to the chain. The marker lives in a different place in each format,
+and `detect_counting_chain` checks all of them:
+
+| format | location |
+|---|---|
+| fly scan | `/entry/program_name@counting_chain` (also accepts `/entry/flyScan/counting_chain`) |
+| SAXS / WAXS frame | `/entry/counting_chain` |
+| step scan | `/entry/instrument/bluesky/metadata/counting_chain` |
+
+Reference: `bits_usaxs/docs/FX4_data_formats.md`. Two knobs are deliberately
+left for calibration against a standard reference material:
+`convertSWAXS.FX4_I_SCALING` (SAXS/WAXS absolute intensity) and
+`fx4support.FX4_RELATIVE_CURRENT_ERROR` (step-scan error bars).
+
+For the full per-technique description of the FX4 reduction — dataset paths,
+arrays, formulas, transmission terms and validation numbers, written so the
+Igor Pro reduction can follow the same path — see
+[`fx4-reduction-guide.md`](fx4-reduction-guide.md).
+
+---
+
 ### Data reduction
 
 **`matilda/convertFlyscan.py`**
@@ -239,6 +283,7 @@ Matilda/
 │   ├── convertSWAXS.py         # SAXS/WAXS 2-D reduction
 │   ├── desmearing.py           # Slit-smearing correction (Lake)
 │   ├── desmearing_methods.py   # Method dispatcher (Abel default, Lake, GP)
+│   ├── fx4support.py           # Counting-chain detection, FX4 helpers
 │   ├── supportFunctions.py     # Shared numerical helpers
 │   ├── supportNikaFunctions.py # Geometry conversion (Nika → pyFAI)
 │   ├── hdf5code.py             # NXcanSAS HDF5 I/O

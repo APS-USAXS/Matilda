@@ -35,18 +35,29 @@ TODO: reduceStepScanToQR and reduceFlyscanToQR mentioned in original header
 """
 
 import os
+import re
 import h5py
 import numpy as np
 import logging
+from .fx4support import (CHAIN_FX4, FX4_RELATIVE_CURRENT_ERROR, as_scalar,
+                         detect_counting_chain, range_indexed_array, ratio_error)
 from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from .supportFunctions import beamCenterCorrection
 from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
 from .hdf5code import saveNXcanSAS, readMyNXcanSAS
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import empty_calibrated_data
-from .supportFunctions import normalizeByTransmission
+from .supportFunctions import normalizeByTransmission, transmissionTerms
 from .desmearing_methods import desmear_dispatch
 from .plotData import plotUSAXSResults
+
+
+# CONFIRMED 2026-07-08 (JIL): 1e7 Hz = Joerger scaler internal clock, correct
+# for step scans (flyscans use a 1e6 Hz MCA clock instead — see
+# supportFunctions.FLYSCAN_MCA_CLOCK_HZ).  Both are correct for their
+# geometry; do not unify.  There is no clock on the FX4 chain: the
+# electrometer reports a mean current and importStepScan supplies seconds.
+JOERGER_CLOCK_HZ = 1e7
 
 
 # This code first reduces data to QR and if provided with Blank, it will do proper data calibration, subtraction, and even desmearing
@@ -195,10 +206,8 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
             else:
                 Blank = dict()
                 Blank["RawData"]=importStepScan(blankPath, blankFilename)         #import data
-                BlTransCounts = Blank['RawData']['metadata']['trans_pin_counts']
-                BlTransGain = Blank['RawData']['metadata']['trans_pin_gain']
-                BlI0Counts = Blank['RawData']['metadata']['trans_I0_counts']
-                BlI0Gain = Blank['RawData']['metadata']['trans_I0_gain']
+                (BlTransCounts, BlTransGain,
+                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
                 Blank["BlankData"]= (createUPDGainsAndBkgErrArrays(Blank))  
                 Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
                 Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
@@ -224,12 +233,20 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
 
 
 def createUPDGainsAndBkgErrArrays(Sample):
+    """Per-point amplifier gain and dark-current error for a step scan."""
+    if Sample["RawData"].get("chain") == CHAIN_FX4:
+        # Gain-independent picoamps: the gain is 1 everywhere and the dark
+        # current's error is the FX4 sequence program's bkgErr for the range
+        # in use at that point — already in pA, with no dwell-time factor.
+        n_points = len(Sample["RawData"]["UPD_array"])
+        return {"UPD_gains": np.ones(n_points),
+                "UPD_bkgErr": range_indexed_array(Sample["RawData"].get("RangeIndex"),
+                                                  Sample["RawData"].get("Bkg_err_map") or {},
+                                                  n_points)}
     # Create UPD_gains and UPD_bkgErr arrays based on the AmpGain values
     AmpGain = Sample["RawData"]["AmpGain"]
     Bkg_map = Sample["RawData"]["Bkg_map"]
-    # CONFIRMED 2026-07-08 (JIL): 1e7 Hz = Joerger scaler internal clock,
-    # correct for step scans (flyscans use a 1e6 Hz MCA clock instead).
-    TimePerPoint = Sample["RawData"]["TimePerPoint"]/ 1e7  # convert scaler counts to seconds
+    TimePerPoint = Sample["RawData"]["TimeInSec"]
     UPD_gains = np.zeros_like(AmpGain, dtype=float)
     UPD_bkgErr = np.zeros_like(AmpGain, dtype=float)
 
@@ -279,17 +296,41 @@ def  calculatedQStep(Sample):
                 
 
 def calculatePDErrorStep(Sample, isBlank=False):
-    # TODO : Igor code uses same for Setp and FLyscan... 
+    """Uncertainty of the normalised step-scan signal, for either chain."""
+    if Sample["RawData"].get("chain") == CHAIN_FX4:
+        return _calculatePDErrorStepFX4(Sample, isBlank=isBlank)
+    return _calculatePDErrorStepScaler(Sample, isBlank=isBlank)
+
+
+def _calculatePDErrorStepFX4(Sample, isBlank=False):
+    """FX4 step scan: propagate a relative current error through UPD / I0.
+
+    Unlike the fly scan, the uascan file records no per-point sigma for the
+    electrometer currents, so the counting statistics that the scaler chain
+    relied on simply are not available.  Each channel is given a relative
+    uncertainty of FX4_RELATIVE_CURRENT_ERROR, the detector channel is
+    combined in quadrature with the measured dark-current error, and the two
+    are propagated through the ratio.  This sets error bars only — the
+    intensities are untouched.
+    """
+    raw = Sample["RawData"]
+    UPD_array = np.asarray(raw["UPD_array"], dtype=float)
+    Monitor = np.asarray(raw["Monitor"], dtype=float)
+    block = Sample["BlankData"] if isBlank else Sample["reducedData"]
+    updBkg = np.asarray(block.get("UPD_bkg", 0.0), dtype=float)
+    updBkgErr = np.asarray(block.get("UPD_bkgErr", 0.0), dtype=float)
+
+    sigma_upd = np.sqrt((FX4_RELATIVE_CURRENT_ERROR * UPD_array)**2 + updBkgErr**2)
+    sigma_i0 = FX4_RELATIVE_CURRENT_ERROR * np.abs(Monitor)
+    return {"Error": ratio_error(UPD_array - updBkg, sigma_upd, Monitor, sigma_i0)}
+
+
+def _calculatePDErrorStepScaler(Sample, isBlank=False):
+    # TODO : Igor code uses same for Setp and FLyscan...
     #OK, another incarnation of the error calculations...
     UPD_array = Sample["RawData"]["UPD_array"]
     # USAXS_PD = Sample["reducedData"]["Intensity"]
-    MeasTimeCts = Sample["RawData"]["TimePerPoint"]
-    # CONFIRMED 2026-07-08 (JIL): the time-base clock differs by geometry.
-    # Step scans count time with the Joerger scaler INTERNAL 1e7 Hz clock;
-    # flyscans use the MCA with a dedicated 1e6 Hz clock source.
-    # 1e7 here and 1e6 in calculatePDErrorFly are BOTH correct — do not unify.
-    Frequency=1e7   # Joerger scaler internal clock (step scans)
-    MeasTime = MeasTimeCts/Frequency    #measurement time in seconds per point
+    MeasTime = Sample["RawData"]["TimeInSec"]    #measurement time in seconds per point
     if isBlank:
         UPD_gains=Sample["BlankData"]["UPD_gains"]
         UPD_bkgErr = Sample["BlankData"]["UPD_bkgErr"]    
@@ -320,27 +361,62 @@ def calculatePDErrorStep(Sample, isBlank=False):
 
 ## Stepscan main code here
 def importStepScan(path, filename):
-    # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
+    """Read a USAXS step-scan (uascan) NeXus file into the RawData dictionary.
+
+    Handles both counting chains (see fx4support).  The array names did NOT
+    change across the conversion — ``/entry/data/UPD`` and ``/entry/data/I0``
+    exist in both — only their units and meaning did:
+
+    * ``scaler`` — counts accumulated over ``/entry/data/seconds`` ticks of
+      the 1e7 Hz Joerger clock, to be divided by the Femto amplifier gain in
+      ``upd_autorange_controls_gain``.
+    * ``FX4``    — gain-independent mean picoamps.  There is no gain array
+      and no ``seconds`` array; the per-point amplifier range needed for the
+      dark-current lookup is ``/entry/data/fx4_autorange_lurange``.
+
+    This is the format most likely to be mis-reduced, which is why the chain
+    is taken from ``/entry/instrument/bluesky/metadata/counting_chain`` and
+    never guessed from the field names.
+    """
     with h5py.File(os.path.join(path, filename), 'r') as file:
+        chain = detect_counting_chain(file)
         #read various data sets
         #AR angle
-        dataset = file['/entry/data/a_stage_r'] 
-        ARangles = np.ravel(np.array(dataset))         
-        #time per point
-        dataset = file['/entry/data/seconds'] 
-        TimePerPoint = np.ravel(np.array(dataset))         
-        # I0 gain
-        dataset = file['/entry/data/I0_autorange_controls_gain'] 
-        I0gain = np.ravel(np.array(dataset)) 
+        dataset = file['/entry/data/a_stage_r']
+        ARangles = np.ravel(np.array(dataset))
+        n_points = len(ARangles)
+        RangeIndex = None
+        Bkg_err_map = None
+        if chain == CHAIN_FX4:
+            # No 'seconds' column: the FX4 mean is time-independent, so the
+            # writer records none.  Reconstruct the requested count time from
+            # the plan arguments — it is used for reporting only.
+            TimePerPoint = _fx4StepCountTime(file, n_points)
+            # Gain-independent picoamps: the gain the scaler chain divided out
+            # is exactly 1 here, for both detector and monitor.
+            I0gain = np.ones(n_points)
+            AmpGain = np.ones(n_points)
+            RangeIndex = np.ravel(np.array(file['/entry/data/fx4_autorange_lurange'])) \
+                if '/entry/data/fx4_autorange_lurange' in file else None
+            if RangeIndex is None:
+                logging.warning(f"{filename}: FX4 step scan without "
+                                "fx4_autorange_lurange; no dark-current subtraction.")
+        else:
+            #time per point
+            dataset = file['/entry/data/seconds']
+            TimePerPoint = np.ravel(np.array(dataset))
+            # I0 gain
+            dataset = file['/entry/data/I0_autorange_controls_gain']
+            I0gain = np.ravel(np.array(dataset))
+            #Arrays for gains during data collection
+            dataset = file['/entry/data/upd_autorange_controls_gain']
+            AmpGain = np.ravel(np.array(dataset))
         #I0 - Monitor (new name: I0, old name: I0_USAXS)
         dataset = file['/entry/data/I0'] if '/entry/data/I0' in file else file['/entry/data/I0_USAXS']
         Monitor = np.ravel(np.array(dataset))
         #UPD (new name: UPD, old name: PD_USAXS)
         dataset = file['/entry/data/UPD'] if '/entry/data/UPD' in file else file['/entry/data/PD_USAXS']
         UPD_array = np.ravel(np.array(dataset))
-        #Arrays for gains during data collection
-        dataset = file['/entry/data/upd_autorange_controls_gain'] 
-        AmpGain = np.ravel(np.array(dataset))
         #metadata
         keys_to_keep = ['SAD_mm', 'SDD_mm', 'thickness', 'title', 'useSBUSAXS',
                         'intervals', 'VToFFactor'
@@ -391,40 +467,131 @@ def importStepScan(path, filename):
         sample_dict['thickness'] = SampleThickness
 
         # now backgrounds for UPD subtraction later
-        # these are the locations of the background values... 
-        # /entry/instrument/bluesky/streams/baseline/I0_autorange_controls_ranges_gain0_background/value, it is array of start adn end values. 
-        Bkg0 = file["/entry/instrument/bluesky/streams/baseline/upd_autorange_controls_ranges_gain0_background/value"][0]
-        Bkg1 = file["/entry/instrument/bluesky/streams/baseline/upd_autorange_controls_ranges_gain1_background/value"][0]
-        Bkg2 = file["/entry/instrument/bluesky/streams/baseline/upd_autorange_controls_ranges_gain2_background/value"][0]
-        Bkg3 = file["/entry/instrument/bluesky/streams/baseline/upd_autorange_controls_ranges_gain3_background/value"][0]
-        Bkg4 = file["/entry/instrument/bluesky/streams/baseline/upd_autorange_controls_ranges_gain4_background/value"][0]
-        # Create a dictionary to map AmpGain values to their corresponding background values
-        Bkg_map = {
-            "1e4": Bkg0,
-            "1e6": Bkg1,
-            "1e8": Bkg2,
-            "1e10": Bkg3,
-            "1e12": Bkg4
-        }
+        baseline = "/entry/instrument/bluesky/streams/baseline/"
+        if chain == CHAIN_FX4:
+            # FX4 dark currents, in pA, keyed by the range index 0-4 that
+            # fx4_autorange_lurange reports at each point.  The Femto
+            # upd_autorange_controls_* records still exist in the baseline but
+            # are stale on this chain — do not read them.
+            Bkg_map = {}
+            Bkg_err_map = {}
+            for i in range(5):
+                bkg = f"{baseline}fx4_autorange_ranges_range{i}_background/value"
+                err = f"{baseline}fx4_autorange_ranges_range{i}_background_error/value"
+                Bkg_map[i] = float(file[bkg][0]) if bkg in file else 0.0
+                Bkg_err_map[i] = float(file[err][0]) if err in file else 0.0
+        else:
+            # these are the locations of the background values...
+            # /entry/instrument/bluesky/streams/baseline/I0_autorange_controls_ranges_gain0_background/value, it is array of start adn end values.
+            Bkg0 = file[f"{baseline}upd_autorange_controls_ranges_gain0_background/value"][0]
+            Bkg1 = file[f"{baseline}upd_autorange_controls_ranges_gain1_background/value"][0]
+            Bkg2 = file[f"{baseline}upd_autorange_controls_ranges_gain2_background/value"][0]
+            Bkg3 = file[f"{baseline}upd_autorange_controls_ranges_gain3_background/value"][0]
+            Bkg4 = file[f"{baseline}upd_autorange_controls_ranges_gain4_background/value"][0]
+            # Create a dictionary to map AmpGain values to their corresponding background values
+            Bkg_map = {
+                "1e4": Bkg0,
+                "1e6": Bkg1,
+                "1e8": Bkg2,
+                "1e10": Bkg3,
+                "1e12": Bkg4
+            }
     # Call the function with your arrays
     check_arrays_same_length(ARangles, TimePerPoint, Monitor, UPD_array)
     #Package these results into dictionary
     data_dict = {"filename": os.path.splitext(filename)[0],
-                "ARangles":ARangles, 
-                "TimePerPoint": TimePerPoint, 
-                "Monitor":Monitor, 
+                "chain": chain,
+                "ARangles":ARangles,
+                "TimePerPoint": TimePerPoint,
+                "TimeInSec": (TimePerPoint if chain == CHAIN_FX4
+                              else TimePerPoint / JOERGER_CLOCK_HZ),
+                "Monitor":Monitor,
                 "UPD_array": UPD_array,
                 "AmpGain": AmpGain,
                 "I0gain": I0gain,
-                "VToFFactor": 1e6,  # this is hardwired to 1e6, mca1 frequency
+                "RangeIndex": RangeIndex,
+                # V/F converter factor; meaningless on the FX4 chain, where the
+                # electrometer reports current directly.
+                "VToFFactor": 1.0 if chain == CHAIN_FX4 else 1e6,
                 "sample": sample_dict,
                 "metadata": metadata_dict,
                 "instrument": instrument_dict,
                 "Bkg_map": Bkg_map,
+                "Bkg_err_map": Bkg_err_map,
                 }
     return data_dict
-    
+
+
+def _fx4StepCountTime(file, n_points):
+    """Per-point count time for an FX4 uascan, in seconds.
+
+    The FX4 reading is a mean current, so the writer records no ``seconds``
+    column.  ``uascan`` computes the dwell from ``count_time`` and, when
+    ``useDynamicTime`` is set, scales it by thirds across the scan (base/3
+    over the first third, base over the second, 2*base over the last).  That
+    is reproduced here.  The value is informational — nothing in the FX4
+    reduction divides by it.
+    """
+    md_path = "/entry/instrument/bluesky/metadata/"
+    count_time = None
+    if md_path + "plan_args" in file:
+        text = str(as_scalar(file[md_path + "plan_args"][()]))
+        match = re.search(r"count_time:\s*([0-9.eE+-]+)", text)
+        if match:
+            try:
+                count_time = float(match.group(1))
+            except ValueError:
+                count_time = None
+    if count_time is None or count_time <= 0:
+        logging.warning("FX4 step scan: no usable count_time in plan_args; "
+                        "reporting 1 s per point.")
+        return np.ones(n_points)
+
+    dynamic = str(as_scalar(file[md_path + "useDynamicTime"][()])).strip().lower() == "true" \
+        if md_path + "useDynamicTime" in file else False
+    if not dynamic:
+        return np.full(n_points, count_time)
+
+    intervals = as_scalar(file[md_path + "intervals"][()]) if md_path + "intervals" in file else None
+    intervals = float(intervals) if intervals else float(n_points)
+    fraction = np.arange(n_points) / max(intervals, 1.0)
+    times = np.full(n_points, count_time)
+    times[fraction < 0.33] = count_time / 3
+    times[fraction >= 0.66] = count_time * 2
+    return times
+
+
 def CorrectUPDGainsStep(data_dict):
+    """Normalised step-scan detector signal, for either counting chain."""
+    if data_dict["RawData"].get("chain") == CHAIN_FX4:
+        return _CorrectUPDStepFX4(data_dict)
+    return _CorrectUPDGainsStepScaler(data_dict)
+
+
+def _CorrectUPDStepFX4(data_dict):
+    """FX4 step scan: I = (UPD - dark) / I0, both in picoamps.
+
+    No gain term and no dwell term — the FX4 reports a gain-independent mean
+    current.  The dark current is looked up per point from
+    ``fx4_autorange_lurange``; unlike the fly scan, the uascan file does
+    record the range at every point.
+
+    Also unlike the scaler chain, there is no one-point gain shift to undo:
+    the Femto gain readback lagged its own range change, while the FX4 range
+    is read in the same event document as the current.
+    """
+    raw = data_dict["RawData"]
+    UPD_array = np.asarray(raw["UPD_array"], dtype=float)
+    Monitor = np.asarray(raw["Monitor"], dtype=float)
+    n_points = len(UPD_array)
+
+    Bckg_corr = range_indexed_array(raw.get("RangeIndex"),
+                                    raw.get("Bkg_map") or {}, n_points)
+    return {"Intensity": (UPD_array - Bckg_corr) / Monitor,
+            "UPD_bkg": Bckg_corr}
+
+
+def _CorrectUPDGainsStepScaler(data_dict):
         # here we will multiply UPD by gain and divide by monitor corrected for its gain.
         # get the needed data from dictionary
     AmpGain = data_dict["RawData"]["AmpGain"]
@@ -478,7 +645,7 @@ def CorrectUPDGainsStep(data_dict):
         if background_value is None:
             background_value = 0    # unknown gain: no background subtraction
             unknown_gains.add(float(gain))
-        Bckg_corr[i] = background_value * TimePerPoint[i]/1e7  # 1e7 Hz Joerger scaler clock (confirmed, see calculatePDErrorStep)
+        Bckg_corr[i] = background_value * TimePerPoint[i]/JOERGER_CLOCK_HZ
     if unknown_gains:
         logging.warning(f"CorrectUPDGainsStep: unknown UPD amplifier gain values "
                         f"{sorted(unknown_gains)}; background set to 0 for those points.")

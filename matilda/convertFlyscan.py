@@ -148,8 +148,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                                                     Sample["reducedData"]["Q"],
                                                     Sample["reducedData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
                                                     Sample["reducedData"]["Error"],
-                                                    Sample["RawData"]["TimePerPoint"],
-                                                    replaceNans=True))
+                                                    Sample["RawData"]["TimeInSec"],
+                                                    replaceNans=True, time_base=1.0))
 
             if (
                 blankPath is not None

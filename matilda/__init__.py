@@ -45,7 +45,7 @@ matilda/convertFlyscan.py
     USAXS flyscan: HDF5 NXsas → normalised I(Q) → desmeared calibrated I(Q).
     Pipeline: importFlyscan → calculatePD_Fly → beamCenterCorrection →
               getBlankFlyscan → normalizeByTransmission →
-              calibrateAndSubtractFlyscan → desmearData → saveNXcanSAS.
+              calibrateAndSubtractFlyscan → desmear_dispatch → saveNXcanSAS.
 
 matilda/convertUSAXS.py
     USAXS step-scan: same pipeline as flyscan (identical file format).
@@ -59,6 +59,12 @@ matilda/convertSWAXS.py
 matilda/desmearing.py
     Lake / Strobl iterative slit-smearing correction.  Ported from Igor Pro.
     Entry point: desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength, …)
+
+matilda/desmearing_methods.py
+    Selectable desmearing methods behind one dispatcher with the same signature
+    and 4-tuple return as desmearData.  Default is the truncated-Abel inversion;
+    Lake and the Gaussian-process variants stay selectable.
+    Entry point: desmear_dispatch(…, method='abel'|'lake'|'gp'|…)
 
 I/O modules (future: matilda/io/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -74,6 +80,17 @@ matilda/readfromtiled.py
 
 Support modules (future: matilda/support/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matilda/fx4support.py
+    Counting-chain detection and FX4-specific arithmetic.
+    Key functions: detect_counting_chain, is_fx4, range_indexed_array,
+                   mean_of_samples, ratio_error, warn_ring_overflows.
+    12-ID-E switched from Femto + V/F + Struck scaler (counts) to FX4
+    electrometers (gain-independent picoamps) on 2026-09-26.  Every reduction
+    path reads both; which chain wrote a file comes from the counting_chain
+    marker the file carries, never from field names — UPD and I0 in the
+    step-scan file kept their names and changed their units.
+    See docs/architecture.md and bits_usaxs/docs/FX4_data_formats.md.
+
 matilda/supportFunctions.py
     Shared numerical helpers: importFlyscan, calculatePD_Fly, beamCenterCorrection,
     smooth_r_data, getBlankFlyscan, normalizeByTransmission,
@@ -224,4 +241,5 @@ BUG-01 is now fixed, so all imports below work directly::
     from matilda.convertSWAXS    import process2Ddata
     from matilda.readfromtiled   import FindLastScanData, FindLastBlankScan
     from matilda.hdf5code        import saveNXcanSAS, readMyNXcanSAS
+    from matilda.fx4support      import detect_counting_chain, is_fx4
 """

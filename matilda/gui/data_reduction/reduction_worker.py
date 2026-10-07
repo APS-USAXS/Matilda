@@ -198,9 +198,12 @@ class ReductionWorker(QThread):
                 density=params.get("density"),
                 transmission_override=params.get("transmission_override"),
                 qmin_override=params.get("qmin_override"),
-                desmear_method=params.get("desmear_method", "lake"),
+                desmear_method=params.get("desmear_method", "abel"),
                 gp_length_scale=params.get("gp_length_scale", 0.5),
                 gp_kernel=params.get("gp_kernel", "matern32"),
+                abel_auto_smooth=params.get("abel_auto_smooth", True),
+                abel_smooth_w=params.get("abel_smooth_w", 0.05),
+                abel_num_mc=params.get("abel_num_mc", 20),
             )
         elif technique == "StepScan":
             result = processStepscan(
@@ -219,9 +222,12 @@ class ReductionWorker(QThread):
                 density=params.get("density"),
                 transmission_override=params.get("transmission_override"),
                 qmin_override=params.get("qmin_override"),
-                desmear_method=params.get("desmear_method", "lake"),
+                desmear_method=params.get("desmear_method", "abel"),
                 gp_length_scale=params.get("gp_length_scale", 0.5),
                 gp_kernel=params.get("gp_kernel", "matern32"),
+                abel_auto_smooth=params.get("abel_auto_smooth", True),
+                abel_smooth_w=params.get("abel_smooth_w", 0.05),
+                abel_num_mc=params.get("abel_num_mc", 20),
             )
         elif technique in ("SAXS", "WAXS"):
             result = process2Ddata(

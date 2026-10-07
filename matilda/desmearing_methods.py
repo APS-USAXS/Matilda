@@ -2,22 +2,27 @@
 desmearing_methods.py
 =====================
 Selectable slit-desmearing methods for USAXS, with a single dispatcher that has
-the same signature/return as ``desmearing.desmearData``. Lake stays the default
-and is untouched (this module calls it); the new options are Gaussian-process
-(GP / "Huang") desmearing, which suppress noise and stay physical (smooth,
-positive) on weak / near-zero / over-subtracted data where Lake produces spikes.
+the same signature/return as ``desmearing.desmearData``. The default is the
+truncated-Abel inversion; the historical Lake iteration is still available
+unchanged, as are the Gaussian-process (GP / "Huang") variants, which suppress
+noise and stay physical (smooth, positive) on weak / near-zero / over-subtracted
+data where Lake produces spikes.
 
 Public entry point
 ------------------
     desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength, *,
-                     method='lake', length_scale_decades=0.5, kernel='matern32',
+                     method='abel', length_scale_decades=0.5, kernel='matern32',
                      sigma_log=4.0, extrap_method='PowerLaw w flat',
-                     extrap_qstart=None, max_iter=20)
+                     extrap_qstart=None, max_iter=20,
+                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20)
         -> (DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ)
 
 Methods
 -------
-    'lake'          : the existing Matilda Lake iterative desmearing (unchanged).
+    'abel'          : analytical truncated-Abel inversion with the exact
+                      finite-slit correction (default). Non-iterative, linear in
+                      the data, Monte-Carlo uncertainties.
+    'lake'          : the historical Matilda Lake iterative desmearing (unchanged).
     'gp'            : Bayesian GP desmearing (multiplicative model, credibility
                       band -> DSM_Error). kernel 'matern32' (default, robust on
                       featured data) or 'rbf' (very smooth, featureless data).
@@ -27,6 +32,8 @@ Numpy-only; no new dependencies. Developed and validated in the 'Better
 desmearing' sandbox (see that project's PLAN / FINDINGS).
 """
 from __future__ import annotations
+
+import logging
 
 import numpy as np
 
@@ -274,6 +281,213 @@ def _gp_core(q, y, err, slit_length, length_scale_decades=0.5, sigma_log=4.0,
     return q, I, err_lin, lower, upper
 
 
+# ---------------------------------------------------------------------------
+# Truncated-Abel desmearing (Huang et al.) with the exact finite-slit correction
+# ---------------------------------------------------------------------------
+# Reference: G.-R. Huang et al., "Analytical desmearing of Bonse-Hart USANS data
+# via truncated Abel inversion" (J. Appl. Cryst.). The paper's Eq. 15 assumes
+# Q << slit length; for USAXS that is not true and it is wrong by up to ~5% near
+# Q ~ slit length. The exact finite-slit relation adds one term:
+#
+#   I(Q) = -(2 L/pi) T1(Q) + T2(Q)
+#   T1(Q) = \int_Q^{sqrt(Q^2+L^2)}   Ismr'(x) / sqrt(x^2 - Q^2) dx
+#   T2(Q) = (2/pi) \int_0^{pi/2} I( sqrt(Q^2 + 2 L^2/(1+sin u)) ) du
+#
+# T2 only needs the desmeared I at s >= sqrt(Q^2+L^2) > Q, so the whole curve is
+# obtained by one sweep from the highest Q downwards — no iteration, no global
+# solve, and the result is *linear* in the smeared data.
+# Full derivation and validation: docs/new_desmearing.md.
+
+def _abel_smooth_local_linear(q, y, w, use_log=None):
+    """Gaussian-weighted local-linear regression of y against ln q.
+
+    Width ``w`` is in ln q units (w = 0.1 is roughly +-10% in Q). Local-linear
+    rather than a plain Gaussian average because an average is biased at the
+    ends of the range and on steep power laws, which is exactly where USAXS
+    data live. Operates on ln y when the data are strictly positive.
+    """
+    x = np.log(np.asarray(q, float))
+    y = np.asarray(y, float)
+    n = len(x)
+    if use_log is None:
+        use_log = bool(np.all(y > 0))
+    yy = np.log(y) if use_log else y
+    half = 4.0 * w
+    lo_i = np.searchsorted(x, x - half, side="left")
+    hi_i = np.searchsorted(x, x + half, side="right")
+    out = np.empty(n)
+    for i in range(n):
+        a, b = lo_i[i], hi_i[i]
+        if b - a < 3:
+            a, b = max(0, i - 1), min(n, i + 2)
+        dx = x[a:b] - x[i]
+        wt = np.exp(-0.5 * (dx / w) ** 2)
+        yw = yy[a:b]
+        S0 = wt.sum(); S1 = (wt * dx).sum(); S2 = (wt * dx * dx).sum()
+        T0 = (wt * yw).sum(); T1 = (wt * dx * yw).sum()
+        det = S0 * S2 - S1 * S1
+        out[i] = (T0 * S2 - T1 * S1) / det if det > 1e-12 * S0 * S2 else T0 / S0
+    return np.exp(out) if use_log else out
+
+
+# median of a chi^2_1 variate; divides median(r^2) into a reduced-chi^2 estimate
+_CHI2_1_MEDIAN = 0.45493642311957275
+
+
+def _abel_find_smooth_width(q, y, err, w_min=0.002, w_max=0.5, target_chi2=1.0,
+                            n_bisect=18):
+    """Largest smoothing width whose reduced chi^2 against the measured points is
+    still <= target (the paper's Step 4). chi^2 grows monotonically with w, so a
+    bisection in ln w is enough. Returns (width, chi2).
+
+    The statistic is the *robust* reduced chi^2, median(r^2)/median(chi^2_1), not
+    the mean. Real USAXS curves carry a few outliers (bad points, a sharp feature
+    the local-linear fit cannot follow), and under the mean two or three of them
+    reach chi^2 = 1 on their own, which collapses the width to no smoothing at
+    all and gives back Lake-like noise.
+    """
+    use_log = bool(np.all(y > 0))
+
+    def chi2(w):
+        r = (_abel_smooth_local_linear(q, y, w, use_log=use_log) - y) / err
+        return float(np.median(r * r) / _CHI2_1_MEDIAN)
+
+    c_hi = chi2(w_max)
+    if c_hi <= target_chi2:
+        return w_max, c_hi
+    c_lo = chi2(w_min)
+    if c_lo > target_chi2:
+        return w_min, c_lo
+    for _ in range(n_bisect):
+        mid = np.sqrt(w_min * w_max)
+        if chi2(mid) <= target_chi2:
+            w_min, c_lo = mid, chi2(mid)
+        else:
+            w_max = mid
+    return w_min, c_lo
+
+
+def _abel_extend(q, I, err, sl, extrap_method, extrap_qstart, n_ext=24):
+    """Extend the smeared curve past Qmax on a dense log grid.
+
+    The inversion needs I up to sqrt(Qmax^2 + 2 L^2), about 1% past Qmax. Reuse
+    Lake's ``extendData`` so the user-chosen extrapolation function and Q start
+    mean the same thing for both methods, then resample its (very sparse, linear)
+    extension onto ``n_ext`` log-spaced points so the T2 quadrature near Qmax has
+    something to interpolate."""
+    from .desmearing import extendData
+
+    n0 = len(q)
+    qstart = extrap_qstart if extrap_qstart else q[-1] / 1.5
+    qstart = min(float(qstart), q[-1] / 1.5)
+    qx, Ix, _, failed = extendData(q.copy(), I.copy(), np.abs(err).copy(),
+                                   sl, qstart, extrap_method)
+    q_top = np.sqrt(q[-1] ** 2 + 2.0 * sl ** 2) * 1.001
+    if failed or len(qx) <= n0 or not np.all(np.isfinite(Ix[n0:])):
+        logging.warning("Abel desmearing: high-Q extension failed, using a flat tail.")
+        qx, Ix = np.array([q[-1], q_top]), np.array([I[-1], I[-1]])
+        n0x = 1
+    else:
+        q_top = max(float(qx[-1]), q_top)
+        n0x = n0
+    q_ext = np.exp(np.linspace(np.log(q[-1]), np.log(q_top), n_ext + 1)[1:])
+    I_ext = np.interp(q_ext, qx[n0x - 1:], Ix[n0x - 1:])
+    return np.concatenate([q, q_ext]), np.concatenate([I, I_ext])
+
+
+def _abel_invert(qe, Is, sl, n_orig, nu=64):
+    """One downward sweep of the exact finite-slit Abel inversion.
+
+    ``qe``/``Is`` are the extended Q grid and the (smoothed) smeared intensity;
+    the first ``n_orig`` points are measured. T1 is integrated analytically per
+    segment with Ismr taken piecewise linear, which handles the 1/sqrt(x^2-Q^2)
+    singularity at x = Q exactly. T2 is a midpoint rule in u."""
+    qe = np.asarray(qe, float)
+    Is = np.asarray(Is, float)
+    n = len(qe)
+    Id = np.full(n, np.nan)
+    slope = np.diff(Is) / np.diff(qe)
+    # Start values in the extension, where Q >> slit length and the paper's
+    # first-order Eq. 7 is good to ~0.01%.
+    Id[n_orig:] = Is[n_orig:] - sl ** 2 / (6.0 * qe[n_orig:]) * np.gradient(Is, qe)[n_orig:]
+    sinu = np.sin((np.arange(nu) + 0.5) * (np.pi / (2.0 * nu)))
+    seg = np.arange(n - 1)
+    for i in range(n_orig - 1, -1, -1):
+        Q = qe[i]
+        Qm = np.hypot(Q, sl)
+        j = seg[i:][qe[i:n - 1] < Qm]
+        if j.size:
+            top = np.minimum(qe[j + 1], Qm)
+            T1 = float(np.sum(slope[j] * (np.arccosh(np.maximum(top / Q, 1.0))
+                                          - np.arccosh(np.maximum(qe[j] / Q, 1.0)))))
+        else:
+            T1 = 0.0
+        s = np.sqrt(Q * Q + 2.0 * sl * sl / (1.0 + sinu))
+        # Nodes that land inside [qe[i], qe[i+1]] depend on the unknown Id[i];
+        # keeping that dependence implicit (instead of clamping to Id[i+1])
+        # removes a systematic drift of several percent at high Q.
+        inb = s < qe[i + 1]
+        a = np.where(inb, (qe[i + 1] - s) / (qe[i + 1] - qe[i]), 0.0)
+        known = np.where(inb, (1.0 - a) * Id[i + 1], np.interp(s, qe[i + 1:], Id[i + 1:]))
+        Id[i] = (-2.0 * sl / np.pi * T1 + known.mean()) / (1.0 - a.mean())
+    return Id
+
+
+def _abel_core(q, y, err, slit_length, *, auto_smooth=True, smooth_w=0.05,
+               num_mc=20, extrap_method="PowerLaw w flat", extrap_qstart=None,
+               nu=64, n_ext=24, seed=None):
+    """Truncated-Abel desmearing end to end. Returns (q, I, Error)."""
+    q = np.asarray(q, float)
+    y = np.asarray(y, float)
+    err = np.asarray(err, float) if err is not None else np.full(q.shape, np.nan)
+    m = np.isfinite(q) & (q > 0) & np.isfinite(y)
+    if err.shape == m.shape:
+        err = err[m]
+    else:
+        err = np.full(int(m.sum()), np.nan)
+    q, y = q[m], y[m]
+    keep = np.concatenate([[True], np.diff(q) > 0])
+    q, y, err = q[keep], y[keep], err[keep]
+    sl = float(slit_length)
+    n0 = len(q)
+
+    good = np.isfinite(err) & (err > 0)
+    if good.any():
+        err = np.where(good, err, np.median(err[good]))
+    else:
+        err = np.full(n0, 0.01 * np.median(np.abs(y)) + 1e-300)
+
+    if auto_smooth:
+        w, chi2 = _abel_find_smooth_width(q, y, err)
+    else:
+        w, chi2 = float(smooth_w), np.nan
+    use_log = bool(np.all(y > 0))
+    Is = _abel_smooth_local_linear(q, y, w, use_log=use_log) if w > 0 else y.copy()
+    logging.info(f"Abel desmearing: smoothing width {w:.4f} (ln q), chi2 {chi2:.2f}, "
+                 f"{n0} points, slit {sl:g} 1/A.")
+
+    qe, Ise = _abel_extend(q, Is, err, sl, extrap_method, extrap_qstart, n_ext=n_ext)
+    Id = _abel_invert(qe, Ise, sl, n0, nu=nu)[:n0]
+
+    if num_mc and num_mc >= 2:
+        # The inversion is linear in Ismr, so Monte Carlo over the measured
+        # points (the high-Q extension is held fixed) propagates the smoothing
+        # as well, which no analytic shortcut does.
+        rng = np.random.default_rng(seed)
+        tail = Ise[n0:]
+        draws = np.empty((int(num_mc), n0))
+        for k in range(int(num_mc)):
+            yk = y + rng.normal(0.0, err)
+            Isk = _abel_smooth_local_linear(q, yk, w, use_log=use_log) if w > 0 else yk
+            draws[k] = _abel_invert(np.concatenate([q, qe[n0:]]),
+                                    np.concatenate([Isk, tail]), sl, n0, nu=nu)[:n0]
+        dsm_err = draws.std(axis=0, ddof=1)
+    else:
+        from .desmearing import calculateErrors
+        dsm_err = np.abs(calculateErrors(err, y, Id, q))
+    return q, Id, dsm_err
+
+
 def _match_dq(SMR_dQ, q_in, q_out):
     if SMR_dQ is None:
         return None
@@ -289,15 +503,24 @@ def _match_dq(SMR_dQ, q_in, q_out):
 # Dispatcher — same signature/return as desmearData
 # ---------------------------------------------------------------------------
 def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
-                     method="lake", length_scale_decades=0.5, kernel="matern32",
+                     method="abel", length_scale_decades=0.5, kernel="matern32",
                      sigma_log=4.0, extrap_method="PowerLaw w flat",
-                     extrap_qstart=None, max_iter=20):
+                     extrap_qstart=None, max_iter=20,
+                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20):
     """Desmear with the selected method. Returns (DSM_Qvec, DSM_Int, DSM_Error,
-    DSM_dQ). method='lake' reproduces the current Matilda behaviour exactly."""
+    DSM_dQ). method='lake' reproduces the historical Matilda behaviour exactly."""
     if SMR_Int is None or len(SMR_Int) == 0 or slitLength is None:
         return None, None, None, None
 
-    method = (method or "lake").lower()
+    method = (method or "abel").lower()
+
+    if method in ("abel", "truncated_abel", "huang_abel"):
+        q, I, E = _abel_core(
+            SMR_Qvec, SMR_Int, SMR_Error, slitLength,
+            auto_smooth=abel_auto_smooth, smooth_w=abel_smooth_w,
+            num_mc=abel_num_mc, extrap_method=extrap_method,
+            extrap_qstart=extrap_qstart)
+        return q, I, E, _match_dq(SMR_dQ, SMR_Qvec, q)
 
     if method in ("lake", "strobl", ""):
         from .desmearing import desmearData
@@ -339,11 +562,13 @@ def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
         return q, I, sd, _match_dq(SMR_dQ, SMR_Qvec, q)
 
     raise ValueError(f"unknown desmear method {method!r} "
-                     "(valid: lake, gp, gp_rbf, gp_lake_mean)")
+                     "(valid: abel, lake, lake_smooth, gp, gp_rbf, gp_lake_mean)")
 
 
-# Map GUI display strings -> (method_key, kernel_key)
+# Map GUI display strings -> (method_key, kernel_key). First entry is the
+# combo-box default.
 GUI_METHOD_MAP = {
+    "Truncated Abel":       ("abel", "matern32"),
     "Lake":                 ("lake", "matern32"),
     "Lake (smoothed)":      ("lake_smooth", "matern32"),
     "Huang GP":             ("gp", "matern32"),

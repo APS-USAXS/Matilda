@@ -8,13 +8,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] — 0.3.0.dev0
 
 ### Added
+- **Truncated-Abel desmearing** (`desmearing_methods.py`, `method='abel'`): an
+  analytical, non-iterative inversion of the slit integral, with the exact
+  finite-slit correction to Huang *et al.*'s Eq. 15 (their form is off by up to
+  ~5% near Q ≈ slit length for USAXS). Linear in the data, so uncertainties come
+  from Monte Carlo over the measured points. Mandatory smoothing is a
+  Gaussian-weighted local-linear regression in ln Q whose width is chosen
+  automatically for a robust (median-based) reduced χ² ≈ 1 — the mean-based
+  form the paper prescribes is driven to zero width by a couple of outliers on
+  real data, which gives back Lake-like noise. On synthetic data its rms error is several
+  times smaller than Lake's at the same noise level. Parameters
+  `abel_auto_smooth` / `abel_smooth_w` / `abel_num_mc` are plumbed through both
+  converters and exposed in the reduction GUI. Derivation and validation in
+  `docs/new_desmearing.md`; implementation notes in `docs/desmearing-methods.md`.
 - **Selectable desmearing methods** (`desmearing_methods.py`): `desmear_dispatch()`
-  offers `lake` (default, unchanged behaviour), `gp` (Huang Gaussian-process,
+  offers `lake` (unchanged behaviour), `gp` (Huang Gaussian-process,
   Matérn/RBF, resolution-aware prior, posterior 1σ returned as `DSM_Error`) and
   `gp_lake_mean`; the converters take `desmear_method` / `gp_length_scale` /
   `gp_kernel`, the reduction GUI exposes them. See `docs/desmearing-methods.md`.
 
 ### Changed
+- **The default desmearing method is now truncated Abel, not Lake.** This
+  changes `desmear_dispatch`, `processFlyscan`, `processStepscan`, the reduction
+  worker and the GUI dropdown — and therefore the production daemon, which does
+  not pass the argument. Lake is still selectable and still bit-for-bit
+  identical to the historical path.
 - **Single Qt import point, `matilda/gui/_qt.py`** (house standard, matches
   pyirena and MailToVault). Nine `try: from PySide6 … except ImportError: from
   PyQt6 …` blocks across the GUI package — plus two inline ones in the middle

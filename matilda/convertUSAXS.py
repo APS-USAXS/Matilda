@@ -57,7 +57,8 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                      extrap_qstart=0.15, minQMinFindRatio=1.05, thickness_override=None,
                      use_mu=False, mu=None, per_gram=False, density=None,
                      transmission_override=None, qmin_override=None,
-                     desmear_method='lake', gp_length_scale=0.5, gp_kernel='matern32'):
+                     desmear_method='abel', gp_length_scale=0.5, gp_kernel='matern32',
+                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
 
     Structurally identical to processFlyscan() (convertFlyscan module) —
@@ -146,7 +147,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter)
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc)
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,

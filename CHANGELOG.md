@@ -122,11 +122,12 @@ the self-referencing K-factor predicts.
 - **FX4 step-scan uncertainties are modelled, not measured.** The uascan file
   records no per-point sigma for the currents, so
   `fx4support.FX4_RELATIVE_CURRENT_ERROR` (1%) stands in. Error bars only.
-- **FX4 fly-scan uncertainties are optimistic by 3-4x.** `upd_sigma`/√N came
-  out consistently below the observed point-to-point scatter of I(q) on the
-  first real fly scans. √N assumes independent samples; the FX4's are filtered
-  averages of `ValuesPerRead` raw readings, so the effective N is smaller.
-  Calibrate against repeat scans before relying on the bars.
+- **FX4 fly-scan uncertainties: characterised, see above.** The per-raw-point
+  estimate is 3-5x optimistic, but the pipeline then under-propagates the
+  noise reduction by a similar factor, so the delivered SMR error bars are
+  right to within ~30%. Both halves should be fixed together, not separately
+  (`FX4_USE_EFFECTIVE_SAMPLES`, and carrying an effective sample count through
+  `smooth_r_data`).
 - **The FX4 fly scan records the amplifier range once, after the scan.** There
   is no per-point range, so one dark current is subtracted throughout and the
   amplifier dead-time masking the scaler chain did from

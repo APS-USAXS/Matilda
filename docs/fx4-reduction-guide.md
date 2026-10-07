@@ -371,6 +371,106 @@ Two notes from the Python/Igor comparison:
   signal-derived differ by ≤0.24% in the steepest band and 0.00% elsewhere.
   Switch 3 is about not over-smoothing real structure, not about fixing a bias.
 
+### 3.11 Igor implementation of the three switches
+
+**Index base differs between the two codes.** Igor's `PD_range` is 1–5 and
+indexes `rwave_smooth_times` 1-based; Python's `UPD_gainsIndx` is 0–4. Same
+five times, `[0.02, 0.02, 0.03, 0.1, 0.4]`, same order. Everything below is
+written in Igor's 1-based convention.
+
+**Globals.** Create once, in the package data folder, so the three can be
+toggled from a panel while comparing against Matilda:
+
+```igor
+Function FX4_InitNoiseGlobals()
+    DFREF saveDF = GetDataFolderDFR()
+    NewDataFolder/O/S root:Packages
+    NewDataFolder/O/S root:Packages:Indra3
+    Variable/G FX4SignalDerivedRange  = 1      // switch 3, on
+    Variable/G FX4ErrorOfMeanOnRebin  = 1      // switch 1, on
+    Variable/G FX4UseEffectiveSamples = 0      // switch 2, OFF — see 3.10
+    SetDataFolder saveDF
+End
+```
+
+**Switch 3 — pseudo-range from the signal.** Call this where the FX4 branch
+builds `PD_range`, in place of filling it from `upd_lurange`. No loop needed:
+
+```igor
+Static Function FX4_SignalDerivedRange(WAVE PD_range, WAVE USAXS_PD)
+    // USAXS_PD is the RAW upd_current, BEFORE dark-current subtraction.
+    NVAR/Z on = root:Packages:Indra3:FX4SignalDerivedRange
+    if (!NVAR_Exists(on) || !on)
+        return 0                                // leave PD_range as found
+    endif
+    Redimension/S PD_range
+    PD_range = 5
+    PD_range = (USAXS_PD[p] >    30) ? 4 : PD_range[p]
+    PD_range = (USAXS_PD[p] >   800) ? 3 : PD_range[p]
+    PD_range = (USAXS_PD[p] > 12000) ? 2 : PD_range[p]
+    PD_range = (USAXS_PD[p] >   1e6) ? 1 : PD_range[p]
+    return 1
+End
+```
+
+This is your own thresholds, unchanged. Thresholds are on the raw
+`upd_current` in the file's own units — do **not** rescale to pA or nA, the
+numbers were chosen against the recorded values.
+
+Then **drop the separate start-point guard**:
+
+```igor
+// startpoint = ceil(binarySearchInterp(Intensity, 0.00001*wavemax(Intensity)))
+// For(i=startpoint; ...)                       // no longer needed
+```
+
+Keep whatever q-based start the scaler chain already used. The two give
+identical output (verified in Python), and one knob is easier to reason about
+when a sample behaves oddly.
+
+**Switch 1 — error of the mean on rebinning.** In the rebinning routine (the
+one that log-bins above Q = 0.0002), the error accumulator currently is
+
+```
+Rebinned_Sdev[i] += Sdev[j]^2           // inside the bin loop
+Rebinned_Sdev[i]  = sqrt(Rebinned_Sdev[i] / cntPoints)
+```
+
+Change the final line to divide by `cntPoints^2` when the switch is on:
+
+```igor
+    NVAR/Z eom = root:Packages:Indra3:FX4ErrorOfMeanOnRebin
+    Variable useEOM = (NVAR_Exists(eom) && eom && isFX4)
+    ...
+    if (cntPoints > 0)
+        Variable denom = useEOM ? cntPoints^2 : cntPoints
+        Rebinned_Sdev[i] = sqrt(Rebinned_Sdev[i] / denom)
+    endif
+```
+
+`isFX4` must be threaded in from the chain detection — **this must not fire on
+scaler-chain data**, or every historical result moves.
+
+**Switch 2 — leave it off.** For completeness, when you do want to try it, it
+is one line in the sigma-of-the-mean step of §3.7:
+
+```igor
+    NVAR/Z eff = root:Packages:Indra3:FX4UseEffectiveSamples
+    Variable vpr = 1
+    if (NVAR_Exists(eff) && eff)
+        vpr = max(FX4_ReadScalar(fileID, "values_per_read", 1), 1)
+    endif
+    N_upd = max(N_upd / vpr, 1)
+    N_i0  = max(N_i0  / vpr, 1)
+```
+
+**What to look at when comparing.** Switch 3 changes the *intensities*
+slightly (less smoothing), so compare `R` vs `AR` before and after on a log
+axis — the high-q tail should get visibly noisier and no feature should move.
+Switches 1 and 2 change **only the error bars**; the intensities must be
+identical to the last digit. If an intensity moves when you toggle 1 or 2,
+something is wired wrong.
+
 ### 3.9 Ring-overflow check
 
 If `ring_overflows` or `ring_overflows_I0` is non-zero, the FX4 driver's ring

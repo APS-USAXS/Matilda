@@ -17,9 +17,11 @@ from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, read
 # canonical copies of the dict helpers live in hdf5code; re-exported here
 # because convertUSAXS/convertSWAXS historically import them from this module
 from .hdf5code import read_group_to_dict, filter_nested_dict, USAXS_METADATA_KEYS
+from . import fx4support          # the FX4_* switches are read through this
 from .fx4support import (CHAIN_FX4, CHAIN_SCALER, FX4_RELATIVE_CURRENT_ERROR,
-                         detect_counting_chain, lookup_many, mean_of_samples,
-                         range_indexed_array, ratio_error, warn_ring_overflows)
+                         as_scalar, detect_counting_chain, lookup_many,
+                         mean_of_samples, range_indexed_array, ratio_error,
+                         signal_derived_range_index, warn_ring_overflows)
 
 #this is to enable graphs in R data clacualtion for debugging. 
 debugme = 0
@@ -628,6 +630,17 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
     updBkg = np.asarray(block.get("UPD_bkg", 0.0), dtype=float)
     updBkgErr = np.asarray(block.get("UPD_bkgErr", 0.0), dtype=float)
 
+    # Independent samples behind each reported mean (FX4 switch 2): the
+    # electrometer pre-averages `values_per_read` raw readings, so N/vpr of the
+    # N = total/mean raw samples are independent.
+    vpr = 1.0
+    if fx4support.FX4_USE_EFFECTIVE_SAMPLES:
+        vpr = float(as_scalar(raw["metadata"].get("values_per_read", 1.0)) or 1.0)
+        if vpr <= 1.0:
+            logging.info("FX4 fly scan: no usable values_per_read; sigma of the "
+                         "mean uses the raw sample count.")
+            vpr = 1.0
+
     def _sigma_of_mean(sigma, total, mean, label):
         # Flat relative error, used where the electrometer gives us nothing.
         fallback = FX4_RELATIVE_CURRENT_ERROR * np.abs(mean)
@@ -638,7 +651,7 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
         samples = mean_of_samples(total, mean)
         if samples is None:
             samples = np.ones_like(mean)
-        out = np.asarray(sigma, dtype=float) / np.sqrt(samples)
+        out = np.asarray(sigma, dtype=float) / np.sqrt(np.maximum(samples / vpr, 1.0))
         # Real files carry a few NaNs in the sigma arrays (seen on the first
         # commissioning fly scans).  Without this they would propagate to a
         # zero error, which reads as an infinitely well known point.
@@ -751,10 +764,14 @@ def _calculatePD_FlyFX4(data_dict):
                      "subtraction applied.")
     updBkg = range_indexed_array(range_index, bkg_table, num_elements)
     updBkgErr = range_indexed_array(range_index, bkgErr_table, num_elements)
-    # Range index kept per point so the downstream smoothing sees a constant
-    # range (it then always takes the plain trapezoid-average branch).
-    GainsIndx = range_indexed_array(range_index, {i: i for i in range(5)},
-                                    num_elements, default=np.nan)
+    # Smoothing range index.  upd_lurange is one post-scan value, so using it
+    # directly puts every point on the slowest smoothing time; derive a
+    # pseudo-range from the signal level instead (FX4 switch 3).
+    if fx4support.FX4_SIGNAL_DERIVED_SMOOTHING_RANGE:
+        GainsIndx = signal_derived_range_index(UPD_array)
+    else:
+        GainsIndx = range_indexed_array(range_index, {i: i for i in range(5)},
+                                        num_elements, default=np.nan)
 
     PD_Intensity = (UPD_array - updBkg) / Monitor
     PD_Intensity = _fixNegativeFlyIntensities(PD_Intensity)
@@ -918,11 +935,14 @@ def _calculatePD_FlyScaler(data_dict):
 
 def rebinData(data_dict,num_points=200, isSMRData=False):
     # Rebin data to 200+peak area points.
+    # FX4 only: return the error of the bin MEAN rather than of one point.
+    error_of_mean = (fx4support.FX4_ERROR_OF_MEAN_ON_REBIN
+                     and data_dict.get("RawData", {}).get("chain") == CHAIN_FX4)
     if isSMRData:
         SMR_Int = data_dict["CalibratedData"]["SMR_Int"]
         SMR_Qvec = data_dict["CalibratedData"]["SMR_Qvec"]
         SMR_Error = data_dict["CalibratedData"]["SMR_Error"]
-        SMR_QvecNew, SMR_IntNew, SMR_ErrorNew, SMR_dQ = rebin_QRSdata(SMR_Qvec, SMR_Int,SMR_Error, num_points)
+        SMR_QvecNew, SMR_IntNew, SMR_ErrorNew, SMR_dQ = rebin_QRSdata(SMR_Qvec, SMR_Int,SMR_Error, num_points, error_of_mean=error_of_mean)
         results = {"SMR_Qvec":SMR_QvecNew,
                 "SMR_Int":SMR_IntNew,
                 "SMR_Error":SMR_ErrorNew,
@@ -932,7 +952,8 @@ def rebinData(data_dict,num_points=200, isSMRData=False):
         Q_array = data_dict["reducedData"]["Q"]
         R_array = data_dict["reducedData"]["Intensity"]
         S_array = data_dict["reducedData"]["Error"]
-        Q_arrayNew, R_arrayNew, S_arrayNew = rebin_QRSdata(Q_array, R_array,S_array, num_points)
+        # rebin_QRSdata returns 4 values; this branch has no use for dQ.
+        Q_arrayNew, R_arrayNew, S_arrayNew, _ = rebin_QRSdata(Q_array, R_array,S_array, num_points, error_of_mean=error_of_mean)
         results = {"Q":Q_arrayNew,
                 "Intensity":R_arrayNew,
                 "Error":S_arrayNew  
@@ -1333,7 +1354,7 @@ def modifiedGauss(xvar, a, x0, sigma, exponent):
 '''
 
 
-def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints):
+def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, error_of_mean=False):
     '''
     Rebin data based on the condition Q < 0.0002 and Q > 0.0002.
     This function will split the data into two parts and rebin the second part using logarithmic scaling.
@@ -1368,7 +1389,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints):
 
     MinStep = Wx_greater[1] - Wx_greater[0]
 
-    Wx_greater2, Wy_greater2, W1, W2, W3, W4, W5, Ws_greater2, Wxsdev, Wxwidth = rebin_log_data(Wx_greater, Wy_greater, NumberOfPoints, MinStep, Wsdev=Ws_greater, Wxsdev=None, Wxwidth=Wdx_greater, W1=None, W2=None, W3=None, W4=None, W5=None)
+    Wx_greater2, Wy_greater2, W1, W2, W3, W4, W5, Ws_greater2, Wxsdev, Wxwidth = rebin_log_data(Wx_greater, Wy_greater, NumberOfPoints, MinStep, Wsdev=Ws_greater, Wxsdev=None, Wxwidth=Wdx_greater, W1=None, W2=None, W3=None, W4=None, W5=None, error_of_mean=error_of_mean)
 
 
     Q_merged = np.concatenate((Wx_less, Wx_greater2))
@@ -1391,7 +1412,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints):
 
 
 
-def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxwidth=None, W1=None, W2=None, W3=None, W4=None, W5=None):
+def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxwidth=None, W1=None, W2=None, W3=None, W4=None, W5=None, error_of_mean=False):
     # Determine which additional waves need to be calculated
     CalcSdev = Wsdev is not None
     CalcXSdev = Wxsdev is not None
@@ -1480,7 +1501,12 @@ def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxw
             if CalcW5:
                 Rebinned_Wv5[i] /= cntPoints
             if CalcSdev:
-                Rebinned_Wsdev[i] = np.sqrt(Rebinned_Wsdev[i] / cntPoints)
+                # RMS of the inputs = error of ONE point; dividing by a further
+                # sqrt(cntPoints) gives the error of their mean, which is what
+                # the bin holds.  Opt-in (FX4 switch 1) so the scaler chain
+                # keeps its historical, deliberately conservative value.
+                denom = cntPoints ** 2 if error_of_mean else cntPoints
+                Rebinned_Wsdev[i] = np.sqrt(Rebinned_Wsdev[i] / denom)
             if CalcXSdev:
                 Rebinned_Wxsdev[i] = np.sqrt(Rebinned_Wxsdev[i] / cntPoints)
 

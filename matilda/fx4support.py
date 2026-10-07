@@ -61,6 +61,71 @@ _CHAIN_LOCATIONS = (
 FX4_RELATIVE_CURRENT_ERROR = 0.01
 
 
+# --- FX4 noise / smoothing treatment ----------------------------------------
+# Three switches, each isolating one correction, so they can be turned off
+# individually while comparing against Igor.  All three apply to the FX4 chain
+# ONLY; the scaler chain is untouched in every case.
+
+# (1) Rebinning returns the error OF THE MEAN, sigma_rms/sqrt(n), instead of the
+#     RMS of the n input errors (which is the error of a single point).  The
+#     bins are disjoint, so for independent inputs sqrt(n) is simply correct.
+#     The inputs have been smoothed and are therefore correlated, which makes
+#     this a slight over-reduction; it is left to cancel against (3), where the
+#     smoothing itself deliberately does NOT reduce the error.  Net effect is
+#     within ~30% of an exact effective-N treatment on commissioning data.
+FX4_ERROR_OF_MEAN_ON_REBIN = True
+
+# (2) OFF by default -- see the measurement below before turning it on.
+#     The electrometer reports values already averaged over `values_per_read`
+#     raw samples behind an analogue filter, so the number of INDEPENDENT
+#     samples behind each reading is N/values_per_read, not N = total/mean.
+#     Dividing sigma by sqrt(N) therefore understates the PER-RAW-POINT error
+#     by sqrt(values_per_read) = 3.2 on the commissioning files, which is the
+#     3-5x shortfall recorded in docs/fx4-reduction-guide.md.
+#
+#     That reasoning is right, but applying it here double-counts, because the
+#     pipeline also fails to propagate the noise reduction of smooth_r_data
+#     (which averages 6-7 points and leaves the error untouched).  Measured on
+#     GC_SRM3600_0131 by reducing two disjoint halves of the raw points
+#     independently and comparing them -- the one estimator the smoothing's
+#     correlation cannot fool -- true/quoted at the SMR stage is:
+#
+#         switch 1 on, this off :  1.34 / 0.87 / 0.90   (Q decades 1e-3..1)
+#         switch 1 on, this on  :  0.42 / 0.27 / 0.29   -> 3x too conservative
+#
+#     So the two unpropagated effects currently cancel, and the honest fix is
+#     to carry an effective sample count through smoothing and rebinning and
+#     then enable this.  Until then, leave it off.
+FX4_USE_EFFECTIVE_SAMPLES = False
+
+# (3) The FX4 fly scan has no per-point amplifier range (the reading is
+#     gain-independent and `upd_lurange` is written once, after the scan), so
+#     every point would get the slowest smoothing time.  Derive a pseudo-range
+#     from the signal level instead: on the scaler chain the amplifier range
+#     WAS a proxy for signal level, and `rwave_smooth_times` was tuned against
+#     it, so a signal-derived index reuses those constants self-consistently.
+#     Thresholds are on the raw `upd_current`, descending; a point below the
+#     last threshold gets FX4_SMOOTHING_RANGE_DEFAULT (the slowest range).
+FX4_SIGNAL_DERIVED_SMOOTHING_RANGE = True
+FX4_SMOOTHING_RANGE_THRESHOLDS = ((1e6, 0), (12000.0, 1), (800.0, 2), (30.0, 3))
+FX4_SMOOTHING_RANGE_DEFAULT = 4
+
+
+def signal_derived_range_index(upd_current,
+                               thresholds=FX4_SMOOTHING_RANGE_THRESHOLDS,
+                               default=FX4_SMOOTHING_RANGE_DEFAULT):
+    """Pseudo amplifier-range index (0-4) from the FX4 signal level.
+
+    See FX4_SIGNAL_DERIVED_SMOOTHING_RANGE.  Returns float so the array can
+    carry NaN the way the scaler chain's masked points do.
+    """
+    upd = np.asarray(upd_current, dtype=float)
+    index = np.full(upd.shape, float(default))
+    for level, range_index in sorted(thresholds, key=lambda t: t[0]):
+        index[upd > level] = float(range_index)
+    return index
+
+
 def as_scalar(value):
     """Unwrap an HDF5 value into a plain Python scalar or str.
 

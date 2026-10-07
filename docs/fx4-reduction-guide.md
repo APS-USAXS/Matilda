@@ -279,13 +279,12 @@ NaNs in the sigma arrays; replace those points with the same 1 % fallback —
 otherwise they propagate to zero error, which reads as an infinitely
 well-known point.
 
-> **Known limitation.** On the first commissioning fly scans this estimate came
-> out **3–4× below** the observed point-to-point scatter of I(q), consistently
-> across the q range. `sqrt(N)` assumes the FX4's samples are independent; they
-> are averages of `values_per_read` raw readings behind an analogue filter, so
-> the effective N is smaller than the nominal one. Calibrate against repeat
-> scans before relying on these bars. The Igor implementation should reproduce
-> this formula so the two codes agree, and both should be corrected together.
+This per-point estimate is **3–5× below** the observed point-to-point scatter
+of the raw I(q) — 4.8× at Q ≈ 5e-4 falling to 1.7× above Q = 0.1 on
+`GC_SRM3600_0131`. `sqrt(N)` assumes the FX4's samples are independent; they
+are averages of `values_per_read` raw readings behind an analogue filter, so
+the effective count is `N/values_per_read`. **Do not "fix" this here** — see
+§3.10, where it turns out to cancel against a second missing factor.
 
 ### 3.8 Smoothing
 
@@ -293,11 +292,84 @@ well-known point.
 
 * The time base is **1.0**, because `channel_time` is already in seconds
   (the scaler chain passed mca1 counts with a base of 1e6 Hz).
-* The range index is constant, so the "range changed across the window" branch
-  never fires and every point takes the plain trapezoid-average branch.
+* There is no per-point amplifier range — see §3.10, switch 3.
 
 Per-range minimum smoothing times (seconds, indexed by range 0–4), unchanged:
 `[0.02, 0.02, 0.03, 0.1, 0.4]`.
+
+### 3.10 Noise handling — the three FX4 switches
+
+Three corrections, each isolated behind its own flag in `fx4support.py` so it
+can be toggled while comparing Igor against Matilda. **All three are FX4-only;
+the scaler chain is bit-for-bit unchanged in every combination.** Defaults:
+
+| switch | constant | default |
+|---|---|---|
+| 1 | `FX4_ERROR_OF_MEAN_ON_REBIN` | **on** |
+| 2 | `FX4_USE_EFFECTIVE_SAMPLES` | **off** |
+| 3 | `FX4_SIGNAL_DERIVED_SMOOTHING_RANGE` | **on** |
+
+**Switch 1 — rebinning returns the error of the mean.** `rebin_log_data`
+accumulated `sqrt(Σσ²/n)`, the RMS of the inputs, which is the error of *one*
+point. A bin holds their **mean**, whose error is `sqrt(Σσ²)/n` — a further
+`1/sqrt(n)`. The bins are disjoint, so for independent inputs this is simply
+correct; it was never applied on either chain. Enabled for FX4 only, because
+changing it on the scaler chain would move every historical result.
+
+**Switch 2 — effective sample count (off by default).** The reasoning in §3.7
+is right: dividing by `sqrt(N)` instead of `sqrt(N/values_per_read)`
+understates the per-raw-point error by `sqrt(10) = 3.2`. But applying it
+double-counts, because the pipeline *also* drops the noise reduction of
+`smooth_r_data`, which averages 6–7 points and leaves the error untouched.
+
+Measured by reducing two disjoint halves of the raw points independently and
+comparing them — the one estimator the smoothing's correlation cannot fool —
+true/quoted error at the SMR stage, per decade of Q from 1e-3:
+
+| setting | 1e-3–1e-2 | 1e-2–1e-1 | 1e-1–1 |
+|---|---|---|---|
+| switch 1 on, switch 2 **off** | 1.34 | 0.87 | 0.90 |
+| switch 1 on, switch 2 on | 0.42 | 0.27 | 0.29 |
+
+So the two unpropagated effects currently cancel to within ~30%. The honest
+fix is to carry an effective sample count through smoothing *and* rebinning
+and then enable switch 2; until then it stays off.
+
+> Do not judge this by the point-to-point scatter of the SMR curve. Smoothing
+> cuts that scatter by 10–13× while the window is only 6–7 points
+> (`sqrt(7) = 2.6`): the output points are heavily correlated, so their
+> scatter understates their uncertainty by about 4×. The halves test above is
+> the one to trust.
+
+**Switch 3 — signal-derived smoothing range.** The FX4 reading is
+gain-independent and `upd_lurange` is written **once, after the scan**, so
+there is no per-point range: every point would take `rwave_smooth_times[4]`,
+the slowest, giving a 12–24 point window across the whole curve. On the scaler
+chain the amplifier range *was* a proxy for signal level, and those smoothing
+times were tuned against it, so derive a pseudo-range from the raw
+`upd_current` and reuse the constants unchanged:
+
+| `upd_current` | range index | window |
+|---|---|---|
+| > 1e6 | 0 | 0.02 s |
+| > 12000 | 1 | 0.02 s |
+| > 800 | 2 | 0.03 s |
+| > 30 | 3 | 0.10 s |
+| otherwise | 4 | 0.40 s |
+
+Thresholds are descending on the **raw** `upd_current`, before dark-current
+subtraction. On `GC_SRM3600_0131` this puts 37/80/133/2823/926 of the 3999
+points in ranges 0–4, a 2–7 point window instead of a uniform 22.
+
+Two notes from the Python/Igor comparison:
+
+* A separate "start smoothing only below 1e-5 of the peak" guard is
+  **redundant** once this is in — the two produce bit-identical output,
+  because the bright head already selects a 1–2 point window. One knob, not
+  two.
+* The wide uniform window was not *distorting* the data: current versus
+  signal-derived differ by ≤0.24% in the steepest band and 0.00% elsewhere.
+  Switch 3 is about not over-smoothing real structure, not about fixing a bias.
 
 ### 3.9 Ring-overflow check
 
@@ -666,10 +738,16 @@ conversion unchanged, while SAXS/WAXS (§5.8) did not.
 ### 6.4 Rebinning and desmearing
 
 Fly scan: rebin to 500 points when more than 800 survive (log binning above
-Q = 0.0002, linear below), then Lake/Strobl desmearing with `slitLength`,
-20 iterations, `PowerLaw w flat` extrapolation from Q = 0.15.
+Q = 0.0002, linear below), then desmearing with `slitLength` and
+`PowerLaw w flat` extrapolation from Q = 0.15. The default method is now the
+truncated-Abel inversion (`docs/desmearing-methods.md` §4a); Lake/Strobl with
+20 iterations is still selectable.
 Step scan: **no rebinning** (if many points were collected, they are wanted),
 then the same desmearing.
+
+On FX4 the rebinned error is the error of the bin **mean** (§3.10, switch 1).
+This matters downstream: the Abel desmearing picks its smoothing width from a
+chi^2 against `SMR_Error`, so an inflated error makes it over-smooth.
 
 ---
 
@@ -682,8 +760,10 @@ Two numbers are placeholders. Both should be fixed in Igor and Python together.
 | `FX4_I_SCALING` | `convertSWAXS.py` | `None` ⇒ use recorded `I_scaling` | SAXS/WAXS **absolute intensity**, off by ~1e10 (§5.8) |
 | `FX4_RELATIVE_CURRENT_ERROR` | `fx4support.py` | `0.01` | **Error bars only**, never intensities (§3.7, §4.6) |
 
-The fly-scan error estimate is additionally known to be optimistic by 3–4×
-(§3.7).
+The fly-scan **per-raw-point** error is additionally 3–5× optimistic (§3.7).
+At the SMR stage this is cancelled by the unpropagated smoothing, so the
+delivered error bars are right to within ~30% (§3.10). Both halves of that
+should be fixed together, not separately.
 
 ---
 

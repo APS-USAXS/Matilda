@@ -130,6 +130,7 @@ AR_CENTER = 8.8439
 WAVELENGTH = 0.5904
 N_POINTS = 2000
 CHANNEL_TIME = 0.05        # s per PSO interval
+VALUES_PER_READ = 10       # raw readings the FX4 pre-averages into each value
 I0_CURRENT = 5.5e4         # pA, steady monitor
 UPD_RANGE = 1              # autoranger range the scan ended on
 DARK = {0: 0.0, 1: 0.05, 2: 0.5, 3: 1.2, 4: 8.4}          # pA, per FX4 range
@@ -191,7 +192,7 @@ def _synthetic_fx4_flyscan(path, transmission=1.0, excess=0.0,
         fly["I0_total"] = i0 * n_samples
         fly["channel_time"] = np.full(N_POINTS, CHANNEL_TIME)
         fly["sample_time"] = 1e-3
-        fly["values_per_read"] = 100
+        fly["values_per_read"] = VALUES_PER_READ
         fly["n_points"] = N_POINTS
         fly["ring_overflows"] = 0
         fly["ring_overflows_I0"] = 0
@@ -280,10 +281,33 @@ def test_fx4_flyscan_errors_use_the_recorded_sigmas(fx4_flyscan_pair):
     error = calculatePDErrorFly(Sample)["Error"]
     assert np.all(np.isfinite(error))
     assert np.all(error > 0)
-    # 2% spread within each interval over 50 samples is ~0.28% on the mean,
-    # and the same again on I0, so the ratio's relative error stays under 1%.
+    # Default (FX4_USE_EFFECTIVE_SAMPLES off): 2% spread within each interval
+    # over 50 samples is 0.28% on the mean, sqrt(2) times that on the ratio.
     relative = error / Sample["reducedData"]["Intensity"]
-    assert np.nanmedian(relative) < 0.01
+    expected = np.sqrt(2) * 0.02 / np.sqrt(CHANNEL_TIME / 1e-3)
+    assert np.nanmedian(relative) == pytest.approx(expected, rel=0.05)
+
+
+def test_fx4_effective_samples_switch_scales_by_sqrt_values_per_read(fx4_flyscan_pair):
+    """Switch 2 must change the error by exactly sqrt(values_per_read)."""
+    from matilda import fx4support
+    from matilda.supportFunctions import (importFlyscan, calculatePD_Fly,
+                                          calculatePDErrorFly)
+    Sample = {"RawData": importFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5")}
+    Sample["reducedData"] = calculatePD_Fly(Sample)
+    saved = fx4support.FX4_USE_EFFECTIVE_SAMPLES
+    try:
+        fx4support.FX4_USE_EFFECTIVE_SAMPLES = False
+        off = calculatePDErrorFly(Sample)["Error"]
+        fx4support.FX4_USE_EFFECTIVE_SAMPLES = True
+        on = calculatePDErrorFly(Sample)["Error"]
+    finally:
+        fx4support.FX4_USE_EFFECTIVE_SAMPLES = saved
+    ratio = on / off
+    # The dark-current error is added in quadrature and does not scale, so the
+    # full sqrt(values_per_read) only shows where the signal dominates it.
+    assert np.all(ratio > 1.0)
+    assert np.max(ratio) == pytest.approx(np.sqrt(VALUES_PER_READ), rel=0.01)
 
 
 def test_fx4_flyscan_full_reduction(fx4_flyscan_pair):
@@ -376,3 +400,54 @@ def test_fx4_step_scan_has_no_gain_or_dwell_term():
     src = inspect.getsource(cu._CorrectUPDStepFX4)
     assert "(UPD_array - Bckg_corr) / Monitor" in src
     assert "AmpGain" not in src
+
+
+def test_fx4_signal_derived_smoothing_range(fx4_flyscan_pair):
+    """Switch 3: the smoothing index must follow the signal, not upd_lurange."""
+    from matilda import fx4support
+    from matilda.supportFunctions import importFlyscan, calculatePD_Fly
+    Sample = {"RawData": importFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5")}
+    on = calculatePD_Fly(Sample)["UPD_gainsIndx"]
+    saved = fx4support.FX4_SIGNAL_DERIVED_SMOOTHING_RANGE
+    try:
+        fx4support.FX4_SIGNAL_DERIVED_SMOOTHING_RANGE = False
+        off = calculatePD_Fly(Sample)["UPD_gainsIndx"]
+    finally:
+        fx4support.FX4_SIGNAL_DERIVED_SMOOTHING_RANGE = saved
+    # Off: one post-scan range everywhere -> the slowest smoothing time for all.
+    assert len(np.unique(off)) == 1
+    # On: the bright rocking-curve peak gets a faster range than the tail.
+    assert len(np.unique(on)) > 1
+    assert on[np.argmax(Sample["RawData"]["UPD_array"])] < on[-1]
+
+
+def test_signal_derived_range_index_thresholds():
+    upd = np.array([2e6, 5e4, 1e3, 100.0, 5.0])
+    assert np.allclose(fx4.signal_derived_range_index(upd), [0, 1, 2, 3, 4])
+
+
+def test_rebin_error_of_mean_is_opt_in():
+    """Switch 1 changes the rebinned error by sqrt(n); default keeps the RMS."""
+    import matilda.supportFunctions as sf
+    q = np.linspace(0.0002, 0.05, 400)
+    i = 1e3 * q ** -2
+    e = 0.1 * i
+    _, _, e_rms, _ = sf.rebin_QRSdata(q.copy(), i.copy(), e.copy(), 50)
+    _, _, e_mean, _ = sf.rebin_QRSdata(q.copy(), i.copy(), e.copy(), 50,
+                                       error_of_mean=True)
+    assert np.all(e_mean <= e_rms + 1e-30)
+    assert np.nanmax(e_rms / np.where(e_mean > 0, e_mean, np.nan)) > 2.0
+
+
+def test_scaler_chain_untouched_by_fx4_switches(tmp_path):
+    """The three FX4 switches must not reach the scaler chain at all."""
+    import matilda.supportFunctions as sf
+    data = {"RawData": {"chain": CHAIN_SCALER},
+            "reducedData": {"Q": np.linspace(0.0002, 0.05, 400),
+                            "Intensity": np.linspace(10, 1, 400),
+                            "Error": np.full(400, 1.0)}}
+    out = sf.rebinData(data, num_points=50)
+    plain = sf.rebin_QRSdata(data["reducedData"]["Q"],
+                             data["reducedData"]["Intensity"],
+                             data["reducedData"]["Error"], 50)
+    assert np.array_equal(out["Error"], plain[2])

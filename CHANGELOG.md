@@ -7,6 +7,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Fixed — FX4 fly-scan noise and uncertainties
+
+Three corrections to the FX4 fly-scan path, each behind its own switch in
+`fx4support.py` so it can be toggled while cross-checking against Igor. **All
+three are FX4-only — the scaler chain is bit-for-bit unchanged in every
+combination**, and `tests/test_fx4support.py` asserts that. Full write-up and
+the measurements behind each: `docs/fx4-reduction-guide.md` §3.10.
+
+- **`FX4_SIGNAL_DERIVED_SMOOTHING_RANGE`** (on). The FX4 reading is
+  gain-independent and `upd_lurange` is written once, after the scan, so
+  `smooth_r_data` was giving every point the slowest smoothing time — a
+  uniform 12–24 point window. The range index is now derived from the raw
+  `upd_current`, reusing the scaler chain's `rwave_smooth_times` constants
+  (on that chain the amplifier range *was* a proxy for signal level, which is
+  what those constants were tuned against). 2–7 point window instead of 22.
+  The old behaviour was not distorting the data — the two differ by ≤0.24% in
+  the steepest band — but it was over-smoothing real structure.
+- **`FX4_ERROR_OF_MEAN_ON_REBIN`** (on). `rebin_log_data` returned
+  `sqrt(Σσ²/n)`, the RMS of the inputs, which is the error of a single point;
+  a bin holds their mean, whose error is a further `1/sqrt(n)` smaller. Bins
+  are disjoint so this is simply correct, but enabling it on the scaler chain
+  would move every historical result.
+- **`FX4_USE_EFFECTIVE_SAMPLES`** (**off**). The electrometer pre-averages
+  `values_per_read` raw readings, so dividing sigma by `sqrt(N)` understates
+  the per-raw-point error by `sqrt(10)` — the 3–5× shortfall recorded in the
+  guide. Correct in itself, but it double-counts: `smooth_r_data` averages
+  6–7 points and leaves the error untouched, and the two omissions cancel.
+  Measured on `GC_SRM3600_0131` by reducing two disjoint halves of the raw
+  points independently, true/quoted at the SMR stage is 1.34/0.87/0.90 with
+  this off and 0.42/0.27/0.29 with it on. Left off until the smoothing's
+  effective sample count is propagated too.
+
+### Fixed
+
+- `rebinData()` raised `ValueError: too many values to unpack` on its non-SMR
+  branch — `rebin_QRSdata` returns four values, not three. That path runs for
+  any fly scan reduced **without** a blank (the web-plot `displayData` route),
+  on both counting chains. Pre-existing, unrelated to FX4.
+
 ### Added — FX4 counting chain
 
 The 12-ID-E counting chain changed on 2026-09-26 from Femto amplifier + V/F

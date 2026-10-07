@@ -1,7 +1,7 @@
 """
 matilda.gui
 ===========
-GUI subpackage for Matilda — placeholder for future PyQt6/pyqtgraph tools.
+GUI subpackage for Matilda — PySide6/pyqtgraph tools.
 
 Planned tools (not yet implemented)
 -------------------------------------
@@ -27,16 +27,21 @@ analysis_gui
 
 GUI framework
 -------------
-All GUI code must use PyQt6 (or PySide6 as a drop-in substitute).
+All GUI code must use PySide6, imported through the ``matilda.gui._qt`` shim —
+never ``from PySide6… import`` directly in a panel, and never PyQt6 alongside
+it in the same environment (they fight over Qt plugin resolution; on macOS the
+symptom is "could not load the Qt platform plugin cocoa").  The shim keeps a
+PyQt6 fallback for environments that only have that binding.
+
 All scientific plotting must use pyqtgraph.
 matplotlib is NOT to be used in GUI code without explicit approval;
-its use is limited to headless file export in matilda.plots.
+its use is limited to headless file export in matilda.plotData.
 
 Dependencies
 ------------
 Declared as optional in pyproject.toml:
-    pip install matilda[gui]      # adds PyQt6 + pyqtgraph
+    pip install matilda[gui]      # adds PySide6 + pyqtgraph + pyepics
 Or via conda (already in environment.yml):
-    pyqt6
+    pyside6>=6.4,<6.8
     pyqtgraph
 """

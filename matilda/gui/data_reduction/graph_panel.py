@@ -25,16 +25,9 @@ import csv
 import numpy as np
 import pyqtgraph as pg
 
-try:
-    from PySide6.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
-    )
-    from PySide6.QtCore import Qt, Signal
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
-    )
-    from PyQt6.QtCore import Qt, pyqtSignal as Signal
+from .._qt import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, Qt, Signal,
+)
 
 from .sas_plot import make_sas_plot, draw_error_bars
 

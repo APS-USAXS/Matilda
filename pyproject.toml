@@ -1,20 +1,27 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs"
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
 
 
 [project]
 name = "Matilda"
-dynamic = ["version"]
+# Static version is authoritative (house standard across the USAXS Python
+# packages).  It was previously derived from git tags via hatch-vcs, which
+# also meant a shallow CI checkout or a tarball install reported a bogus
+# version into every NXcanSAS file written by hdf5code.py.
+# Bump this here, then tag the release with the matching v<version>.
+version = "0.3.0.dev0"
 description = "Live data processing package for USAXS/SAXS/WAXS instrument"
 readme = "README.md"
 authors = [
     { name = "Jan Ilavsky", email = "ilavsky@anl.gov" },
 ]
-license = { file = "LICENSE.txt" }
+# Custom UChicago Argonne / BESSY agreement — no SPDX identifier applies, so
+# the file is shipped as-is and the license is declared via the classifier.
+license-files = ["LICENSE.txt"]
+# Deviation from the >=3.10 house floor: the beamline server and every
+# developer env run 3.12, and the CI matrix only covers 3.11/3.12, so 3.10
+# would be an untested claim.  Do not lower it without adding 3.10 to CI.
 requires-python = ">=3.11"
 keywords = [
     "SAXS", "USAXS", "WAXS", "small-angle X-ray scattering",
@@ -32,12 +39,6 @@ classifiers = [
     "License :: Other/Proprietary License",
 ]
 
-[project.urls]
-Homepage = "https://github.com/APS-USAXS/Matilda"
-Repository = "https://github.com/APS-USAXS/Matilda"
-"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
-Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
-
 # Core runtime dependencies (verified used in source code).
 # GUI dependencies (PyQt6, pyqtgraph) are listed separately below so the
 # headless server install can omit them if needed.
@@ -54,13 +55,19 @@ dependencies = [
     # tifffile removed 2026-07: only referenced from commented-out debug code
 ]
 
+[project.urls]
+Homepage = "https://github.com/APS-USAXS/Matilda"
+Repository = "https://github.com/APS-USAXS/Matilda"
+"Bug Tracker" = "https://github.com/APS-USAXS/Matilda/issues"
+Changelog = "https://github.com/APS-USAXS/Matilda/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 # Install with: pip install matilda[gui]
-# GUI tools use PySide6 (preferred) or PyQt6 as fallback + pyqtgraph for plotting.
+# GUI tools use PySide6 + pyqtgraph for plotting.  Both bindings are reached
+# through the single matilda/gui/_qt.py shim, which falls back to PyQt6 — so a
+# PyQt6-only environment still runs, but this extra never installs it.
 # IMPORTANT: install only ONE of PySide6 or PyQt6 — having both on the same
 # environment causes Qt platform-plugin conflicts on macOS ("cocoa not found").
-# PySide6 is listed here as the default.  Users who prefer PyQt6 should install
-# it manually and NOT use this extras group.
 # matplotlib is intentionally NOT listed here: it is a core headless dep.
 gui = [
     "PySide6>=6.4,<6.8",  # 6.8+ requires GLIBC 2.32; RHEL 8 only has GLIBC 2.28
@@ -94,10 +101,11 @@ matilda = "matilda.matilda:main"
 matilda-sample-plates = "matilda.gui.sample_plate_setup:run_sample_plate_setup"
 matilda-gui = "matilda.gui.data_reduction:main"
 
-[tool.hatch.build.targets.wheel]
-# Package matilda/ and its subpackages (gui/, reduction/).
-# tests/ is intentionally excluded from the wheel.
-packages = ["matilda"]
+[tool.setuptools.packages.find]
+# Package matilda/ and its subpackages (gui/, gui/data_reduction/, reduction/).
+# tests/, docs/, ControlData/, TestData/ and IgorExample/ stay out of the wheel.
+include = ["matilda*"]
+namespaces = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -107,7 +115,7 @@ python_files = ["test_*.py"]
 
 [tool.ruff]
 # Scratch/example folders are not linted.
-extend-exclude = ["CodeFragments", "IgorExample", "docs"]
+extend-exclude = ["CodeFragments", "IgorExample", "docs", "build", "dist"]
 line-length = 200          # legacy code has long lines; do not fight it yet
 
 [tool.ruff.lint]

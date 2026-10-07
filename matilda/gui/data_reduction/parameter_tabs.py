@@ -23,20 +23,11 @@ Adding new parameters later
 3. Pass the value through ReductionWorker to the converter function.
 """
 
-try:
-    from PySide6.QtWidgets import (
-        QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-        QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame, QCheckBox,
-    )
-    from PySide6.QtCore import Signal
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-        QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
-        QFrame, QCheckBox,
-    )
-    from PyQt6.QtCore import pyqtSignal as Signal
+from .._qt import (
+    QWidget, QTabWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
+    QLabel, QSpinBox, QDoubleSpinBox, QComboBox, QPushButton,
+    QFrame, QCheckBox, Signal,
+)
 
 
 # Must match the SelectedFunction branch names in matilda.desmearing.extendData
@@ -48,6 +39,9 @@ EXTRAP_METHODS = [
     "Porod",
     "flat",
 ]
+
+# Desmearing method display strings -> (method_key, kernel_key) mappings.
+from ...desmearing_methods import GUI_METHOD_MAP, GUI_KERNEL_MAP  # noqa: E402
 
 # Maps technique name → tab index (must stay in sync with addTab order)
 TECHNIQUE_TAB_IDX: dict[str, int] = {
@@ -505,6 +499,71 @@ class _USAXSTab(_TechniqueTab):
         self._extrap_qstart.setToolTip("Q value above which the extrapolation is applied")
         form.addRow("Extrap Q start:", self._extrap_qstart)
 
+        # ── Desmearing method (Lake / Huang GP) ───────────────────────────────
+        self._desmear_method = QComboBox()
+        self._desmear_method.addItems(list(GUI_METHOD_MAP.keys()))
+        self._desmear_method.setToolTip(
+            "Desmearing algorithm. 'Truncated Abel' is the default: an analytical, "
+            "non-iterative inversion that is linear in the data and gives Monte-Carlo "
+            "uncertainties. 'Lake' is the historical iterative method. 'Huang GP' is a "
+            "noise-suppressing Bayesian method that stays smooth and positive on "
+            "weak/over-subtracted data and returns uncertainties.")
+        self._desmear_method.currentTextChanged.connect(self._on_desmear_method_changed)
+        form.addRow("Method:", self._desmear_method)
+
+        # ── Truncated-Abel controls ───────────────────────────────────────────
+        abel_row = QHBoxLayout()
+        self._abel_auto_smooth = QCheckBox("Auto (χ²≈1)")
+        self._abel_auto_smooth.setChecked(True)
+        self._abel_auto_smooth.setToolTip(
+            "Pick the largest smoothing width whose reduced χ² against the measured\n"
+            "points is still ≤ 1. Relies on realistic SMR errors — if they are\n"
+            "inflated this over-smooths; uncheck and set the width by hand.")
+        abel_row.addWidget(self._abel_auto_smooth)
+        self._abel_smooth_w = QDoubleSpinBox()
+        self._abel_smooth_w.setRange(0.002, 0.5)
+        self._abel_smooth_w.setValue(0.05)
+        self._abel_smooth_w.setDecimals(3)
+        self._abel_smooth_w.setSingleStep(0.01)
+        self._abel_smooth_w.setSuffix("  ln Q")
+        self._abel_smooth_w.setToolTip(
+            "Manual smoothing width, in ln Q units (0.1 ≈ ±10% in Q). The inversion\n"
+            "differentiates the data, so some smoothing is always required.")
+        abel_row.addWidget(self._abel_smooth_w, 1)
+        form.addRow("Abel smoothing:", abel_row)
+        self._abel_auto_smooth.toggled.connect(
+            lambda on: self._abel_smooth_w.setEnabled(
+                not on and "Abel" in self._desmear_method.currentText()))
+
+        self._abel_num_mc = QSpinBox()
+        self._abel_num_mc.setRange(0, 200)
+        self._abel_num_mc.setValue(20)
+        self._abel_num_mc.setSingleStep(5)
+        self._abel_num_mc.setToolTip(
+            "Monte-Carlo realizations used for the desmeared uncertainties.\n"
+            "Below 2 falls back to the Lake-style error estimate.")
+        form.addRow("Abel MC draws:", self._abel_num_mc)
+
+        self._gp_kernel = QComboBox()
+        self._gp_kernel.addItems(["Matérn-3/2", "RBF"])
+        self._gp_kernel.setToolTip(
+            "GP smoothness kernel. Matérn-3/2 preserves sharp features (peaks); "
+            "RBF is smoother but can erase peaks — use only on featureless samples.")
+        form.addRow("GP kernel:", self._gp_kernel)
+
+        self._gp_length_scale = QDoubleSpinBox()
+        self._gp_length_scale.setRange(0.1, 2.0)
+        self._gp_length_scale.setValue(0.5)
+        self._gp_length_scale.setSingleStep(0.1)
+        self._gp_length_scale.setDecimals(2)
+        self._gp_length_scale.setSuffix("  decades")
+        self._gp_length_scale.setToolTip(
+            "GP correction smoothness length, in decades of q. Larger = smoother "
+            "(more noise suppression, more risk of washing out real features).")
+        form.addRow("GP length scale:", self._gp_length_scale)
+
+        self._on_desmear_method_changed(self._desmear_method.currentText())
+
         layout.addLayout(form)
         layout.addStretch()
 
@@ -522,7 +581,22 @@ class _USAXSTab(_TechniqueTab):
             self._blank_label.setText("(none assigned)")
             self._blank_label.setStyleSheet("color: grey; font-style: italic;")
 
+    def _on_desmear_method_changed(self, text: str):
+        """Enable GP kernel only for GP methods; the length-scale control is also
+        used by 'Lake (smoothed)' as its smoothing window (in decades). The Abel
+        controls apply only to the truncated-Abel method."""
+        is_gp = "GP" in text
+        needs_length = is_gp or ("smooth" in text.lower())
+        is_abel = "Abel" in text
+        self._gp_kernel.setEnabled(is_gp)
+        self._gp_length_scale.setEnabled(needs_length)
+        self._abel_auto_smooth.setEnabled(is_abel)
+        self._abel_num_mc.setEnabled(is_abel)
+        self._abel_smooth_w.setEnabled(is_abel and not self._abel_auto_smooth.isChecked())
+
     def get_params(self) -> dict:
+        method_key, kernel_default = GUI_METHOD_MAP.get(
+            self._desmear_method.currentText(), ("abel", "matern32"))
         params = {
             "blank_mode":         self._blank_mode.currentText(),
             "thickness":          self._get_thickness(),
@@ -530,6 +604,12 @@ class _USAXSTab(_TechniqueTab):
             "desmear_iter":       self._desmear_iter.value(),
             "extrap_method":      self._extrap_method.currentText(),
             "extrap_qstart":      self._extrap_qstart.value(),
+            "desmear_method":     method_key,
+            "gp_kernel":          GUI_KERNEL_MAP.get(self._gp_kernel.currentText(), kernel_default),
+            "gp_length_scale":    self._gp_length_scale.value(),
+            "abel_auto_smooth":   self._abel_auto_smooth.isChecked(),
+            "abel_smooth_w":      self._abel_smooth_w.value(),
+            "abel_num_mc":        self._abel_num_mc.value(),
             "qmin_override":      (
                 self._qmin_spin.value()
                 if self._override_qmin.isChecked() else None

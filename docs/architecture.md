@@ -107,7 +107,7 @@ USAXS flyscan: HDF5 NXsas → normalised I(Q) → desmeared calibrated I(Q).
 Pipeline:
 `importFlyscan` → `calculatePD_Fly` → `beamCenterCorrection` →
 `getBlankFlyscan` → `normalizeByTransmission` →
-`calibrateAndSubtractFlyscan` → `desmearData` → `saveNXcanSAS`
+`calibrateAndSubtractFlyscan` → `desmear_dispatch` → `saveNXcanSAS`
 
 **`matilda/convertUSAXS.py`**
 USAXS step-scan: identical pipeline to flyscan.
@@ -123,6 +123,13 @@ Pipeline:
 **`matilda/desmearing.py`**
 Lake/Strobl iterative slit-smearing correction, ported from Igor Pro.
 Entry point: `desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength, …)`
+
+**`matilda/desmearing_methods.py`**
+Selectable desmearing methods behind one dispatcher with the same signature and
+4-tuple return as `desmearData`. Default is the truncated-Abel inversion;
+Lake and the Gaussian-process variants remain selectable.
+Entry point: `desmear_dispatch(…, method='abel'|'lake'|'gp'|…)`.
+See `docs/desmearing-methods.md`.
 
 ---
 
@@ -176,6 +183,13 @@ Key functions: `plotUSAXSResults`, `plotSWAXSResults`
 ---
 
 ### GUI subpackage
+
+**`matilda/gui/_qt.py`**
+Single Qt import point for everything under `matilda/gui/`. PySide6, with a
+PyQt6 fallback for environments that only have that binding; `Signal` is
+normalised across the two. GUI modules do `from .._qt import QWidget, Qt,
+Signal` — a direct `from PySide6… import` in a panel is a test failure
+(`tests/test_gui_qt_shim.py`), as is any Qt import on the daemon path.
 
 **`matilda/gui/sample_plate_setup.py`**
 Sample Plate Setup GUI — replaces Igor Pro "Setup Sample Plates".
@@ -267,7 +281,8 @@ Matilda/
 │   ├── convertFlyscan.py       # USAXS flyscan reduction
 │   ├── convertUSAXS.py         # USAXS step-scan reduction
 │   ├── convertSWAXS.py         # SAXS/WAXS 2-D reduction
-│   ├── desmearing.py           # Slit-smearing correction
+│   ├── desmearing.py           # Slit-smearing correction (Lake)
+│   ├── desmearing_methods.py   # Method dispatcher (Abel default, Lake, GP)
 │   ├── fx4support.py           # Counting-chain detection, FX4 helpers
 │   ├── supportFunctions.py     # Shared numerical helpers
 │   ├── supportNikaFunctions.py # Geometry conversion (Nika → pyFAI)
@@ -275,6 +290,7 @@ Matilda/
 │   ├── plotData.py             # Headless JPEG plot export
 │   └── gui/
 │       ├── __init__.py
+│       ├── _qt.py                  # Single Qt import point (PySide6)
 │       ├── sample_plate_setup.py   # Sample Plate Setup GUI
 │       └── data_reduction/         # matilda-gui data reduction application
 ├── tests/

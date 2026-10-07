@@ -20,20 +20,11 @@ import webbrowser
 import h5py
 import numpy as np
 
-try:
-    from PySide6.QtWidgets import (
-        QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-        QPushButton, QLabel, QProgressBar,
-        QFileDialog, QMessageBox, QPlainTextEdit,
-    )
-    from PySide6.QtCore import Qt
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-        QPushButton, QLabel, QProgressBar,
-        QFileDialog, QMessageBox, QPlainTextEdit,
-    )
-    from PyQt6.QtCore import Qt
+from .._qt import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QPushButton, QLabel, QProgressBar, QSizePolicy,
+    QFileDialog, QMessageBox, QPlainTextEdit, Qt,
+)
 
 from .file_tree import FileTreeWidget
 from .parameter_tabs import ParameterTabWidget
@@ -78,10 +69,6 @@ class MatildaReductionWindow(QMainWindow):
         # Spacer to push help button to the right
         spacer = QWidget()
         spacer.setMinimumWidth(0)
-        try:
-            from PySide6.QtWidgets import QSizePolicy
-        except ImportError:
-            from PyQt6.QtWidgets import QSizePolicy
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         tb.addWidget(spacer)
 

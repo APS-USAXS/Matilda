@@ -34,31 +34,18 @@ from dataclasses import dataclass, field
 import numpy as np
 import h5py
 
-try:
-    from PySide6.QtWidgets import (
-        QApplication, QMainWindow, QWidget, QTabWidget,
-        QTableWidget, QTableWidgetItem, QHeaderView,
-        QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-        QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
-        QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
-        QDialogButtonBox, QGroupBox,
-        QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
-        QTextEdit, QScrollArea,
-    )
-    from PySide6.QtCore import Qt, QTimer, Signal as pyqtSignal, QSettings
-    from PySide6.QtGui import QFont, QColor
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QWidget, QTabWidget,
-        QTableWidget, QTableWidgetItem, QHeaderView,
-        QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-        QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
-        QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
-        QDialogButtonBox, QGroupBox, QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
-        QTextEdit, QScrollArea,
-    )
-    from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSettings
-    from PyQt6.QtGui import QFont, QColor
+from ._qt import (
+    QApplication, QMainWindow, QWidget, QTabWidget,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
+    QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QSpinBox,
+    QCheckBox, QComboBox, QFileDialog, QMessageBox, QDialog,
+    QDialogButtonBox, QGroupBox,
+    QAbstractItemView, QMenu, QListWidget, QListWidgetItem,
+    QTextEdit, QScrollArea, QInputDialog,
+    Qt, QTimer, QSettings, Signal,
+    QFont, QColor,
+)
 
 import pyqtgraph as pg
 
@@ -793,7 +780,7 @@ class SampleTable(QTableWidget):
     Table widget for sample positions.  Columns: Name, SX, SY, Thickness,
     USAXS-checkbox, SAXS-checkbox, WAXS-checkbox, MetaData.
     """
-    dataChanged = pyqtSignal()
+    dataChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(0, 8, parent)
@@ -1258,7 +1245,7 @@ class PlateCanvas(pg.GraphicsLayoutWidget):
     pyqtgraph widget showing the plate image and sample position markers.
     Click on the image to assign position to the currently selected table row.
     """
-    positionClicked = pyqtSignal(float, float)  # sx, sy in mm
+    positionClicked = Signal(float, float)  # sx, sy in mm
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2256,10 +2243,6 @@ class SamplePlateSetupWindow(QMainWindow):
             QMessageBox.information(self, "No saved sets",
                                     "No sets saved yet. Save a set first.")
             return
-        try:
-            from PySide6.QtWidgets import QInputDialog
-        except ImportError:
-            from PyQt6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getItem(self, "Load set", "Select set:", names, 0, False)
         if ok and name in self._saved_sets:
             if self._unsaved:

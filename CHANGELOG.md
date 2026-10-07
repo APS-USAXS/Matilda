@@ -5,7 +5,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [Unreleased] — 0.3.0.dev0
 
 ### Added — FX4 counting chain
 
@@ -94,6 +94,62 @@ the self-referencing K-factor predicts.
   `/entry/flyScan`, prefers the FX4 `upd_bkg*` over any Femto-era copies in
   `/entry/metadata`, and raises a specific error if the geometry fields are
   missing entirely.
+
+### Added — desmearing methods
+- **Truncated-Abel desmearing** (`desmearing_methods.py`, `method='abel'`): an
+  analytical, non-iterative inversion of the slit integral, with the exact
+  finite-slit correction to Huang *et al.*'s Eq. 15 (their form is off by up to
+  ~5% near Q ≈ slit length for USAXS). Linear in the data, so uncertainties come
+  from Monte Carlo over the measured points. Mandatory smoothing is a
+  Gaussian-weighted local-linear regression in ln Q whose width is chosen
+  automatically for a robust (median-based) reduced χ² ≈ 1 — the mean-based
+  form the paper prescribes is driven to zero width by a couple of outliers on
+  real data, which gives back Lake-like noise. On synthetic data its rms error is several
+  times smaller than Lake's at the same noise level. Parameters
+  `abel_auto_smooth` / `abel_smooth_w` / `abel_num_mc` are plumbed through both
+  converters and exposed in the reduction GUI. Derivation and validation in
+  `docs/new_desmearing.md`; implementation notes in `docs/desmearing-methods.md`.
+- **Selectable desmearing methods** (`desmearing_methods.py`): `desmear_dispatch()`
+  offers `lake` (unchanged behaviour), `gp` (Huang Gaussian-process,
+  Matérn/RBF, resolution-aware prior, posterior 1σ returned as `DSM_Error`) and
+  `gp_lake_mean`; the converters take `desmear_method` / `gp_length_scale` /
+  `gp_kernel`, the reduction GUI exposes them. See `docs/desmearing-methods.md`.
+
+### Changed
+- **The default desmearing method is now truncated Abel, not Lake.** This
+  changes `desmear_dispatch`, `processFlyscan`, `processStepscan`, the reduction
+  worker and the GUI dropdown — and therefore the production daemon, which does
+  not pass the argument. Lake is still selectable and still bit-for-bit
+  identical to the historical path.
+- **Single Qt import point, `matilda/gui/_qt.py`** (house standard, matches
+  pyirena and MailToVault). Nine `try: from PySide6 … except ImportError: from
+  PyQt6 …` blocks across the GUI package — plus two inline ones in the middle
+  of functions — collapse into one shim that also normalises `Signal`
+  (`pyqtSignal` under PyQt6). GUI modules now do `from .._qt import QWidget, Qt,
+  Signal`; changing binding is a one-file edit. Behaviour is unchanged: PySide6
+  first, PyQt6 fallback, same names. `tests/test_gui_qt_shim.py` fails on a new
+  direct binding import, and on any Qt or `matilda.gui` import from the daemon
+  path — by scanning source, so it works on a machine with no Qt installed.
+- **Build backend is `setuptools>=77` with a static `version`** in
+  `pyproject.toml`, replacing `hatchling` + `hatch-vcs`. This matches the house
+  standard used by pyirena/MailToVault and removes a real failure mode: the
+  version string is stamped into every NXcanSAS file by `hdf5code.py`, and a
+  git-derived version reported garbage from a shallow CI checkout or a source
+  tarball with no tags. Bump `version` in `pyproject.toml`, then tag `v<version>`.
+- Wheel contents now come from `[tool.setuptools.packages.find]`
+  (`include = ["matilda*"]`); `LICENSE.txt` ships via PEP 639 `license-files`.
+- `IMPROVEMENT_PLAN.md` renamed to `PLAN.md` — the plan-file name used across
+  the other USAXS Python repos.
+- The `>=3.11` floor (house baseline is `>=3.10`) is now annotated in
+  `pyproject.toml` with the reason: server and CI run 3.11/3.12 only.
+- `build/`, `dist/` and `*.egg-info/` are gitignored and excluded from ruff —
+  setuptools leaves them in the tree where hatchling did not.
+
+### Fixed
+- Dead `from .desmearing import desmearData` imports in `convertFlyscan.py` and
+  `convertUSAXS.py`, left over when the dispatcher replaced the direct call.
+  These were failing `ruff check` (F401) in CI. Module docstrings updated to
+  name `desmear_dispatch()`.
 
 ---
 

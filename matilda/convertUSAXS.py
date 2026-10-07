@@ -16,7 +16,7 @@ Data flow
 importFlyscan() from supportFunctions    — read raw arrays (step and fly share format)
 calculatePD_Fly() / beamCenterCorrection()
 calibrateAndSubtractFlyscan()
-desmearData()
+desmear_dispatch()
 saveNXcanSAS() / readMyNXcanSAS()         — cache in HDF5
 
 Notes
@@ -48,7 +48,7 @@ from .hdf5code import saveNXcanSAS, readMyNXcanSAS
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import empty_calibrated_data
 from .supportFunctions import normalizeByTransmission, transmissionTerms
-from .desmearing import desmearData
+from .desmearing_methods import desmear_dispatch
 from .plotData import plotUSAXSResults
 
 
@@ -67,7 +67,9 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                      desmear_iter=20, extrap_method='PowerLaw w flat',
                      extrap_qstart=0.15, minQMinFindRatio=1.05, thickness_override=None,
                      use_mu=False, mu=None, per_gram=False, density=None,
-                     transmission_override=None, qmin_override=None):
+                     transmission_override=None, qmin_override=None,
+                     desmear_method='abel', gp_length_scale=0.5, gp_kernel='matern32',
+                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20):
     """Reduce a single USAXS step-scan HDF5 file to calibrated 1-D I(Q).
 
     Structurally identical to processFlyscan() (convertFlyscan module) —
@@ -156,7 +158,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength,ExtrapMethod=extrap_method,ExtrapQstart=extrap_qstart, MaxNumIter=desmear_iter)
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc)
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,

@@ -19,16 +19,10 @@ import h5py
 import numpy as np
 import pyqtgraph as pg
 
-try:
-    from PySide6.QtWidgets import (
-        QDialog, QVBoxLayout, QHBoxLayout,
-        QPushButton, QLabel, QCheckBox,
-    )
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QDialog, QVBoxLayout, QHBoxLayout,
-        QPushButton, QLabel, QCheckBox,
-    )
+from .._qt import (
+    QDialog, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QCheckBox,
+)
 
 _HDF5_DATA_PATH = "/entry/data/data"
 

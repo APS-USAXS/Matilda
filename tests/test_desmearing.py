@@ -66,3 +66,85 @@ def test_extend_data_rejects_nan_intensity():
     Int[3] = np.nan
     with pytest.raises(ValueError):
         extendData(np.linspace(0.01, 0.1, 10), Int, np.ones(10), 0.03, 0.05, "flat")
+
+
+# --- truncated-Abel desmearing ------------------------------------------------
+
+SLIT = 0.03
+
+
+def _model(q):
+    """Three-level-ish USAXS model with a flat background."""
+    return 1e3 / (1 + (q * 2000) ** 4) + 5.0 / (1 + (q * 120) ** 4) + 1e-6 * q ** -2.0 + 0.05
+
+
+def _smear(q, slit=SLIT):
+    """Accurate slit smearing by direct quadrature: (1/L)*int_0^L I(sqrt(q^2+y^2)) dy."""
+    from scipy.integrate import quad
+    return np.array([quad(lambda y: _model(np.hypot(qq, y)), 0, slit, limit=200)[0] / slit
+                     for qq in q])
+
+
+def test_abel_recovers_noise_free_model():
+    """Noise-free closure test: the inversion must return the true intensity."""
+    from matilda.desmearing_methods import desmear_dispatch
+    q = np.logspace(-4, np.log10(0.3), 300)
+    smr = _smear(q)
+    Q, I, E, dQ = desmear_dispatch(q, smr, 1e-3 * smr, np.gradient(q), SLIT,
+                                   method="abel", abel_auto_smooth=False,
+                                   abel_smooth_w=0.0, abel_num_mc=0)
+    ratio = I / _model(Q)
+    assert np.sqrt(np.mean((ratio - 1) ** 2)) < 0.01
+    assert len(Q) == len(q) and len(E) == len(q) and len(dQ) == len(q)
+
+
+def test_abel_beats_lake_on_noisy_data():
+    """The whole point of the method: it does not amplify noise the way Lake does."""
+    from matilda.desmearing_methods import desmear_dispatch
+    q = np.logspace(-4, np.log10(0.3), 300)
+    smr = _smear(q)
+    rng = np.random.default_rng(0)
+    noisy = smr * (1 + 0.02 * rng.standard_normal(len(q)))
+    err = 0.02 * smr
+    _, Ia, Ea, _ = desmear_dispatch(q, noisy, err, np.gradient(q), SLIT,
+                                    method="abel", abel_num_mc=5)
+    _, Il, _, _ = desmear_dispatch(q, noisy.copy(), err.copy(), np.gradient(q), SLIT,
+                                   method="lake")
+    rms_abel = np.sqrt(np.mean((Ia / _model(q) - 1) ** 2))
+    rms_lake = np.sqrt(np.mean((Il / _model(q) - 1) ** 2))
+    assert rms_abel < 0.5 * rms_lake
+    assert np.all(np.isfinite(Ea)) and np.all(Ea >= 0)
+
+
+def test_abel_auto_width_survives_outliers():
+    """A few bad points must not collapse the auto smoothing width.
+
+    Under a mean-based chi^2, two or three outliers reach chi^2 = 1 on their own,
+    the width drops to ~0 and the result is as noisy as Lake. The criterion is
+    therefore the robust (median-based) reduced chi^2.
+    """
+    from matilda.desmearing_methods import _abel_find_smooth_width
+    q = np.logspace(-4, np.log10(0.3), 300)
+    smr = _smear(q)
+    rng = np.random.default_rng(3)
+    y = smr * (1 + 0.02 * rng.standard_normal(len(q)))
+    err = 0.02 * smr
+    w_clean, _ = _abel_find_smooth_width(q, y, err)
+    y[[57, 212, 268]] *= [3.0, 0.3, 4.0]          # three bad points
+    w_spiked, _ = _abel_find_smooth_width(q, y, err)
+    assert w_clean > 0.03
+    assert w_spiked > 0.5 * w_clean
+
+
+def test_dispatch_lake_matches_desmear_data_exactly():
+    """method='lake' must stay bit-for-bit identical to the historical path."""
+    from matilda.desmearing_methods import desmear_dispatch
+    q = np.logspace(-4, -0.5, 200)
+    Int = 1e6 * q ** -3 + 100.0
+    err = 0.01 * Int
+    dQ = np.gradient(q)
+    a = desmearData(q.copy(), Int.copy(), err.copy(), dQ.copy(), slitLength=SLIT,
+                    ExtrapMethod="PowerLaw w flat", ExtrapQstart=None, MaxNumIter=20)
+    b = desmear_dispatch(q.copy(), Int.copy(), err.copy(), dQ.copy(), SLIT,
+                         method="lake", extrap_method="PowerLaw w flat", max_iter=20)
+    assert all(np.array_equal(x, y) for x, y in zip(a, b))

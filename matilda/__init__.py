@@ -45,7 +45,7 @@ matilda/convertFlyscan.py
     USAXS flyscan: HDF5 NXsas → normalised I(Q) → desmeared calibrated I(Q).
     Pipeline: importFlyscan → calculatePD_Fly → beamCenterCorrection →
               getBlankFlyscan → normalizeByTransmission →
-              calibrateAndSubtractFlyscan → desmearData → saveNXcanSAS.
+              calibrateAndSubtractFlyscan → desmear_dispatch → saveNXcanSAS.
 
 matilda/convertUSAXS.py
     USAXS step-scan: same pipeline as flyscan (identical file format).
@@ -59,6 +59,12 @@ matilda/convertSWAXS.py
 matilda/desmearing.py
     Lake / Strobl iterative slit-smearing correction.  Ported from Igor Pro.
     Entry point: desmearData(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength, …)
+
+matilda/desmearing_methods.py
+    Selectable desmearing methods behind one dispatcher with the same signature
+    and 4-tuple return as desmearData.  Default is the truncated-Abel inversion;
+    Lake and the Gaussian-process variants stay selectable.
+    Entry point: desmear_dispatch(…, method='abel'|'lake'|'gp'|…)
 
 I/O modules (future: matilda/io/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -105,8 +111,13 @@ matilda/plotData.py
 
 GUI subpackage (planned — matilda/gui/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+matilda/gui/_qt.py
+    Single Qt import point for the whole gui/ subpackage (PySide6, PyQt6
+    fallback).  GUI modules import Qt names from here, never from PySide6
+    directly.
+
 matilda/gui/__init__.py
-    Placeholder.  Future PyQt6 / pyqtgraph GUI tools:
+    Placeholder.  Future PySide6 / pyqtgraph GUI tools:
     - reduction_gui  : interactive 2-D → 1-D reduction with parameter control
     - survey_tool    : scan browser / overview
     - analysis_gui   : pyirena analysis launcher

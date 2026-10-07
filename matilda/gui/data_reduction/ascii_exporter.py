@@ -28,10 +28,7 @@ import os
 import h5py
 import numpy as np
 
-try:
-    from PySide6.QtCore import QThread, Signal
-except ImportError:
-    from PyQt6.QtCore import QThread, pyqtSignal as Signal
+from .._qt import QThread, Signal
 
 
 _NXCANSAS_ATTRS = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}

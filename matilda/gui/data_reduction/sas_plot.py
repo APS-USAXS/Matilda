@@ -25,10 +25,7 @@ import numpy as np
 from pathlib import Path
 import pyqtgraph as pg
 
-try:
-    from PySide6.QtWidgets import QFileDialog, QMessageBox
-except ImportError:
-    from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from .._qt import QFileDialog, QMessageBox
 
 
 # ===========================================================================

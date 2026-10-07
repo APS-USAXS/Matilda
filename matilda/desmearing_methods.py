@@ -305,12 +305,17 @@ def _abel_smooth_local_linear(q, y, w, use_log=None):
     rather than a plain Gaussian average because an average is biased at the
     ends of the range and on steep power laws, which is exactly where USAXS
     data live. Operates on ln y when the data are strictly positive.
+
+    ``use_log`` is a preference, not an instruction: it is honoured only when
+    every value really is positive. A Monte-Carlo realization can push a weak
+    point to zero or below even though the unperturbed curve was positive, and
+    taking its log would turn that whole draw into NaN.
     """
     x = np.log(np.asarray(q, float))
     y = np.asarray(y, float)
     n = len(x)
-    if use_log is None:
-        use_log = bool(np.all(y > 0))
+    positive = bool(np.all(y > 0))
+    use_log = positive if use_log is None else (use_log and positive)
     yy = np.log(y) if use_log else y
     half = 4.0 * w
     lo_i = np.searchsorted(x, x - half, side="left")

@@ -179,6 +179,14 @@ Code pieces, in call order:
     dependence is kept implicit: `T2 = α·Id[i] + β`, solved as
     `Id[i] = (−(2L/π)T1 + β)/(1−α)`. `α < 1` always, because every node has
     `s > Q`.
+- **Log vs linear smoothing** — `_abel_smooth_local_linear` works on `ln I`,
+  which preserves power laws, but only when every point is positive. The
+  `use_log` argument is therefore a *preference*, overridden when it is not
+  valid. This matters inside the Monte Carlo: a draw can push a weak point to
+  zero or below even on a curve that was positive, and `log` of that turned
+  the whole realization into NaN, so `DSM_Error` came back NaN —
+  intermittently, since the draws are random. Regression test:
+  `test_abel_monte_carlo_survives_a_draw_going_non_positive`.
 - **Uncertainties** — the inversion is *linear* in `Ismr`, unlike Lake, so error
   propagation is well defined. `abel_num_mc` (default 20) realizations add
   `N(0, SMR_Error)` to the **measured** points only (the high-Q extension is held

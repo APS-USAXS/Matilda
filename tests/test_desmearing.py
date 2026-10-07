@@ -136,6 +136,21 @@ def test_abel_auto_width_survives_outliers():
     assert w_spiked > 0.5 * w_clean
 
 
+def test_abel_monte_carlo_survives_a_draw_going_non_positive():
+    """A noisy realization may push a weak point to <= 0 even when the data are
+    positive.  Taking its log turned that whole draw into NaN and poisoned
+    DSM_Error — intermittently, since the draws are random."""
+    from matilda.desmearing_methods import _abel_core
+    q = np.logspace(-3, -0.5, 200)
+    I = 1e-3 * q ** -2 + 0.02
+    I[:6] = 1e-4                       # weak low-q block
+    err = np.full(len(q), 0.05)        # errors far larger than the signal there
+    for seed in range(12):
+        _, Id, E = _abel_core(q, I.copy(), err, 0.03, num_mc=8, seed=seed)
+        assert np.all(np.isfinite(Id)), f"non-finite intensity, seed {seed}"
+        assert np.all(np.isfinite(E)) and np.all(E >= 0), f"bad error, seed {seed}"
+
+
 def test_dispatch_lake_matches_desmear_data_exactly():
     """method='lake' must stay bit-for-bit identical to the historical path."""
     from matilda.desmearing_methods import desmear_dispatch

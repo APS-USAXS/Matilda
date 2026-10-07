@@ -41,6 +41,12 @@ the measurements behind each: `docs/fx4-reduction-guide.md` §3.10.
 
 ### Fixed
 
+- **Abel desmearing returned NaN error bars, intermittently.** The Monte-Carlo
+  loop reused the log/linear choice made from the unperturbed curve, but a
+  noisy realization can push a weak point to zero or below; `log` of that made
+  the whole draw NaN and poisoned `DSM_Error`. Hit roughly one run in ten on
+  the FX4 step-scan smoke test, depending on the random draw. `use_log` is now
+  a preference that is overridden when the values are not all positive.
 - `rebinData()` raised `ValueError: too many values to unpack` on its non-SMR
   branch — `rebin_QRSdata` returns four values, not three. That path runs for
   any fly scan reduced **without** a blank (the web-plot `displayData` route),

@@ -33,6 +33,7 @@ desmearing' sandbox (see that project's PLAN / FINDINGS).
 """
 from __future__ import annotations
 
+import functools
 import logging
 
 import numpy as np
@@ -338,37 +339,91 @@ def _abel_smooth_local_linear(q, y, w, use_log=None):
 # median of a chi^2_1 variate; divides median(r^2) into a reduced-chi^2 estimate
 _CHI2_1_MEDIAN = 0.45493642311957275
 
+# Auto-width tuning. Upper limit of the search, in ln q: a hard ceiling so the
+# daemon can never smooth past ~+-25% in Q, whatever the error bars say.
+_ABEL_SMOOTH_W_MAX = 0.25
+# Local guard: points per sliding window (windows overlap by half), and the
+# confidence level at which pure noise must still pass every window.
+_ABEL_LOCAL_WINDOW = 40
+_ABEL_LOCAL_CONFIDENCE = 0.95
 
-def _abel_find_smooth_width(q, y, err, w_min=0.002, w_max=0.5, target_chi2=1.0,
-                            n_bisect=18):
-    """Largest smoothing width whose reduced chi^2 against the measured points is
-    still <= target (the paper's Step 4). chi^2 grows monotonically with w, so a
-    bisection in ln w is enough. Returns (width, chi2).
 
-    The statistic is the *robust* reduced chi^2, median(r^2)/median(chi^2_1), not
-    the mean. Real USAXS curves carry a few outliers (bad points, a sharp feature
-    the local-linear fit cannot follow), and under the mean two or three of them
-    reach chi^2 = 1 on their own, which collapses the width to no smoothing at
-    all and gives back Lake-like noise.
+def _windowed_robust_chi2(r2, nw):
+    """Robust reduced chi^2 of each half-overlapping window of ``nw`` points.
+    Works on a 2-D stack of rows as well (last axis is Q)."""
+    win = np.lib.stride_tricks.sliding_window_view(r2, nw, axis=-1)
+    return np.median(win[..., ::max(1, nw // 2), :], axis=-1) / _CHI2_1_MEDIAN
+
+
+@functools.lru_cache(maxsize=64)
+def _abel_local_chi2_limit(n, nw, confidence=_ABEL_LOCAL_CONFIDENCE, n_sim=400):
+    """Threshold for the worst window: the ``confidence`` quantile of
+    max-over-windows robust chi^2 when the residuals are pure unit-variance noise.
+
+    A target of 1 per window would not do: the median of 40 chi^2_1 draws
+    scatters around 1, and the worst of ~25 windows sits near 1.8 on noise alone.
+    Simulated with a fixed seed, so the result is deterministic."""
+    r2 = np.random.default_rng(12345).standard_normal((n_sim, n)) ** 2
+    return float(np.quantile(_windowed_robust_chi2(r2, nw).max(axis=1), confidence))
+
+
+def _abel_find_smooth_width(q, y, err, w_min=0.002, w_max=_ABEL_SMOOTH_W_MAX,
+                            target_chi2=1.0, n_bisect=18, local_window=_ABEL_LOCAL_WINDOW):
+    """Largest smoothing width that passes both chi^2 tests against the measured
+    points (the paper's Step 4, plus a local guard). chi^2 grows monotonically
+    with w, so a bisection in ln w is enough. Returns (width, global chi2).
+
+    Global test: the *robust* reduced chi^2, median(r^2)/median(chi^2_1), not the
+    mean. Real USAXS curves carry a few outliers (bad points, a sharp feature the
+    local-linear fit cannot follow), and under the mean two or three of them reach
+    chi^2 = 1 on their own, which collapses the width to no smoothing at all and
+    gives back Lake-like noise.
+
+    Local test: the same robust chi^2 in every window of ``local_window``
+    consecutive points must stay below the noise-calibrated limit
+    (``_abel_local_chi2_limit``). Without it a misfit confined to one Q range
+    cannot move the global median: on glassy carbon (SRM 3600) the ~370 points
+    below the knee near Q = 0.08 fit fine at any width, so the global test
+    accepted w = 0.2-0.4 while the knee region sat at chi^2 ~ 100. The window
+    median keeps the local test as outlier-proof as the global one.
     """
     use_log = bool(np.all(y > 0))
+    n = len(q)
+    nw = min(int(local_window), n)
+    local_limit = _abel_local_chi2_limit(n, nw)
 
-    def chi2(w):
+    def test(w):
+        """Returns (passes, global chi2, local-only failure, worst window chi2, its Q)."""
         r = (_abel_smooth_local_linear(q, y, w, use_log=use_log) - y) / err
-        return float(np.median(r * r) / _CHI2_1_MEDIAN)
+        r2 = r * r
+        c = float(np.median(r2) / _CHI2_1_MEDIAN)
+        local = _windowed_robust_chi2(r2, nw)
+        k = int(np.argmax(local))
+        a = k * max(1, nw // 2)
+        ok_global, ok_local = c <= target_chi2, local[k] <= local_limit
+        return (ok_global and ok_local, c, ok_global and not ok_local,
+                float(local[k]), float(np.sqrt(q[a] * q[a + nw - 1])))
 
-    c_hi = chi2(w_max)
-    if c_hi <= target_chi2:
+    ok, c_hi, _, local_at_cap, _ = test(w_max)
+    if ok:
         return w_max, c_hi
-    c_lo = chi2(w_min)
-    if c_lo > target_chi2:
+    ok, c_lo, *_ = test(w_min)
+    if not ok:
         return w_min, c_lo
+    reject = None
     for _ in range(n_bisect):
         mid = np.sqrt(w_min * w_max)
-        if chi2(mid) <= target_chi2:
-            w_min, c_lo = mid, chi2(mid)
+        ok, c_mid, *info = test(mid)
+        if ok:
+            w_min, c_lo = mid, c_mid
         else:
-            w_max = mid
+            w_max, reject = mid, info
+    if reject is not None and reject[0]:
+        # the last rejected width sits on the boundary, so report the misfit the
+        # cap would have given, which says how much the guard is holding back
+        logging.info(f"Abel desmearing: auto width limited by the local fit near "
+                     f"Q = {reject[2]:.4g} 1/A (window chi2 {local_at_cap:.1f} at the "
+                     f"{_ABEL_SMOOTH_W_MAX} cap, limit {local_limit:.2f}).")
     return w_min, c_lo
 
 

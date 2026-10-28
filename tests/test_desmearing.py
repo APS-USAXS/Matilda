@@ -136,6 +136,47 @@ def test_abel_auto_width_survives_outliers():
     assert w_spiked > 0.5 * w_clean
 
 
+def _glassy_carbon_like(seed):
+    """SRM 3600-like SMR curve: weak, noisy low-Q power law with error bars about
+    twice the real scatter, then a sharp knee near Q = 0.08 measured precisely.
+    This is the case where the global median chi^2 alone over-smooths: the
+    low-Q majority of the points accepts any width and outvotes the knee."""
+    q = np.geomspace(1.2e-3, 0.3, 500)
+    I0 = 2e-4 * q ** -3 + 30.0 * np.exp(-(q * 18.0) ** 2 / 3) + 0.02
+    err = np.where(q < 0.03, 0.06, 0.012) * I0
+    rng = np.random.default_rng(seed)
+    y = I0 + rng.normal(0.0, err / np.where(q < 0.03, 2.0, 1.2))
+    return q, y, err
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_abel_auto_width_respects_a_local_feature(seed):
+    """A misfit confined to one Q range must limit the width (local guard).
+
+    With the global test alone (one window spanning the curve, no 0.25 cap) the
+    width comes out ~0.18 and the knee is visibly over-smoothed; the windowed
+    test brings it back to ~0.04."""
+    from matilda.desmearing_methods import _abel_find_smooth_width
+    q, y, err = _glassy_carbon_like(seed)
+    w_global_only, _ = _abel_find_smooth_width(q, y, err, w_max=0.5, local_window=len(q))
+    w, _ = _abel_find_smooth_width(q, y, err)
+    assert w_global_only > 0.15
+    assert w < 0.08
+
+
+def test_abel_auto_width_capped_and_free_on_featureless_data():
+    """Featureless data with generous error bars smooth all the way to the hard
+    cap, never past it: the local guard must not fire on noise alone."""
+    from matilda.desmearing_methods import _ABEL_SMOOTH_W_MAX, _abel_find_smooth_width
+    q = np.geomspace(1.2e-3, 0.3, 500)
+    I0 = 1e-3 * q ** -3
+    err = 0.02 * I0
+    for seed in range(5):
+        y = I0 + np.random.default_rng(seed).normal(0.0, err / 1.3)
+        w, _ = _abel_find_smooth_width(q, y, err)
+        assert w == _ABEL_SMOOTH_W_MAX == 0.25
+
+
 def test_abel_monte_carlo_survives_a_draw_going_non_positive():
     """A noisy realization may push a weak point to <= 0 even when the data are
     positive.  Taking its log turned that whole draw into NaN and poisoned

@@ -7,6 +7,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Fixed — Abel auto smoothing over-smoothed localized features
+
+The automatic smoothing width of the truncated-Abel desmearing used one robust
+(median) χ² over the whole curve, so a misfit confined to one Q range could not
+move it. On glassy carbon (SRM 3600) the noisy low-Q majority accepted any width
+and the knee at Q ≈ 0.08 came out clearly over-smoothed (auto w = 0.2–0.4).
+
+- **Local guard.** The robust χ² must now also pass in every window of 40
+  points, against a limit calibrated on pure noise (95% quantile of the worst
+  window). Outlier robustness is kept. SRM 3600 widths drop to 0.078–0.088.
+- **Hard ceiling** on the auto width lowered from 0.5 to **0.25** ln Q. A
+  hand-set width in the GUI is unaffected.
+- An INFO log line says when, and near which Q, the local guard limited the width.
+
+Not yet mirrored in Igor (`IN3_Abel_FindSmoothWidth`, which still uses the mean
+χ² and a 0.5 ceiling). Port plan with code: `docs/desmearing-methods.md` §4a.1.
+Details: `docs/desmearing-methods.md` §4a.
+
 ### Fixed — FX4 fly-scan noise and uncertainties
 
 Three corrections to the FX4 fly-scan path, each behind its own switch in

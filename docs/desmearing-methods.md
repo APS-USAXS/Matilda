@@ -134,9 +134,12 @@ Code pieces, in call order:
 - **`_abel_find_smooth_width(q, y, err)`** — the inversion differentiates the
   data and the `1/√(x²−Q²)` kernel weights the neighbourhood of `Q` heavily, so
   smoothing is mandatory: 1% noise becomes ~7% scatter without it. This is the
-  paper's Step 4 — bisect in `ln w` over `[0.002, 0.5]` for the **largest** width
-  whose reduced χ² of `(smoothed − measured)/SMR_Error` is still ≤ 1. χ² rises
-  monotonically with `w`, so bisection is safe.
+  paper's Step 4 — bisect in `ln w` over `[0.002, 0.25]` for the **largest** width
+  whose reduced χ² of `(smoothed − measured)/SMR_Error` is still ≤ 1 *and* that
+  passes the local guard below. χ² rises monotonically with `w`, so bisection is
+  safe. The 0.25 upper limit (`_ABEL_SMOOTH_W_MAX`, ≈ ±25% in Q) is a hard
+  safety ceiling for the daemon; it applies to auto only — a hand-set width in
+  the GUI may still go to 0.5.
   The statistic is the **robust** reduced χ², `median(r²)/median(χ²₁)` with
   `median(χ²₁) = 0.45494`, *not* the mean. This matters: real USAXS curves carry
   a few outliers (bad points, or a feature too sharp for the local-linear fit),
@@ -144,6 +147,22 @@ Code pieces, in call order:
   `TestData/NXcanSAS_SMR.h5` that collapsed the width from 0.16 to 0.016 — no
   smoothing at all — and the desmeared curve came back as noisy as Lake's.
   Regression test: `test_abel_auto_width_survives_outliers`.
+  **Local guard.** A median over the whole curve cannot see a misfit confined to
+  one Q range. On glassy carbon (SRM 3600, 10/2026 FX4 data) the ~370 points
+  below the knee at Q ≈ 0.08 carry error bars ~2× their scatter and accept any
+  width, so the global test picked w = 0.2–0.4 while the knee region sat at
+  χ² ≈ 100 — visibly over-smoothed. Now the same robust χ² is also computed in
+  every half-overlapping window of 40 points (`_ABEL_LOCAL_WINDOW`), and the
+  worst window must stay below the 95% quantile of what pure noise gives for
+  that `N` and window (`_abel_local_chi2_limit`, simulated once with a fixed seed
+  and cached; ≈ 2.4 for 500 points). The calibration matters: a target of 1 per
+  window would fire on noise alone, since the worst of ~25 window medians sits
+  near 1.8 even for a perfect fit. On those SRM 3600 files the width is now
+  0.078–0.088 (hand-picked 0.05–0.10 looked right); window size 25–60 and
+  confidence 95–99% move it by < 0.01. When the guard is what limits the width,
+  an INFO line names the Q where it bound and the window χ² the cap would have
+  given. Regression tests: `test_abel_auto_width_respects_a_local_feature`,
+  `test_abel_auto_width_capped_and_free_on_featureless_data`.
   The criterion still trusts the *scale* of `SMR_Error`: inflated errors
   over-smooth, underestimated errors under-smooth. The chosen width and χ² are
   logged at INFO level; uncheck "Auto" in the GUI and set the width by hand when
@@ -205,6 +224,209 @@ prototype): noise-free 0.18% / 0.3% rms; 1% noise with auto width 1.1% / 0.7%;
 3% noise 2.9% / 1.7%. In all cases the lowest 1–3 points are the weakest (the
 smoothing window is one-sided there and `T1` integrates over the most points) —
 on USAXS those points sit next to the beam anyway.
+
+### 4a.1 Igor port of the auto-width guard (`IN3_Calculations.ipf`)
+
+Implementation plan for bringing `IN3_Abel_FindSmoothWidth` in line with
+`_abel_find_smooth_width`: a robust global χ², a local window guard, and the
+0.25 ceiling. All changes are in `SAXS_IgorCode/User Procedures/Indra 2/IN3_Calculations.ipf`,
+in the truncated-Abel block (`IN3_DesmearDataAbel` and its static helpers).
+The inversion, the smoother, the extension and the Monte Carlo errors stay as
+they are. Only the choice of width changes, and only when `DesmearAbelAutoSmooth = 1`.
+
+**Where Igor and Python differ today**
+
+| | Igor now | Python | Port? |
+|---|---|---|---|
+| Global χ² | mean, `sum(chi)/nOrig` | median(r²)/median(χ²₁) | **yes**, step 2 |
+| Local guard | none | worst 40-point window ≤ noise limit | **yes**, steps 3–4 |
+| Width ceiling | `kAbelSmoothMaxW = 0.5` | 0.25 | **yes**, step 1 |
+| Non-finite or ≤ 0 `SMR_Error` | used as is | replaced by the median of the good errors | **yes**, step 5 |
+| Bisection steps | 12 | 18 | no, 12 already resolves w to < 0.1% |
+| Smoother cutoff | ±5σ | ±4σ | no, makes no difference |
+| What gets smoothed | extended data (`extQ`/`extInt`), χ² over the first `nOrig` | measured points only | no, only affects the last few points |
+
+The Python threshold is simulated with numpy's random generator, which Igor
+cannot reproduce. Igor uses a closed-form fit to the same quantity instead
+(step 3). It is within 0.09 of the Python value from 40 to 4000 points, and
+the width barely depends on it: a threshold change of 0.4 (95% → 99%
+confidence) moves the width by < 0.005.
+
+**Step 1 — constants.** Next to `kAbelNumU`:
+
+```igor
+static Constant kAbelSmoothMinW = 0.002				//search range for auto smoothing width, in ln(Q)
+static Constant kAbelSmoothMaxW = 0.25				//hard ceiling, was 0.5 (Matilda 10/2026)
+static Constant kAbelLocalWindow = 40				//points per local chi^2 window, windows overlap by half
+static Constant kAbelChi2_1Median = 0.454936423119573	//median of chi^2 with 1 degree of freedom
+```
+
+**Step 2 — robust global χ².** Replace the body of `IN3_Abel_ReducedChi2` and
+split out the squared residuals, which the local guard needs too.
+`median()` ignores NaN and has been built in since Igor 7.
+
+```igor
+//*************************************************************************
+// squared normalized residuals of smoothed vs measured, measured points only
+static Function/WAVE IN3_Abel_ResidSq(WAVE smInt, WAVE extInt, WAVE errW, variable nOrig)
+	Make/FREE/D/N=(nOrig) r2 = ((smInt[p]-extInt[p])/errW[p])^2
+	return r2
+End
+
+//*************************************************************************
+// robust reduced chi^2, median(r^2)/median(chi^2_1). Not the mean: two or three bad
+// points reach chi^2 = 1 on their own and collapse the auto width to no smoothing.
+static Function IN3_Abel_ReducedChi2(WAVE smInt, WAVE extInt, WAVE errW, variable nOrig)
+	WAVE r2 = IN3_Abel_ResidSq(smInt, extInt, errW, nOrig)
+	return median(r2)/kAbelChi2_1Median
+End
+```
+
+`IN3_DesmearDataAbel` still calls `IN3_Abel_ReducedChi2` for the
+`AbelSmoothChi2` wave-note entry, so that number becomes the robust χ², the
+same quantity Matilda logs. Values in notes written before this change are
+mean χ² and are not comparable.
+
+**Step 3 — local guard helpers.** The windows must be the same as Python's:
+starts `a = 0, 20, 40, …` while `a + 40 ≤ n`. A trailing partial window is
+dropped. For `n < 40` there is a single window of all the points.
+
+```igor
+//*************************************************************************
+// Worst robust chi^2 over half-overlapping windows of kAbelLocalWindow points.
+// Returns it; qAt receives the geometric-centre Q of that window.
+static Function IN3_Abel_WorstWindowChi2(WAVE r2, WAVE qv, variable &qAt)
+	variable n = numpnts(r2)
+	variable nw = min(kAbelLocalWindow, n)
+	variable stepW = max(1, floor(nw/2))
+	variable a, c, worst = -inf
+	for(a = 0; a + nw <= n; a += stepW)
+		c = median(r2, pnt2x(r2, a), pnt2x(r2, a+nw-1))/kAbelChi2_1Median
+		if(c > worst)
+			worst = c
+			qAt = sqrt(qv[a]*qv[a+nw-1])
+		endif
+	endfor
+	return worst
+End
+
+//*************************************************************************
+// Limit for the worst window: 95% quantile of the worst-window robust chi^2 for
+// pure unit noise. Closed-form fit (K = number of windows) to the simulation in
+// Matilda's _abel_local_chi2_limit; within 0.09 of it for 40-4000 points.
+// A limit of 1 per window would not do: on noise alone the worst window is ~1.8.
+static Function IN3_Abel_LocalChi2Limit(variable n)
+	variable nw = min(kAbelLocalWindow, n)
+	variable K = floor((n-nw)/max(1, floor(nw/2))) + 1
+	return 1.742 + 0.2267*ln(K)
+End
+```
+
+The fit is calibrated for 40-point windows. For `n < 40` the limit is a bit
+too low (1.742 instead of the window's own value), which only errs toward less
+smoothing. USAXS curves are never that short.
+
+**Step 4 — the width search.** Add a pass/fail helper and replace
+`IN3_Abel_FindSmoothWidth`. Like Python, it tests the ceiling first.
+
+```igor
+//*************************************************************************
+// Does width w pass both tests? localOnlyFail = passes globally, fails locally.
+// worst/qAt = worst window chi^2 and its Q (for the history message).
+static Function IN3_Abel_WidthPasses(WAVE extQ, WAVE extInt, WAVE errW, variable nOrig, variable w, variable limitL, variable &localOnlyFail, variable &worst, variable &qAt)
+	WAVE sm = IN3_Abel_SmoothLocalLinear(extQ, extInt, w, 1)
+	WAVE r2 = IN3_Abel_ResidSq(sm, extInt, errW, nOrig)
+	variable okG = (median(r2)/kAbelChi2_1Median <= 1)
+	worst = IN3_Abel_WorstWindowChi2(r2, extQ, qAt)
+	variable okL = (worst <= limitL)
+	localOnlyFail = (okG && !okL)
+	return (okG && okL)
+End
+
+//*************************************************************************
+// Largest smoothing width that passes the robust global chi^2 <= 1 (paper, Sec. 3.2
+// step 4) AND the local guard: every kAbelLocalWindow-point window below the noise
+// limit. Without the guard a misfit confined to one Q range cannot move the global
+// median (glassy carbon: knee near Q=0.08 over-smoothed at w=0.2-0.4).
+// Bisection in ln(width).
+static Function IN3_Abel_FindSmoothWidth(WAVE extQ, WAVE extInt, WAVE errW, variable nOrig)
+
+	variable lo = ln(kAbelSmoothMinW), hi = ln(kAbelSmoothMaxW), mid, it
+	variable limitL = IN3_Abel_LocalChi2Limit(nOrig)
+	variable localOnly, worst, qAt, worstAtCap
+	variable rejectedLocal = 0, rejectQ = NaN
+
+	if(IN3_Abel_WidthPasses(extQ, extInt, errW, nOrig, exp(hi), limitL, localOnly, worstAtCap, qAt))
+		print "IN3_Abel: chi^2<=1 even for maximal smoothing (errors overestimated?), using maximal width"
+		return exp(hi)
+	endif
+	if(!IN3_Abel_WidthPasses(extQ, extInt, errW, nOrig, exp(lo), limitL, localOnly, worst, qAt))
+		print "IN3_Abel: chi^2>1 even for minimal smoothing (errors underestimated?), using minimal width"
+		return exp(lo)
+	endif
+	for(it = 0; it < 12; it += 1)
+		mid = (lo+hi)/2
+		if(IN3_Abel_WidthPasses(extQ, extInt, errW, nOrig, exp(mid), limitL, localOnly, worst, qAt))
+			lo = mid
+		else
+			hi = mid
+			rejectedLocal = localOnly
+			rejectQ = qAt
+		endif
+	endfor
+	if(rejectedLocal)
+		printf "IN3_Abel: auto width limited by the local fit near Q=%g 1/A (window chi2 %.1f at the %g cap, limit %.2f)\r", rejectQ, worstAtCap, kAbelSmoothMaxW, limitL
+	endif
+	return exp(lo)
+End
+```
+
+Each test smooths once and evaluates both criteria from the same residuals.
+The window medians are cheap next to the smoothing, so run time is essentially
+unchanged.
+
+**Step 5 — sanitize `SMR_Error` before use.** Python does this in
+`_abel_core`. In `IN3_DesmearDataAbel`, right after the `WAVE SMR_dQ = …` line, build a
+free copy and pass it everywhere `SMR_Error` currently goes as an error
+weight: `IN3_Abel_FindSmoothWidth`, `IN3_Abel_ReducedChi2` and
+`IN3_Abel_MonteCarloErrors`. **Keep the original `SMR_Error`** for
+`DSM_Error` (its wave notes are duplicated) and for `DesmNormalizedError`.
+
+```igor
+	//error weights for smoothing / chi^2 / MC: non-finite or <=0 replaced by the median
+	//of the good ones (a NaN would make gnoise() poison a whole MC realization)
+	Duplicate/FREE/D SMR_Error, errUse, goodErr
+	goodErr = (numtype(SMR_Error[p]) == 0 && SMR_Error[p] > 0) ? SMR_Error[p] : NaN
+	variable medErr = median(goodErr)
+	if(numtype(medErr) != 0)
+		medErr = 0.01*median(SMR_Int)		//no usable errors at all: 1% of typical intensity
+	endif
+	errUse = (numtype(SMR_Error[p]) == 0 && SMR_Error[p] > 0) ? SMR_Error[p] : medErr
+```
+
+(Python's last-resort fallback is `0.01·median(|I|)`. With positive SMR data
+the two are the same.)
+
+**Step 6 — what to check after porting**
+
+1. **Glassy carbon, the case that motivated this.** Use
+   `GC_SRM3600_0007` … `_0015` from
+   `USAXS_data/2026/2026-10/10_19_setup/data/data_usaxs`. With auto on, the
+   history line should report a width of **0.078–0.089**, and the "limited by the
+   local fit near Q≈0.11–0.15" message should appear for every file. Before the
+   port Igor gives 0.115–0.125 here; Matilda's old code gave 0.19–0.41. An
+   emulation of the Igor variant (closed-form limit, 12 steps) gave 0.0856,
+   0.0795, 0.0885, 0.0858, 0.0874 against Matilda's 0.0852, 0.0782, 0.0880,
+   0.0853, 0.0869. Expect Igor within ≈ 0.005 of Matilda's INFO line for the
+   same file. A larger gap means the windows or the limit are wired differently.
+2. **No regression on featureless data.** `IN3_Abel_SyntheticTest(0.03, 0.01, -1)`
+   should still print a ratio sdev close to its pre-port value. The width may
+   drop, since the old 0.5 ceiling is gone and the model has two knees.
+3. **Outliers.** Multiply two or three SMR points by 3 on a smooth sample and
+   desmear with auto on. The width must stay within a factor of ~2 of the clean
+   value. A collapse to 0.002 means a mean χ² is still being used somewhere.
+4. **Manual mode is untouched.** With auto off, `DesmearAbelSmoothW` is used as
+   typed, up to 0.5, and results must be identical to the pre-port code.
 
 ---
 

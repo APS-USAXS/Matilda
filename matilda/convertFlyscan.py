@@ -65,6 +65,8 @@ from .hdf5code import load_dict_from_hdf5, save_dict_to_hdf5, saveNXcanSAS, read
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
+from .supportFunctions import _fixNegativeFlyIntensities
+from .fx4support import CHAIN_FX4, add_relative_floor
 from .supportFunctions import empty_calibrated_data
 from .desmearing_methods import desmear_dispatch
 
@@ -141,6 +143,7 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                 writeThicknessOverride(hdf_file, '/entry/sample/thickness',
                                        thickness_override, filename)
             Sample["RawData"]=importFlyscan(path, filename)                         # import data
+            is_fx4 = Sample["RawData"].get("chain") == CHAIN_FX4
             Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
             Sample["reducedData"].update(calculatePDErrorFly(Sample))               # Calculate UPD error, mostly the same as in Igor                
             Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0))   # Beam center correction
@@ -149,7 +152,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                                                     Sample["reducedData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
                                                     Sample["reducedData"]["Error"],
                                                     Sample["RawData"]["TimeInSec"],
-                                                    replaceNans=True, time_base=1.0))
+                                                    replaceNans=True, time_base=1.0,
+                                                    fx4_noise_model=is_fx4))
 
             if (
                 blankPath is not None
@@ -164,6 +168,11 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
                     if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
                         Sample["CalibratedData"].update(rebinData(Sample, num_points=num_points, isSMRData=True))         #Rebin data
+                    if is_fx4:
+                        # ~0.1% of I survives all averaging on strong signal;
+                        # added once, after rebinning (fx4support).
+                        Sample["CalibratedData"]["SMR_Error"] = add_relative_floor(
+                            Sample["CalibratedData"]["SMR_Int"], Sample["CalibratedData"]["SMR_Error"])
                     slitLength=Sample["CalibratedData"]["slitLength"]
                     #DesmearNumberOfIterations = 10
                     SMR_Int =Sample["CalibratedData"]["SMR_Int"]
@@ -216,6 +225,11 @@ def reduceFlyscanToQR(path, filename, recalculateAllData=False):
                 Sample = dict()
                 Sample["RawData"]=importFlyscan(path, filename)         #import data
                 Sample["reducedData"]= calculatePD_Fly(Sample)       # Correct gains
+                if Sample["RawData"].get("chain") == CHAIN_FX4:
+                    # FX4 lifts negative intensities after smoothing; this web-plot
+                    # path does not smooth, so lift here for the log-scale plot.
+                    Sample["reducedData"]["Intensity"] = _fixNegativeFlyIntensities(
+                        Sample["reducedData"]["Intensity"])
                 Sample["reducedData"].update(beamCenterCorrection(Sample,useGauss=0)) #Beam center correction
                 Sample["reducedData"].update(rebinData(Sample))         #Rebin data
                 # Create the group and dataset for the new data inside the hdf5 file for future use. 

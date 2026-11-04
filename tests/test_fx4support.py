@@ -274,6 +274,11 @@ def test_fx4_flyscan_intensity_is_a_plain_current_ratio(fx4_flyscan_pair):
 
 
 def test_fx4_flyscan_errors_use_the_recorded_sigmas(fx4_flyscan_pair):
+    """Per-interval error = electronic floor + shot-like term, through the ratio.
+
+    Written out from the model in docs/fx4-flyscan-uncertainties.md rather than
+    by calling fx4support, so a change to the helper cannot pass by itself.
+    """
     from matilda.supportFunctions import (importFlyscan, calculatePD_Fly,
                                           calculatePDErrorFly)
     Sample = {"RawData": importFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5")}
@@ -281,33 +286,29 @@ def test_fx4_flyscan_errors_use_the_recorded_sigmas(fx4_flyscan_pair):
     error = calculatePDErrorFly(Sample)["Error"]
     assert np.all(np.isfinite(error))
     assert np.all(error > 0)
-    # Default (FX4_USE_EFFECTIVE_SAMPLES off): 2% spread within each interval
-    # over 50 samples is 0.28% on the mean, sqrt(2) times that on the ratio.
-    relative = error / Sample["reducedData"]["Intensity"]
-    expected = np.sqrt(2) * 0.02 / np.sqrt(CHANNEL_TIME / 1e-3)
-    assert np.nanmedian(relative) == pytest.approx(expected, rel=0.05)
+
+    raw = Sample["RawData"]
+    upd, i0 = raw["UPD_array"], raw["Monitor"]
+    n_reads = CHANNEL_TIME / 1e-3
+    dark, dark_err = DARK[UPD_RANGE], DARK_ERR[UPD_RANGE]
+    q = fx4.FX4_SHOT_CHARGE_PC
+    s_upd2 = ((0.02 * upd) ** 2 / (n_reads * VALUES_PER_READ)
+              + q * np.clip(upd - dark, 0, None) / CHANNEL_TIME + dark_err ** 2)
+    s_i02 = (0.02 * i0) ** 2 / (n_reads * VALUES_PER_READ) + q * i0 / CHANNEL_TIME
+    R = (upd - dark) / i0
+    expected = np.sqrt(s_upd2 + R ** 2 * s_i02) / i0
+    assert np.allclose(error, expected, rtol=1e-10)
 
 
-def test_fx4_effective_samples_switch_scales_by_sqrt_values_per_read(fx4_flyscan_pair):
-    """Switch 2 must change the error by exactly sqrt(values_per_read)."""
-    from matilda import fx4support
+def test_fx4_error_of_a_zero_net_current_is_not_zero(fx4_flyscan_pair):
+    """A point sitting exactly on the dark current still has its floor error."""
     from matilda.supportFunctions import (importFlyscan, calculatePD_Fly,
                                           calculatePDErrorFly)
     Sample = {"RawData": importFlyscan(str(fx4_flyscan_pair), "Sample_0002.h5")}
+    Sample["RawData"]["UPD_array"][-5:] = DARK[UPD_RANGE]
     Sample["reducedData"] = calculatePD_Fly(Sample)
-    saved = fx4support.FX4_USE_EFFECTIVE_SAMPLES
-    try:
-        fx4support.FX4_USE_EFFECTIVE_SAMPLES = False
-        off = calculatePDErrorFly(Sample)["Error"]
-        fx4support.FX4_USE_EFFECTIVE_SAMPLES = True
-        on = calculatePDErrorFly(Sample)["Error"]
-    finally:
-        fx4support.FX4_USE_EFFECTIVE_SAMPLES = saved
-    ratio = on / off
-    # The dark-current error is added in quadrature and does not scale, so the
-    # full sqrt(values_per_read) only shows where the signal dominates it.
-    assert np.all(ratio > 1.0)
-    assert np.max(ratio) == pytest.approx(np.sqrt(VALUES_PER_READ), rel=0.01)
+    error = calculatePDErrorFly(Sample)["Error"]
+    assert np.all(error[-5:] > 0)
 
 
 def test_fx4_flyscan_full_reduction(fx4_flyscan_pair):
@@ -426,26 +427,15 @@ def test_signal_derived_range_index_thresholds():
     assert np.allclose(fx4.signal_derived_range_index(upd), [0, 1, 2, 3, 4])
 
 
-def test_rebin_error_of_mean_is_opt_in():
-    """Switch 1 changes the rebinned error by sqrt(n); default keeps the RMS."""
-    import matilda.supportFunctions as sf
-    q = np.linspace(0.0002, 0.05, 400)
-    i = 1e3 * q ** -2
-    e = 0.1 * i
-    _, _, e_rms, _ = sf.rebin_QRSdata(q.copy(), i.copy(), e.copy(), 50)
-    _, _, e_mean, _ = sf.rebin_QRSdata(q.copy(), i.copy(), e.copy(), 50,
-                                       error_of_mean=True)
-    assert np.all(e_mean <= e_rms + 1e-30)
-    assert np.nanmax(e_rms / np.where(e_mean > 0, e_mean, np.nan)) > 2.0
-
-
-def test_scaler_chain_untouched_by_fx4_switches(tmp_path):
-    """The three FX4 switches must not reach the scaler chain at all."""
+def test_scaler_chain_rebin_untouched_by_fx4_noise_model(tmp_path):
+    """The FX4 smoothing-window treatment must not reach the scaler chain."""
     import matilda.supportFunctions as sf
     data = {"RawData": {"chain": CHAIN_SCALER},
             "reducedData": {"Q": np.linspace(0.0002, 0.05, 400),
                             "Intensity": np.linspace(10, 1, 400),
-                            "Error": np.full(400, 1.0)}}
+                            "Error": np.full(400, 1.0),
+                            # present but must be ignored on this chain
+                            "SmoothWindow": np.full(400, 1.0)}}
     out = sf.rebinData(data, num_points=50)
     plain = sf.rebin_QRSdata(data["reducedData"]["Q"],
                              data["reducedData"]["Intensity"],

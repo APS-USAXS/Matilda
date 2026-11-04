@@ -233,45 +233,45 @@ interval cancels in the ratio.
 For comparison, the scaler chain computed:
 `I = ((UPD − t·bkg)/(f·gain)) / (Monitor/I0Gain)` with `f = 1e6`.
 
-Then apply the **negative-intensity fix**, unchanged from Igor
-`IN3_FixNegativeIntensities`:
-
-```
-startIndex = round(0.2 · n)              // skip the rocking-curve peak
-Vmin = nanmin(I[startIndex : n−1])
-if (Vmin < 0)
-    I += 1.1·|Vmin| + 0.3e-10·nanmax(I)
-endif
-```
-
-(Igor constants: `Indra_PDIntBackFixScaleVmin = 1.1`,
-`Indra_PDIntBackFixScaleVmax = 0.3e-10`.)
+**No negative-intensity fix here.** Weak FX4 points scatter around zero after
+dark subtraction, so a lift applied now is set by the single most negative
+noise point (0.3–0.7 pA on the 2026-10 data, as large as the net high-Q
+signal), and sample and blank get different random offsets. The FX4 chain
+applies the same Igor `IN3_FixNegativeIntensities` **after smoothing** (§3.8),
+where the minimum follows the real background. The scaler chain still lifts
+here, unchanged.
 
 ### 3.7 Uncertainty
 
-`upd_sigma` / `I0_sigma` are the spread of samples **within** each interval,
-not the error of the mean. So divide by `sqrt(N)`:
+Measured noise model; the data behind it are in
+`docs/fx4-flyscan-uncertainties.md`. Every term depends on **signal level
+only** — never on Q, never on photon energy.
 
 ```
-N_upd = |upd_total / upd_current|      // clamped to >= 1, else 1
+N_upd = |upd_total / upd_current|      // reads per interval, clamped to >= 1
 N_i0  = |I0_total  / I0_current|
+vpr   = values_per_read                // 10; 1 if missing (conservative)
+t     = channel_time                   // s
+q_eff = 6.5e-4                         // pC, FX4_SHOT_CHARGE_PC
 
-sigma_upd = upd_sigma / sqrt(N_upd)
-sigma_i0  = I0_sigma  / sqrt(N_i0)
+net   = upd_current − updBkg
+s_upd = sqrt( upd_sigma^2/(N_upd·vpr) + q_eff·max(net,0)/t + updBkgErr^2 )
+s_i0  = sqrt( I0_sigma^2 /(N_i0 ·vpr) + q_eff·I0_current/t )
 
-sigma_upd = sqrt(sigma_upd^2 + updBkgErr^2)     // fold in dark-current error
-
-Error = ratio_error(upd_current − updBkg, sigma_upd, I0_current, sigma_i0)
+R     = net / I0_current
+Error = sqrt( s_upd^2 + R^2·s_i0^2 ) / I0_current
 ```
 
-where the ratio propagation is
-
-```
-rel_num = (num != 0) ? num_err/num : 0
-rel_den = (den != 0) ? den_err/den : 0
-ratio   = (den != 0) ? num/den     : 0
-err     = |ratio| · sqrt(rel_num^2 + rel_den^2)        // 0 if non-finite
-```
+* **Electronic floor**, `sigma/sqrt(N·vpr)`: the recorded per-interval spread
+  behaves like that of N·values_per_read independent raw samples. Dividing by
+  `sqrt(N)` alone overstated weak-signal errors by ~√10.
+* **Shot-like term**, `q_eff·net/t`: invisible to `upd_sigma`, dominant from
+  ~1 pA net upward. `q_eff` fitted to 5–9e-4 pC at 12, 21, 24 and 28 keV alike
+  (E/3.65 eV would change 2.3× over that range), so it is one constant. Diode
+  efficiency does not enter; the term is written in measured current.
+* The ratio is propagated in the form above, not as `|R|·sqrt(rel_num² +
+  rel_den²)`: the relative form gives a point sitting exactly on the dark
+  current zero error.
 
 Where a sigma array is absent, fall back to a flat relative error of
 **1 %** (`FX4_RELATIVE_CURRENT_ERROR`) of the current. Real files carry a few
@@ -279,75 +279,45 @@ NaNs in the sigma arrays; replace those points with the same 1 % fallback —
 otherwise they propagate to zero error, which reads as an infinitely
 well-known point.
 
-This per-point estimate is **3–5× below** the observed point-to-point scatter
-of the raw I(q) — 4.8× at Q ≈ 5e-4 falling to 1.7× above Q = 0.1 on
-`GC_SRM3600_0131`. `sqrt(N)` assumes the FX4's samples are independent; they
-are averages of `values_per_read` raw readings behind an analogue filter, so
-the effective count is `N/values_per_read`. **Do not "fix" this here** — see
-§3.10, where it turns out to cancel against a second missing factor.
+This is the error of **one** interval. Smoothing (§3.8) and rebinning (§6.4)
+reduce it for the averaging they do.
 
 ### 3.8 Smoothing
 
-`smooth_r_data` is unchanged in substance, with two FX4 differences:
+Same windows as the scaler chain; four FX4 differences (`fx4_noise_model=True`):
 
 * The time base is **1.0**, because `channel_time` is already in seconds
   (the scaler chain passed mca1 counts with a base of 1e6 Hz).
-* There is no per-point amplifier range — see §3.10, switch 3.
+* The range index is derived from the signal, not `upd_lurange` (§3.10).
+* **Average in linear intensity**, not ln(I). Weak FX4 points include
+  negatives that ln(I) cannot hold (they were NaN-replaced from neighbours,
+  biasing upward), and averaging ln(I) of noisy data is biased low: 11–12 % at
+  high Q on a strong ceramic, 1–2 % on glassy carbon. On strong, steep data the
+  two differ by < 0.07 %.
+* **Propagate the averaging into the error.** For the trapezoid boxcar of n
+  points, `Error /= sqrt(n_eff)` with `n_eff = (n−1)^2/(n−1.5)` (the end points
+  carry half weight). For the linear-fit branch at range boundaries,
+  `Error /= sqrt(n_used)` instead of the scaler chain's fixed `/3`. Keep
+  `n_eff` per point as **SmoothWindow** (1 where not smoothed): rebinning needs
+  it.
+* **Then** apply the negative-intensity fix of §3.6 (Igor
+  `IN3_FixNegativeIntensities`, minimum over the last 80 % of points,
+  `1.1·|Vmin| + 0.3e-10·max`). It is one flat constant, absorbed by the flat
+  background of any model; done after smoothing it follows the background
+  level instead of a noise spike.
 
 Per-range minimum smoothing times (seconds, indexed by range 0–4), unchanged:
-`[0.02, 0.02, 0.03, 0.1, 0.4]`.
+`[0.02, 0.02, 0.03, 0.1, 0.4]`. At t ≈ 0.019 s that is a 41–47 point window
+below 30 pA and 7–15 points above.
 
-### 3.10 Noise handling — the three FX4 switches
+### 3.10 Signal-derived smoothing range
 
-Three corrections, each isolated behind its own flag in `fx4support.py` so it
-can be toggled while comparing Igor against Matilda. **All three are FX4-only;
-the scaler chain is bit-for-bit unchanged in every combination.** Defaults:
-
-| switch | constant | default |
-|---|---|---|
-| 1 | `FX4_ERROR_OF_MEAN_ON_REBIN` | **on** |
-| 2 | `FX4_USE_EFFECTIVE_SAMPLES` | **off** |
-| 3 | `FX4_SIGNAL_DERIVED_SMOOTHING_RANGE` | **on** |
-
-**Switch 1 — rebinning returns the error of the mean.** `rebin_log_data`
-accumulated `sqrt(Σσ²/n)`, the RMS of the inputs, which is the error of *one*
-point. A bin holds their **mean**, whose error is `sqrt(Σσ²)/n` — a further
-`1/sqrt(n)`. The bins are disjoint, so for independent inputs this is simply
-correct; it was never applied on either chain. Enabled for FX4 only, because
-changing it on the scaler chain would move every historical result.
-
-**Switch 2 — effective sample count (off by default).** The reasoning in §3.7
-is right: dividing by `sqrt(N)` instead of `sqrt(N/values_per_read)`
-understates the per-raw-point error by `sqrt(10) = 3.2`. But applying it
-double-counts, because the pipeline *also* drops the noise reduction of
-`smooth_r_data`, which averages 6–7 points and leaves the error untouched.
-
-Measured by reducing two disjoint halves of the raw points independently and
-comparing them — the one estimator the smoothing's correlation cannot fool —
-true/quoted error at the SMR stage, per decade of Q from 1e-3:
-
-| setting | 1e-3–1e-2 | 1e-2–1e-1 | 1e-1–1 |
-|---|---|---|---|
-| switch 1 on, switch 2 **off** | 1.34 | 0.87 | 0.90 |
-| switch 1 on, switch 2 on | 0.42 | 0.27 | 0.29 |
-
-So the two unpropagated effects currently cancel to within ~30%. The honest
-fix is to carry an effective sample count through smoothing *and* rebinning
-and then enable switch 2; until then it stays off.
-
-> Do not judge this by the point-to-point scatter of the SMR curve. Smoothing
-> cuts that scatter by 10–13× while the window is only 6–7 points
-> (`sqrt(7) = 2.6`): the output points are heavily correlated, so their
-> scatter understates their uncertainty by about 4×. The halves test above is
-> the one to trust.
-
-**Switch 3 — signal-derived smoothing range.** The FX4 reading is
-gain-independent and `upd_lurange` is written **once, after the scan**, so
-there is no per-point range: every point would take `rwave_smooth_times[4]`,
-the slowest, giving a 12–24 point window across the whole curve. On the scaler
-chain the amplifier range *was* a proxy for signal level, and those smoothing
-times were tuned against it, so derive a pseudo-range from the raw
-`upd_current` and reuse the constants unchanged:
+The FX4 reading is gain-independent and `upd_lurange` is written **once,
+after the scan**, so there is no per-point range: every point would take
+`rwave_smooth_times[4]`, the slowest. On the scaler chain the amplifier range
+*was* a proxy for signal level, and those smoothing times were tuned against
+it, so derive a pseudo-range from the raw `upd_current` and reuse the
+constants unchanged (`FX4_SIGNAL_DERIVED_SMOOTHING_RANGE`, on):
 
 | `upd_current` | range index | window |
 |---|---|---|
@@ -358,118 +328,84 @@ times were tuned against it, so derive a pseudo-range from the raw
 | otherwise | 4 | 0.40 s |
 
 Thresholds are descending on the **raw** `upd_current`, before dark-current
-subtraction. On `GC_SRM3600_0131` this puts 37/80/133/2823/926 of the 3999
-points in ranges 0–4, a 2–7 point window instead of a uniform 22.
+subtraction. A separate "start smoothing only below 1e-5 of the peak" guard is
+redundant once this is in.
 
-Two notes from the Python/Igor comparison:
+The two other switches of the first FX4 release are **retired** (2026-11):
+"error of the mean on rebin" and "effective samples N/values_per_read". The
+first double-counted the smoothing once that is propagated; the second had the
+direction wrong (the floor is `N·values_per_read`, §3.7). Their apparent
+cancellation on the commissioning pair was a coincidence of its 20–100 pA
+signal level; on weak samples the SMR errors came out 3–7× too large.
 
-* A separate "start smoothing only below 1e-5 of the peak" guard is
-  **redundant** once this is in — the two produce bit-identical output,
-  because the bright head already selects a 1–2 point window. One knob, not
-  two.
-* The wide uniform window was not *distorting* the data: current versus
-  signal-derived differ by ≤0.24% in the steepest band and 0.00% elsewhere.
-  Switch 3 is about not over-smoothing real structure, not about fixing a bias.
-
-### 3.11 Igor implementation of the three switches
+### 3.11 Igor implementation of the noise model
 
 **Index base differs between the two codes.** Igor's `PD_range` is 1–5 and
 indexes `rwave_smooth_times` 1-based; Python's `UPD_gainsIndx` is 0–4. Same
 five times, `[0.02, 0.02, 0.03, 0.1, 0.4]`, same order. Everything below is
-written in Igor's 1-based convention.
+written in Igor's 1-based convention, and applies **only when the file is FX4**;
+the scaler chain stays as it is, apart from §6.3.
 
-**Globals.** Create once, in the package data folder, so the three can be
-toggled from a panel while comparing against Matilda:
+**Constants.**
 
 ```igor
-Function FX4_InitNoiseGlobals()
-    DFREF saveDF = GetDataFolderDFR()
-    NewDataFolder/O/S root:Packages
-    NewDataFolder/O/S root:Packages:Indra3
-    Variable/G FX4SignalDerivedRange  = 1      // switch 3, on
-    Variable/G FX4ErrorOfMeanOnRebin  = 1      // switch 1, on
-    Variable/G FX4UseEffectiveSamples = 0      // switch 2, OFF — see 3.10
-    SetDataFolder saveDF
-End
+Constant FX4_ShotChargePC      = 6.5e-4   // pC, energy independent (12-28 keV)
+Constant FX4_RelErrorFloor     = 1e-3     // added once to SMR_Error after rebin
 ```
 
-**Switch 3 — pseudo-range from the signal.** Call this where the FX4 branch
-builds `PD_range`, in place of filling it from `upd_lurange`. No loop needed:
+**1. Per-interval error** (replaces the `upd_sigma/sqrt(N)` step):
+
+```igor
+// updWvSigma, updTotal, USAXS_PD = upd_current (raw), Bkg = dark, BkgErr
+// I0 = I0_current, I0Sigma, I0Total, MeasTime = channel_time, vpr from file
+Duplicate/FREE USAXS_PD, Nupd, NetUPD, SigUPD2, SigI02
+Nupd   = max(abs(updTotal/USAXS_PD), 1)
+NetUPD = USAXS_PD - Bkg
+SigUPD2 = updWvSigma^2/(Nupd*vpr) + FX4_ShotChargePC*max(NetUPD,0)/MeasTime + BkgErr^2
+SigI02  = I0Sigma^2/(max(abs(I0Total/I0),1)*vpr) + FX4_ShotChargePC*I0/MeasTime
+PD_Error = sqrt(SigUPD2 + (NetUPD/I0)^2*SigI02) / I0
+```
+
+**2. Pseudo-range** (switch 3, unchanged):
 
 ```igor
 Static Function FX4_SignalDerivedRange(WAVE PD_range, WAVE USAXS_PD)
     // USAXS_PD is the RAW upd_current, BEFORE dark-current subtraction.
-    NVAR/Z on = root:Packages:Indra3:FX4SignalDerivedRange
-    if (!NVAR_Exists(on) || !on)
-        return 0                                // leave PD_range as found
-    endif
     Redimension/S PD_range
     PD_range = 5
     PD_range = (USAXS_PD[p] >    30) ? 4 : PD_range[p]
     PD_range = (USAXS_PD[p] >   800) ? 3 : PD_range[p]
     PD_range = (USAXS_PD[p] > 12000) ? 2 : PD_range[p]
     PD_range = (USAXS_PD[p] >   1e6) ? 1 : PD_range[p]
-    return 1
 End
 ```
 
-This is your own thresholds, unchanged. Thresholds are on the raw
-`upd_current` in the file's own units — do **not** rescale to pA or nA, the
-numbers were chosen against the recorded values.
+**3. Smoothing** (`IN3_SmoothRData` FX4 branch): average `R_Int` directly
+rather than `log(R_Int)`, divide `R_Error` by `sqrt(n_eff)` where the boxcar
+is used (`n_eff = (n-1)^2/(n-1.5)`) and by `sqrt(n_used)` in the linear-fit
+branch, store `n_eff` in a wave `SmoothWindow` (1 elsewhere), and call
+`IN3_FixNegativeIntensities` **after** the loop instead of before it.
 
-Then **drop the separate start-point guard**:
-
-```igor
-// startpoint = ceil(binarySearchInterp(Intensity, 0.00001*wavemax(Intensity)))
-// For(i=startpoint; ...)                       // no longer needed
-```
-
-Keep whatever q-based start the scaler chain already used. The two give
-identical output (verified in Python), and one knob is easier to reason about
-when a sample behaves oddly.
-
-**Switch 1 — error of the mean on rebinning.** In the rebinning routine (the
-one that log-bins above Q = 0.0002), the error accumulator currently is
-
-```
-Rebinned_Sdev[i] += Sdev[j]^2           // inside the bin loop
-Rebinned_Sdev[i]  = sqrt(Rebinned_Sdev[i] / cntPoints)
-```
-
-Change the final line to divide by `cntPoints^2` when the switch is on:
+**4. Rebin** (the log-binning routine above Q = 0.0002), with `SmoothWindow`
+rebinned alongside as a sum:
 
 ```igor
-    NVAR/Z eom = root:Packages:Indra3:FX4ErrorOfMeanOnRebin
-    Variable useEOM = (NVAR_Exists(eom) && eom && isFX4)
-    ...
-    if (cntPoints > 0)
-        Variable denom = useEOM ? cntPoints^2 : cntPoints
-        Rebinned_Sdev[i] = sqrt(Rebinned_Sdev[i] / denom)
+    Rebinned_Sdev[i] = sqrt(Rebinned_Sdev[i] / cntPoints)          // RMS, as now
+    if (isFX4)
+        Variable meanW = max(Rebinned_W[i] / cntPoints, 1)
+        Rebinned_Sdev[i] /= sqrt(max(cntPoints / meanW, 1))        // independent points only
     endif
 ```
 
-`isFX4` must be threaded in from the chain detection — **this must not fire on
-scaler-chain data**, or every historical result moves.
+**5. After rebin:** `SMR_Error = sqrt(SMR_Error^2 + (FX4_RelErrorFloor*SMR_Int)^2)`.
 
-**Switch 2 — leave it off.** For completeness, when you do want to try it, it
-is one line in the sigma-of-the-mean step of §3.7:
+**6. SMR_Error and SampleTransmission** — see §6.3; this one affects both chains.
 
-```igor
-    NVAR/Z eff = root:Packages:Indra3:FX4UseEffectiveSamples
-    Variable vpr = 1
-    if (NVAR_Exists(eff) && eff)
-        vpr = max(FX4_ReadScalar(fileID, "values_per_read", 1), 1)
-    endif
-    N_upd = max(N_upd / vpr, 1)
-    N_i0  = max(N_i0  / vpr, 1)
-```
-
-**What to look at when comparing.** Switch 3 changes the *intensities*
-slightly (less smoothing), so compare `R` vs `AR` before and after on a log
-axis — the high-q tail should get visibly noisier and no feature should move.
-Switches 1 and 2 change **only the error bars**; the intensities must be
-identical to the last digit. If an intensity moves when you toggle 1 or 2,
-something is wired wrong.
+**What to look at when comparing.** Steps 1, 4 and 5 change **only error bars**.
+Step 3 changes intensities: by < 0.1 % where the signal is strong, and by a flat
+offset (the lift) plus the removal of the ln(I) bias where it is weak. Use the
+halves test of `tests/test_fx4_noise.py` (even vs odd raw points, peak pinned to
+the full scan's) to check the error bars; target true/quoted ≈ 1.
 
 ### 3.9 Ring-overflow check
 
@@ -825,11 +761,19 @@ OmegaFactor = (UPDsize/SDD) · radians(FWHM_blank)
 Kfactor     = BlankPeakMax · OmegaFactor · thickness_cm
 
 SMR_Int   = SMR_Int   / (Kfactor · MSAXSCorrection)
-SMR_Error = SMR_Error / (Kfactor · MSAXSCorrection) · PeakToPeakTransmission
+SMR_Error = SMR_Error / (Kfactor · MSAXSCorrection)
 ```
 
-The last factor is the Igor 2014 correction for highly absorbing,
-strongly scattering samples.
+**No `· PeakToPeakTransmission` on SMR_Error (both chains, since 2026-11).**
+Igor's 2/2014 line `SMR_Error *= SampleTransmission` undoes an extra
+`/SampleTransmission` earlier in Igor's own formula
+(`SMR_Error = sqrt(R_error^2/T^2 + BL^2)/Kfactor`, `IN3_SupportFnct.ipf`).
+Matilda divides by PeakToPeakTransmission only once (in
+`normalizeByTransmission`), so carrying the multiplication over shrank the
+*relative* error by T_pp: ~10 % on ordinary samples, 18× on a strongly
+multiple-scattering one (T_pp = 0.055, MSAXS = 7). Igor itself also divides
+SMR_Error by `Kfactor` only, not `Kfactor·MSAXSCorrection`, and has a `/3` from
+12/2013; revisit both when porting.
 
 Note the K-factor is derived from the blank's **own** peak, not from a stored
 constant — which is why USAXS absolute calibration carried across the FX4
@@ -845,7 +789,11 @@ truncated-Abel inversion (`docs/desmearing-methods.md` §4a); Lake/Strobl with
 Step scan: **no rebinning** (if many points were collected, they are wanted),
 then the same desmearing.
 
-On FX4 the rebinned error is the error of the bin **mean** (§3.10, switch 1).
+On FX4 a bin of n points keeps the RMS of its inputs divided by
+`sqrt(max(n / mean SmoothWindow, 1))` — the number of *independent* points it
+holds; smoothed neighbours share their raw data. Then
+`SMR_Error = sqrt(SMR_Error² + (1e-3·SMR_Int)²)`: ~0.1 % of I survives all
+averaging on strong signal. The scaler chain keeps the plain RMS.
 This matters downstream: the Abel desmearing picks its smoothing width from a
 chi^2 against `SMR_Error`, so an inflated error makes it over-smooth.
 
@@ -860,10 +808,9 @@ Two numbers are placeholders. Both should be fixed in Igor and Python together.
 | `FX4_I_SCALING` | `convertSWAXS.py` | `None` ⇒ use recorded `I_scaling` | SAXS/WAXS **absolute intensity**, off by ~1e10 (§5.8) |
 | `FX4_RELATIVE_CURRENT_ERROR` | `fx4support.py` | `0.01` | **Error bars only**, never intensities (§3.7, §4.6) |
 
-The fly-scan **per-raw-point** error is additionally 3–5× optimistic (§3.7).
-At the SMR stage this is cancelled by the unpropagated smoothing, so the
-delivered error bars are right to within ~30% (§3.10). Both halves of that
-should be fixed together, not separately.
+The fly-scan noise constants (`FX4_SHOT_CHARGE_PC`, `FX4_RELATIVE_ERROR_FLOOR`)
+are **measured**, not placeholders: see §3.7 and
+`docs/fx4-flyscan-uncertainties.md`.
 
 ---
 
@@ -885,10 +832,14 @@ implementation following this document should reproduce them.
 | OmegaFactor | 3.83808e-8 |
 | Kfactor | 6.17160e-6 |
 | slitLength | 0.0245475 Å⁻¹ |
-| **desmeared plateau, 0.01 < q < 0.1** | **29.75 cm²/cm³** (certified ≈ 30) |
+| **desmeared plateau, 0.01 < q < 0.1** | **29.71 cm²/cm³** (certified ≈ 30) |
 
 A repeat pair (`_R_0132`/`_R_0133`, not bundled) agrees to ~1 % over the same
-range.
+range. The plateau rose from 29.52 to 29.71 with the 2026-11 noise changes: the
+blank is no longer lifted before smoothing, a flat +0.17 cm⁻¹ at every Q.
+
+**Error bars:** halves test on this pair, true/quoted per Q band
+1e-3 / 3e-3 / 1e-2 / 3e-2 / 0.1 → 1.05 / 0.82 / 0.72 / 0.96 / 0.77.
 
 **Step scan:** Kfactor 1.42487e-5, slitLength 0.0245475. Transmission comes out
 1.35 — unphysical, and a property of the commissioning data, not the code

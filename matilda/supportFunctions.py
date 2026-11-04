@@ -323,6 +323,13 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
         logging.info(f"Found blank for {scan_filename} , blank name : {selected_blank_filename}")
     return selected_blank_path, selected_blank_filename   
 
+# Version of the reduction cached in a blank file under entry/blankData.  Bump
+# it whenever the blank-side reduction changes, so stale caches are recomputed.
+#   2 (2026-11): FX4 noise model, linear smoothing with propagated error,
+#                negative-intensity lift moved after smoothing.
+BLANK_CACHE_VERSION = 2
+
+
 def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
       # will reduce the blank linked as input into Igor BL_R_Int 
       # after reducing this first time, data are saved in Nexus file for subsequent use. 
@@ -339,37 +346,48 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                     logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
 
             if location in hdf_file:
-                # exists, so lets reuse the data from the file
-                Blank = dict()
-                Blank = load_dict_from_hdf5(hdf_file, location)
-                logging.info(f"Used existing Blank data from {blankFilename}")
-                return Blank
-            else:
-                Blank = dict()
-                Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
-                (BlTransCounts, BlTransGain,
-                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
-                Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
-                Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
-                Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
-                Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
-                Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
-                Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
-                Blank["BlankData"].update(calculatePDErrorFly(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
-                Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
-                Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
-                                                        Blank["BlankData"]["Q"],
-                                                        Blank["BlankData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
-                                                        Blank["BlankData"]["Error"],
-                                                        Blank["RawData"]["TimeInSec"],
-                                                        replaceNans=True, time_base=1.0 ))
-                # we need to return just the BlankData part 
-                BlankData=dict()
-                BlankData=Blank["BlankData"]
-                # Create the group and dataset for the new data inside the hdf5 file for future use. 
-                save_dict_to_hdf5(BlankData, location, hdf_file)
-                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
-                return BlankData
+                # Reuse the cached blank only if it was made by this reduction
+                # version; otherwise recompute it, so a blank cached before a
+                # change to the blank-side reduction is never silently mixed
+                # with a sample reduced the new way.
+                cached = load_dict_from_hdf5(hdf_file, location)
+                try:
+                    cached_version = int(np.ravel(cached.get("BlankCacheVersion", 0))[0])
+                except (TypeError, ValueError, IndexError):
+                    cached_version = 0
+                if cached_version == BLANK_CACHE_VERSION:
+                    logging.info(f"Used existing Blank data from {blankFilename}")
+                    return cached
+                del hdf_file[location]
+                logging.info(f"Cached Blank data in {blankFilename} is version "
+                             f"{cached_version}, current is {BLANK_CACHE_VERSION}; recalculating.")
+            Blank = dict()
+            Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
+            (BlTransCounts, BlTransGain,
+             BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
+            Blank["BlankData"]= calculatePD_Fly(Blank)                  # Creates Intensity with corrected gains and background subtraction
+            Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
+            Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
+            Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
+            Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
+            Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
+            Blank["BlankData"].update(calculatePDErrorFly(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
+            Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
+            Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
+                                                    Blank["BlankData"]["Q"],
+                                                    Blank["BlankData"]["UPD_gainsIndx"],    # range INDEX (0-4), not gain values
+                                                    Blank["BlankData"]["Error"],
+                                                    Blank["RawData"]["TimeInSec"],
+                                                    replaceNans=True, time_base=1.0,
+                                                    fx4_noise_model=Blank["RawData"].get("chain") == CHAIN_FX4))
+            Blank["BlankData"]["BlankCacheVersion"] = BLANK_CACHE_VERSION
+            # we need to return just the BlankData part 
+            BlankData=dict()
+            BlankData=Blank["BlankData"]
+            # Create the group and dataset for the new data inside the hdf5 file for future use. 
+            save_dict_to_hdf5(BlankData, location, hdf_file)
+            logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
+            return BlankData
 
 def transmissionTerms(raw_data):
     """Return (pin_counts, pin_gain, I0_counts, I0_gain) for a USAXS scan.
@@ -462,6 +480,10 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     
     #Intensity and Error are corrected for transmission in normalize by transmission above. 
     SMR_Qvec, SMR_Int, SMR_Error, IntRatio = subtract_data(Q, Intensity,Error, BL_Q, BL_Intensity, BL_Error)
+    # Sample's smoothing window (FX4), carried on the SMR grid for rebinData.
+    SMR_Window = Sample["reducedData"].get("SmoothWindow")
+    if SMR_Window is not None and len(SMR_Window) != len(SMR_Qvec):
+        SMR_Window = None
     # we need to fix negative intensities as Igor does in IN3_FixNegativeIntensities
     # use NaN-safe variants: SMR_Int may contain NaNs from masked gain changes
     MaxSMR_Int = np.nanmax(SMR_Int)
@@ -531,6 +553,8 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         SMR_Qvec = SMR_Qvec[largest_value:]
         SMR_Int = SMR_Int[largest_value:]
         SMR_Error = SMR_Error[largest_value:]
+        if SMR_Window is not None:
+            SMR_Window = np.asarray(SMR_Window)[largest_value:]
     else:
         # This case means the calculated start index is at or beyond the end of the array
         logging.warning(f"Calculated start_index_for_data ({largest_value}) is at or beyond array length ({len(SMR_Qvec)}). "
@@ -538,6 +562,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         SMR_Qvec = np.array([])
         SMR_Int = np.array([])
         SMR_Error = np.array([])
+        SMR_Window = None
     # now calibration... 
     metadata_dict = Sample["RawData"]["metadata"]
     for key in ('detector_distance', 'UPDsize'):
@@ -569,7 +594,12 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     #apply calibration
     SMR_Int =  SMR_Int / (Kfactor*MSAXSCorrection) 
     SMR_Error = SMR_Error/ (Kfactor*MSAXSCorrection) 
-    SMR_Error = SMR_Error * PeakToPeakTransmission  #this is Igor correction from 2014 which fixes issues with high absorption well scattering samples.
+    # No "SMR_Error *= PeakToPeakTransmission" here (it was ported from Igor's
+    # 2/2014 change).  In Igor that line undoes an extra /SampleTransmission
+    # earlier in the same SMR_Error formula; this code divides by
+    # PeakToPeakTransmission only once (normalizeByTransmission), so the
+    # multiplication shrank the RELATIVE error by T_pp: ~10% on ordinary
+    # samples, 18x on a strongly multiple-scattering one (T_pp = 0.055).
     # Per-gram normalization for powder samples
     if per_gram and density is not None and density > 0:
         SMR_Int = SMR_Int / density
@@ -596,6 +626,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
             "MSAXSCorrection":MSAXSCorrection,
             "calculated_mu":calculated_mu,
             "calculated_qmin":calculated_qmin,
+            "SMR_SmoothWindow":SMR_Window,
             }
 
 
@@ -607,21 +638,16 @@ def calculatePDErrorFly(Sample, isBlank=False):
 
 
 def _calculatePDErrorFlyFX4(Sample, isBlank=False):
-    """FX4 fly scan: propagate the electrometers' own per-interval statistics.
+    """FX4 fly scan: uncertainty of R = (upd - dark) / I0 for each interval.
 
-    ``upd_sigma`` / ``I0_sigma`` are the spread of the samples WITHIN each PSO
-    interval, not the error of the mean, so each is divided by sqrt(N) with
-    N = total/mean.  The UPD term is then combined in quadrature with the dark
-    current's measured error, and the two channels are propagated through the
-    ratio.  When the sigma arrays are absent the flat
-    FX4_RELATIVE_CURRENT_ERROR is used instead.
+    Each channel uses the measured noise model in fx4support.current_sigma
+    (electronic floor + shot-like term, both set by signal level only); the
+    UPD term is combined in quadrature with the dark current's error and the
+    two channels are propagated through the ratio.  When the sigma arrays are
+    absent the flat FX4_RELATIVE_CURRENT_ERROR is used instead.
 
-    Known to be optimistic.  On the first commissioning fly scans this
-    estimate came out 3-4x below the observed point-to-point scatter of I(q),
-    consistently across the q range.  sqrt(N) assumes the FX4's samples are
-    independent; they are averages of ValuesPerRead raw readings behind an
-    analogue filter, so the effective N is smaller than the nominal one.
-    Calibrate the factor against repeat scans before relying on these bars.
+    This is the error of ONE interval.  smooth_r_data and rebin_log_data
+    reduce it for the averaging they do; see docs/fx4-flyscan-uncertainties.md.
     """
     raw = Sample["RawData"]
     UPD_array = np.asarray(raw["UPD_array"], dtype=float)
@@ -629,29 +655,28 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
     block = Sample["BlankData"] if isBlank else Sample["reducedData"]
     updBkg = np.asarray(block.get("UPD_bkg", 0.0), dtype=float)
     updBkgErr = np.asarray(block.get("UPD_bkgErr", 0.0), dtype=float)
+    channel_time = np.asarray(raw["TimeInSec"], dtype=float)
 
-    # Independent samples behind each reported mean (FX4 switch 2): the
-    # electrometer pre-averages `values_per_read` raw readings, so N/vpr of the
-    # N = total/mean raw samples are independent.
-    vpr = 1.0
-    if fx4support.FX4_USE_EFFECTIVE_SAMPLES:
-        vpr = float(as_scalar(raw["metadata"].get("values_per_read", 1.0)) or 1.0)
-        if vpr <= 1.0:
-            logging.info("FX4 fly scan: no usable values_per_read; sigma of the "
-                         "mean uses the raw sample count.")
-            vpr = 1.0
+    vpr = as_scalar(raw["metadata"].get("values_per_read"))
+    try:
+        vpr = float(vpr)
+    except (TypeError, ValueError):
+        vpr = 1.0
+    if not vpr >= 1.0:
+        # Conservative: without it the floor comes out sqrt(values_per_read)
+        # too large, never too small.
+        logging.info("FX4 fly scan: no usable values_per_read; the electronic "
+                     "noise floor is not reduced for it.")
+        vpr = 1.0
 
-    def _sigma_of_mean(sigma, total, mean, label):
+    def _sigma(sigma, total, mean, net, label):
         # Flat relative error, used where the electrometer gives us nothing.
         fallback = FX4_RELATIVE_CURRENT_ERROR * np.abs(mean)
         if sigma is None:
             logging.info(f"FX4 fly scan: no {label}; using a flat "
                          f"{FX4_RELATIVE_CURRENT_ERROR:.1%} relative uncertainty.")
             return fallback
-        samples = mean_of_samples(total, mean)
-        if samples is None:
-            samples = np.ones_like(mean)
-        out = np.asarray(sigma, dtype=float) / np.sqrt(np.maximum(samples / vpr, 1.0))
+        out = fx4support.current_sigma(sigma, total, mean, vpr, net, channel_time)
         # Real files carry a few NaNs in the sigma arrays (seen on the first
         # commissioning fly scans).  Without this they would propagate to a
         # zero error, which reads as an infinitely well known point.
@@ -663,13 +688,19 @@ def _calculatePDErrorFlyFX4(Sample, isBlank=False):
             out = np.where(bad, fallback, out)
         return out
 
-    sigma_upd = _sigma_of_mean(raw.get("UPD_sigma"), raw.get("UPD_total"),
-                               UPD_array, "upd_sigma")
-    sigma_i0 = _sigma_of_mean(raw.get("I0_sigma"), raw.get("I0_total"),
-                              Monitor, "I0_sigma")
+    sigma_upd = _sigma(raw.get("UPD_sigma"), raw.get("UPD_total"), UPD_array,
+                       UPD_array - updBkg, "upd_sigma")
+    sigma_i0 = _sigma(raw.get("I0_sigma"), raw.get("I0_total"), Monitor,
+                      Monitor, "I0_sigma")
     sigma_upd = np.sqrt(sigma_upd**2 + updBkgErr**2)
 
-    Error = ratio_error(UPD_array - updBkg, sigma_upd, Monitor, sigma_i0)
+    # sigma_R = sqrt(sigma_upd^2 + R^2 sigma_I0^2) / I0.  Same as ratio_error,
+    # but written so a net current of exactly zero keeps its error instead of
+    # getting none (ratio_error's relative form drops a zero numerator).
+    with np.errstate(divide="ignore", invalid="ignore"):
+        R = (UPD_array - updBkg) / Monitor
+        Error = np.sqrt(sigma_upd**2 + (R * sigma_i0)**2) / np.abs(Monitor)
+    Error = np.where(np.isfinite(Error), Error, 0.0)
     return {"Error": Error}
 
 
@@ -773,8 +804,10 @@ def _calculatePD_FlyFX4(data_dict):
         GainsIndx = range_indexed_array(range_index, {i: i for i in range(5)},
                                         num_elements, default=np.nan)
 
+    # No negative-intensity lift here: weak FX4 points scatter around zero, and
+    # lifting before smoothing lets one noise spike set the offset.
+    # smooth_r_data lifts after averaging instead, when it is still needed.
     PD_Intensity = (UPD_array - updBkg) / Monitor
-    PD_Intensity = _fixNegativeFlyIntensities(PD_Intensity)
 
     return {"Intensity": PD_Intensity,
             "Error": 0.01 * PD_Intensity,   # placeholder, see calculatePDErrorFly
@@ -788,7 +821,10 @@ def _fixNegativeFlyIntensities(PD_Intensity):
     """Igor IN3_FixNegativeIntensities: lift an over-subtracted background.
 
     Minimum is taken over the last 80% of the points so the rocking-curve
-    peak at the start cannot dominate.
+    peak at the start cannot dominate.  Adds one constant to the whole curve,
+    which every model with a flat background absorbs.  On the FX4 chain it is
+    applied to SMOOTHED data (see smooth_r_data), so the offset follows the
+    real background level rather than the single most extreme noise point.
     """
     startIndex = int(np.round(0.2 * len(PD_Intensity)))
     MinIntensity = np.nanmin(PD_Intensity[startIndex:-1])
@@ -935,25 +971,29 @@ def _calculatePD_FlyScaler(data_dict):
 
 def rebinData(data_dict,num_points=200, isSMRData=False):
     # Rebin data to 200+peak area points.
-    # FX4 only: return the error of the bin MEAN rather than of one point.
-    error_of_mean = (fx4support.FX4_ERROR_OF_MEAN_ON_REBIN
-                     and data_dict.get("RawData", {}).get("chain") == CHAIN_FX4)
+    # FX4 only: pass the smoothing window so a bin's error counts only its
+    # independent points (see rebin_QRSdata).  The scaler chain keeps the RMS.
+    is_fx4 = data_dict.get("RawData", {}).get("chain") == CHAIN_FX4
     if isSMRData:
         SMR_Int = data_dict["CalibratedData"]["SMR_Int"]
         SMR_Qvec = data_dict["CalibratedData"]["SMR_Qvec"]
         SMR_Error = data_dict["CalibratedData"]["SMR_Error"]
-        SMR_QvecNew, SMR_IntNew, SMR_ErrorNew, SMR_dQ = rebin_QRSdata(SMR_Qvec, SMR_Int,SMR_Error, num_points, error_of_mean=error_of_mean)
+        window = data_dict["CalibratedData"].get("SMR_SmoothWindow") if is_fx4 else None
+        SMR_QvecNew, SMR_IntNew, SMR_ErrorNew, SMR_dQ = rebin_QRSdata(SMR_Qvec, SMR_Int,SMR_Error, num_points, smooth_window=window)
         results = {"SMR_Qvec":SMR_QvecNew,
                 "SMR_Int":SMR_IntNew,
                 "SMR_Error":SMR_ErrorNew,
                 "SMR_dQ":SMR_dQ,
+                # the window described the un-rebinned grid; it is used up here
+                "SMR_SmoothWindow":None,
                 }    
     else:
         Q_array = data_dict["reducedData"]["Q"]
         R_array = data_dict["reducedData"]["Intensity"]
         S_array = data_dict["reducedData"]["Error"]
+        window = data_dict["reducedData"].get("SmoothWindow") if is_fx4 else None
         # rebin_QRSdata returns 4 values; this branch has no use for dQ.
-        Q_arrayNew, R_arrayNew, S_arrayNew, _ = rebin_QRSdata(Q_array, R_array,S_array, num_points, error_of_mean=error_of_mean)
+        Q_arrayNew, R_arrayNew, S_arrayNew, _ = rebin_QRSdata(Q_array, R_array,S_array, num_points, smooth_window=window)
         results = {"Q":Q_arrayNew,
                 "Intensity":R_arrayNew,
                 "Error":S_arrayNew  
@@ -1136,7 +1176,8 @@ def beamCenterCorrection(data_dict, useGauss=1, isBlank=False):
 
 
 def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
-                  replaceNans=True, time_base=FLYSCAN_MCA_CLOCK_HZ):
+                  replaceNans=True, time_base=FLYSCAN_MCA_CLOCK_HZ,
+                  fx4_noise_model=False):
     """Smooth flyscan R data per amplifier range.
 
     UPD_gainsIndx is the amplifier RANGE INDEX (0-4, from
@@ -1147,28 +1188,48 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
     *meas_time* is divided by *time_base* to get seconds.  The scaler chain
     passes mca1 clock counts (time_base = 1e6 Hz); the FX4 chain passes
     channel_time, already in seconds, with time_base = 1.
+
+    With *fx4_noise_model* (FX4 chain only; the scaler chain is unchanged):
+
+    * Averages in linear intensity instead of ln(I).  Weak FX4 points scatter
+      around zero; ln(I) cannot hold them, and averaging ln(I) of noisy data is
+      biased low.
+    * Divides the error by sqrt(number of points averaged), and by sqrt(n) of
+      the points used in the linear-fit branch (instead of the fixed 1/3).
+    * Applies the negative-intensity lift AFTER smoothing, when still needed.
+
+    Returns ``Intensity``, ``Error`` and ``SmoothWindow``: the effective number
+    of raw points behind each output point (1 where not smoothed).  rebinData
+    uses it to tell how many independent points a bin really holds.
     """
     # Smoothing times for different ranges, indexed by range 0-4
     rwave_smooth_times = [0.02, 0.02, 0.03, 0.1, 0.4]   # these are [in sec] values for USAXS on 4/20/2025
 
-    # Logarithm of intensity
-    # Replace negative or zero intensities with NaN before taking log
-    intensity_safe = np.where(intensity > 0, intensity, np.nan)
-    temp_int_log = np.log(intensity_safe)
+    r_error = np.array(r_error, dtype=float)
+    window = np.ones(len(intensity))
+
+    if fx4_noise_model:
+        temp_int = np.array(intensity, dtype=float)
+    else:
+        # Logarithm of intensity
+        # Replace negative or zero intensities with NaN before taking log
+        intensity_safe = np.where(intensity > 0, intensity, np.nan)
+        temp_int = np.log(intensity_safe)
     # for some cases replace nans with interpolated values
     if replaceNans:
         # Create a mask for NaNs
-        nan_mask = np.isnan(temp_int_log)
-        # Indices of non-NaN values
-        x_non_nan = qvector[~nan_mask]
-        y_non_nan = temp_int_log[~nan_mask]
-        # Create an interpolation function
-        interp_func = interp1d(x_non_nan, y_non_nan, kind='linear', fill_value='extrapolate')
-        # Replace NaNs with interpolated values
-        temp_int_log[nan_mask] = interp_func(qvector[nan_mask])
+        nan_mask = np.isnan(temp_int)
+        if nan_mask.any():
+            # Indices of non-NaN values
+            x_non_nan = qvector[~nan_mask]
+            y_non_nan = temp_int[~nan_mask]
+            # Create an interpolation function
+            interp_func = interp1d(x_non_nan, y_non_nan, kind='linear', fill_value='extrapolate')
+            # Replace NaNs with interpolated values
+            temp_int[nan_mask] = interp_func(qvector[nan_mask])
 
 
-    smooth_intensity = np.copy(temp_int_log)
+    smooth_intensity = np.copy(temp_int)
     meas_time_sec = np.asarray(meas_time, dtype=float)/time_base
 
     def linear_fit(x, a, b):
@@ -1196,7 +1257,7 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
             tmp_time = rwave_smooth_times[4]
 
         if meas_time_sec[i] > tmp_time:
-            smooth_intensity[i] = temp_int_log[i]
+            smooth_intensity[i] = temp_int[i]
         else:
             start_points = int(np.ceil(tmp_time / meas_time_sec[i])) + 1
             end_points = start_points
@@ -1208,32 +1269,56 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
                 end_points = len(intensity) - 1 - i
 
             if (UPD_gainsIndx[i - start_points] != UPD_gainsIndx[i]) or (UPD_gainsIndx[i + end_points] != UPD_gainsIndx[i]):
-                temp_r = temp_int_log[i - start_points:i + end_points]
+                temp_r = temp_int[i - start_points:i + end_points]
                 temp_q = qvector[i - start_points:i + end_points]
+                n_used = len(temp_r) - int(np.isnan(temp_r).sum())
 
-                if len(temp_r) > np.isnan(temp_r).sum() + 5:
+                if n_used > 5:
                     popt, _ = curve_fit(linear_fit, temp_q, temp_r)
                     smooth_intensity[i] = linear_fit(qvector[i], *popt)
-                    r_error[i] /= 3
+                    if fx4_noise_model:
+                        # A straight-line fit evaluated near its centre has
+                        # about the error of the mean of the points it used.
+                        r_error[i] /= np.sqrt(n_used)
+                        window[i] = n_used
+                    else:
+                        r_error[i] /= 3
                 else:
-                    smooth_intensity[i] = temp_int_log[i]
-                    r_error[i] = r_error[i]
+                    smooth_intensity[i] = temp_int[i]
             else:
-                temp_r = temp_int_log[i - start_points:i + end_points + 1]
+                temp_r = temp_int[i - start_points:i + end_points + 1]
                 temp_q = qvector[i - start_points:i + end_points + 1]
                 start_x = temp_q[0]
                 end_x = temp_q[-1]
                 area = np.trapezoid(temp_r, temp_q)
                 smooth_intensity[i] = area / (end_x - start_x)
-                r_error[i] = r_error[i]
+                if fx4_noise_model:
+                    n_eff = _trapezoid_effective_points(len(temp_r))
+                    r_error[i] /= np.sqrt(n_eff)
+                    window[i] = n_eff
 
-    intensity = np.exp(smooth_intensity)
-    #occasionally we are running out of number resolution here and we are getting 0 as exp(smooth_value)
-    #this is a hack to fix that, the dynamic range o fthe nstrumet is at most 11 decades, so let's fix background to that. 
-    MaxInt = np.max(intensity)
-    intensity[intensity < MaxInt*1e-11 ] = MaxInt*1e-11
+    if fx4_noise_model:
+        intensity = _fixNegativeFlyIntensities(smooth_intensity)
+    else:
+        intensity = np.exp(smooth_intensity)
+        #occasionally we are running out of number resolution here and we are getting 0 as exp(smooth_value)
+        #this is a hack to fix that, the dynamic range o fthe nstrumet is at most 11 decades, so let's fix background to that. 
+        MaxInt = np.max(intensity)
+        intensity[intensity < MaxInt*1e-11 ] = MaxInt*1e-11
     return  {"Intensity":intensity,
-              "Error":r_error} 
+              "Error":r_error,
+              "SmoothWindow":window}
+
+
+def _trapezoid_effective_points(n):
+    """Effective number of equally weighted points in an n-point trapezoid mean.
+
+    The trapezoid gives the two end points half weight, so it averages down
+    noise like (sum w)^2 / sum w^2 = (n-1)^2 / (n-1.5) points, not n.
+    """
+    if n < 3:
+        return float(max(n, 1))
+    return (n - 1) ** 2 / (n - 1.5)
 
 def find_crossing_index(array, target_value):
     for index, value in enumerate(array):
@@ -1354,13 +1439,19 @@ def modifiedGauss(xvar, a, x0, sigma, exponent):
 '''
 
 
-def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, error_of_mean=False):
+def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, smooth_window=None):
     '''
     Rebin data based on the condition Q < 0.0002 and Q > 0.0002.
     This function will split the data into two parts and rebin the second part using logarithmic scaling.
     The first part (Q < 0.0002) will remain unchanged, while the second part (Q > 0.0002) will be rebinned.
     The function will return the merged data from both parts.
     The rebinning is done using the rebin_log_data function, which takes care of the logarithmic scaling.     
+
+    smooth_window (FX4 only): effective number of raw points behind each input
+    point, from smooth_r_data.  When given, a bin's error is the RMS of its
+    inputs divided by sqrt(max(n / mean window, 1)) -- the number of
+    independent points it really holds.  Without it the bin keeps the RMS of
+    its inputs, the historical scaler-chain behaviour.
     '''
     # create Wdx array based on Wx
     Wdx = np.zeros(len(Wx))
@@ -1380,6 +1471,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, error_of_mean=False):
     Wy_greater = Wy[mask_greater]
     Ws_greater = Ws[mask_greater]
     Wdx_greater = Wdx[mask_greater]
+    Wwin_greater = None if smooth_window is None else np.asarray(smooth_window, dtype=float)[mask_greater]
 
     if len(Wx_greater) < 2:
         # Not enough high-Q points to rebin — return the data unchanged.
@@ -1389,7 +1481,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, error_of_mean=False):
 
     MinStep = Wx_greater[1] - Wx_greater[0]
 
-    Wx_greater2, Wy_greater2, W1, W2, W3, W4, W5, Ws_greater2, Wxsdev, Wxwidth = rebin_log_data(Wx_greater, Wy_greater, NumberOfPoints, MinStep, Wsdev=Ws_greater, Wxsdev=None, Wxwidth=Wdx_greater, W1=None, W2=None, W3=None, W4=None, W5=None, error_of_mean=error_of_mean)
+    Wx_greater2, Wy_greater2, W1, W2, W3, W4, W5, Ws_greater2, Wxsdev, Wxwidth = rebin_log_data(Wx_greater, Wy_greater, NumberOfPoints, MinStep, Wsdev=Ws_greater, Wxsdev=None, Wxwidth=Wdx_greater, W1=None, W2=None, W3=None, W4=None, W5=None, smooth_window=Wwin_greater)
 
 
     Q_merged = np.concatenate((Wx_less, Wx_greater2))
@@ -1412,7 +1504,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, error_of_mean=False):
 
 
 
-def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxwidth=None, W1=None, W2=None, W3=None, W4=None, W5=None, error_of_mean=False):
+def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxwidth=None, W1=None, W2=None, W3=None, W4=None, W5=None, smooth_window=None):
     # Determine which additional waves need to be calculated
     CalcSdev = Wsdev is not None
     CalcXSdev = Wxsdev is not None
@@ -1462,6 +1554,7 @@ def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxw
     Rebinned_Wv5 = np.zeros(NumberOfPoints) if CalcW5 else None
     Rebinned_Wsdev = np.zeros(NumberOfPoints) if CalcSdev else None
     Rebinned_Wxsdev = np.zeros(NumberOfPoints) if CalcXSdev else None
+    Rebinned_Window = np.zeros(NumberOfPoints) if smooth_window is not None else None
 
     j = 0
     for i in range(NumberOfPoints):
@@ -1484,6 +1577,8 @@ def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxw
                 Rebinned_Wsdev[i] += Wsdev[j] ** 2
             if CalcXSdev:
                 Rebinned_Wxsdev[i] += Wxsdev[j] ** 2
+            if Rebinned_Window is not None:
+                Rebinned_Window[i] += smooth_window[j]
             cntPoints += 1
             j += 1
 
@@ -1501,12 +1596,15 @@ def rebin_log_data(Wx, Wy, NumberOfPoints, MinStep, Wsdev=None, Wxsdev=None, Wxw
             if CalcW5:
                 Rebinned_Wv5[i] /= cntPoints
             if CalcSdev:
-                # RMS of the inputs = error of ONE point; dividing by a further
-                # sqrt(cntPoints) gives the error of their mean, which is what
-                # the bin holds.  Opt-in (FX4 switch 1) so the scaler chain
-                # keeps its historical, deliberately conservative value.
-                denom = cntPoints ** 2 if error_of_mean else cntPoints
-                Rebinned_Wsdev[i] = np.sqrt(Rebinned_Wsdev[i] / denom)
+                # RMS of the inputs = error of ONE point.  With smooth_window
+                # (FX4) the bin mean is worth n/w independent points: smoothed
+                # neighbours share their raw data, so dividing by sqrt(n) would
+                # count the smoothing's averaging a second time.  Without it the
+                # scaler chain keeps its historical, conservative RMS.
+                Rebinned_Wsdev[i] = np.sqrt(Rebinned_Wsdev[i] / cntPoints)
+                if Rebinned_Window is not None:
+                    mean_window = max(Rebinned_Window[i] / cntPoints, 1.0)
+                    Rebinned_Wsdev[i] /= np.sqrt(max(cntPoints / mean_window, 1.0))
             if CalcXSdev:
                 Rebinned_Wxsdev[i] = np.sqrt(Rebinned_Wxsdev[i] / cntPoints)
 

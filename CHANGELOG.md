@@ -25,37 +25,55 @@ Not yet mirrored in Igor (`IN3_Abel_FindSmoothWidth`, which still uses the mean
 χ² and a 0.5 ceiling). Port plan with code: `docs/desmearing-methods.md` §4a.1.
 Details: `docs/desmearing-methods.md` §4a.
 
+### Fixed — USAXS SMR error bars were scaled by the peak-to-peak transmission
+
+**`SMR_Error` no longer gets multiplied by `PeakToPeakTransmission`, on both
+counting chains, so error bars on strongly multiple-scattering samples are no
+longer far too small.** The line was ported from Igor's 2/2014 change, where
+it undoes an extra division by the transmission earlier in Igor's own formula.
+Matilda divides only once, so the multiplication shrank the *relative* error by
+T_pp: ~8 % on the bundled scaler fly scan, 35 % on the bundled step scan, 18×
+on a strong ceramic with MSAXS = 7. SMR and DSM intensities are unchanged
+(desmeared values move ≤ 0.06 % through the Abel width choice). Historical
+error bars move by the same factor. Igor keeps the line; see
+`docs/fx4-reduction-guide.md` §6.3 before porting.
+
 ### Fixed — FX4 fly-scan noise and uncertainties
 
-Three corrections to the FX4 fly-scan path, each behind its own switch in
-`fx4support.py` so it can be toggled while cross-checking against Igor. **All
-three are FX4-only — the scaler chain is bit-for-bit unchanged in every
-combination**, and `tests/test_fx4support.py` asserts that. Full write-up and
-the measurements behind each: `docs/fx4-reduction-guide.md` §3.10.
+**FX4 fly-scan error bars now match the real noise to within ~0.7–1.6× across
+1 pA to 4e5 pA and 12–28 keV; they were 3–7× too large on weak samples and up
+to 20× too small on strong multiple-scattering ones.** Measured by reducing the
+even and the odd raw points of a scan independently and comparing them, on
+glassy carbon (12 and 21 keV), a strong ceramic in an NMR tube (24 keV) and a
+28 keV air blank. Full write-up: `docs/fx4-flyscan-uncertainties.md`; Igor
+porting steps: `docs/fx4-reduction-guide.md` §3.7, §3.8, §3.11. FX4 only; the
+scaler chain is unchanged apart from the fix above.
 
-- **`FX4_SIGNAL_DERIVED_SMOOTHING_RANGE`** (on). The FX4 reading is
-  gain-independent and `upd_lurange` is written once, after the scan, so
-  `smooth_r_data` was giving every point the slowest smoothing time — a
-  uniform 12–24 point window. The range index is now derived from the raw
-  `upd_current`, reusing the scaler chain's `rwave_smooth_times` constants
-  (on that chain the amplifier range *was* a proxy for signal level, which is
-  what those constants were tuned against). 2–7 point window instead of 22.
-  The old behaviour was not distorting the data — the two differ by ≤0.24% in
-  the steepest band — but it was over-smoothing real structure.
-- **`FX4_ERROR_OF_MEAN_ON_REBIN`** (on). `rebin_log_data` returned
-  `sqrt(Σσ²/n)`, the RMS of the inputs, which is the error of a single point;
-  a bin holds their mean, whose error is a further `1/sqrt(n)` smaller. Bins
-  are disjoint so this is simply correct, but enabling it on the scaler chain
-  would move every historical result.
-- **`FX4_USE_EFFECTIVE_SAMPLES`** (**off**). The electrometer pre-averages
-  `values_per_read` raw readings, so dividing sigma by `sqrt(N)` understates
-  the per-raw-point error by `sqrt(10)` — the 3–5× shortfall recorded in the
-  guide. Correct in itself, but it double-counts: `smooth_r_data` averages
-  6–7 points and leaves the error untouched, and the two omissions cancel.
-  Measured on `GC_SRM3600_0131` by reducing two disjoint halves of the raw
-  points independently, true/quoted at the SMR stage is 1.34/0.87/0.90 with
-  this off and 0.42/0.27/0.29 with it on. Left off until the smoothing's
-  effective sample count is propagated too.
+- **Per-interval error** (`_calculatePDErrorFlyFX4`, `fx4support.current_sigma`):
+  electronic floor `upd_sigma/sqrt(N·values_per_read)` plus a shot-like term
+  `FX4_SHOT_CHARGE_PC·(I−dark)/t` with one energy-independent constant
+  (6.5e-4 pC; the fitted value does not follow E/3.65 eV). Both depend on signal
+  level only, never on Q. A point exactly on the dark current keeps its error.
+- **Smoothing** (`smooth_r_data(..., fx4_noise_model=True)`): averages in linear
+  intensity (ln(I) averaging read 1–12 % low on weak data and NaN-replaced
+  negative points), divides the error by √(points averaged), returns that count
+  as `SmoothWindow`, and applies the negative-intensity lift **after** smoothing.
+  Before, the lift was set by the single most negative raw point (0.3–0.7 pA,
+  as large as the net high-Q signal) and differed between sample and blank.
+- **Rebinning**: a bin's error counts only its independent points,
+  RMS/√max(n/window, 1). Replaces switch 1 (error of the mean), which
+  double-counted the smoothing.
+- **Final floor**: `SMR_Error ⊕ 0.1 % of SMR_Int`, once, after rebinning.
+- **Switches retired:** `FX4_ERROR_OF_MEAN_ON_REBIN` and
+  `FX4_USE_EFFECTIVE_SAMPLES` are gone (the latter had the direction wrong).
+  `FX4_SIGNAL_DERIVED_SMOOTHING_RANGE` stays, unchanged.
+- **Cached blanks are recomputed** when they were reduced by an older version
+  (`BLANK_CACHE_VERSION` in `entry/blankData`), so a stale blank is never mixed
+  with a sample reduced the new way.
+- Intensity effect on `GC_SRM3600_0131`/`Blank_0130`: a flat +0.17 cm⁻¹ at every
+  Q (smaller blank lift); plateau 29.52 → 29.71 cm²/cm³.
+- New tests: `tests/test_fx4_noise.py`, including the even/odd halves acceptance
+  test on the bundled FX4 fly scan.
 
 ### Fixed
 
@@ -140,12 +158,8 @@ the self-referencing K-factor predicts.
 - **FX4 step-scan uncertainties are modelled, not measured.** The uascan file
   records no per-point sigma for the currents, so
   `fx4support.FX4_RELATIVE_CURRENT_ERROR` (1%) stands in. Error bars only.
-- **FX4 fly-scan uncertainties: characterised, see above.** The per-raw-point
-  estimate is 3-5x optimistic, but the pipeline then under-propagates the
-  noise reduction by a similar factor, so the delivered SMR error bars are
-  right to within ~30%. Both halves should be fixed together, not separately
-  (`FX4_USE_EFFECTIVE_SAMPLES`, and carrying an effective sample count through
-  `smooth_r_data`).
+- **FX4 fly-scan uncertainties: measured, see above.** The shot-like constant
+  is confirmed at 12, 21, 24 and 28 keV; nothing below 12 keV yet.
 - **The FX4 fly scan records the amplifier range once, after the scan.** There
   is no per-point range, so one dark current is subtracted throughout and the
   amplifier dead-time masking the scaler chain did from

@@ -27,6 +27,8 @@ detect_counting_chain(h5obj)  -> 'FX4' or 'scaler'
 is_fx4(h5obj)                 -> bool
 warn_ring_overflows(...)      -> log a warning when FX4 dropped samples
 as_scalar(value)              -> unwrap 1-element arrays / decode bytes
+current_sigma(...)            -> fly-scan interval uncertainty (noise model)
+add_relative_floor(I, E)      -> final relative error floor
 lookup(group, name, default)  -> tolerant scalar read from an h5py group
 """
 
@@ -61,44 +63,39 @@ _CHAIN_LOCATIONS = (
 FX4_RELATIVE_CURRENT_ERROR = 0.01
 
 
-# --- FX4 noise / smoothing treatment ----------------------------------------
-# Three switches, each isolating one correction, so they can be turned off
-# individually while comparing against Igor.  All three apply to the FX4 chain
-# ONLY; the scaler chain is untouched in every case.
-
-# (1) Rebinning returns the error OF THE MEAN, sigma_rms/sqrt(n), instead of the
-#     RMS of the n input errors (which is the error of a single point).  The
-#     bins are disjoint, so for independent inputs sqrt(n) is simply correct.
-#     The inputs have been smoothed and are therefore correlated, which makes
-#     this a slight over-reduction; it is left to cancel against (3), where the
-#     smoothing itself deliberately does NOT reduce the error.  Net effect is
-#     within ~30% of an exact effective-N treatment on commissioning data.
-FX4_ERROR_OF_MEAN_ON_REBIN = True
-
-# (2) OFF by default -- see the measurement below before turning it on.
-#     The electrometer reports values already averaged over `values_per_read`
-#     raw samples behind an analogue filter, so the number of INDEPENDENT
-#     samples behind each reading is N/values_per_read, not N = total/mean.
-#     Dividing sigma by sqrt(N) therefore understates the PER-RAW-POINT error
-#     by sqrt(values_per_read) = 3.2 on the commissioning files, which is the
-#     3-5x shortfall recorded in docs/fx4-reduction-guide.md.
+# --- FX4 fly-scan noise model ------------------------------------------------
+# Measured, not assumed: docs/fx4-flyscan-uncertainties.md has the data behind
+# every number here (12, 21, 24 and 28 keV; 1 pA to 4e5 pA; glassy carbon, air
+# and NMR-tube blanks, and a very strong ceramic).  Everything below depends on
+# the SIGNAL LEVEL only -- never on Q and never on photon energy -- so it holds
+# for samples 10x weaker or 1000x stronger than glassy carbon.
 #
-#     That reasoning is right, but applying it here double-counts, because the
-#     pipeline also fails to propagate the noise reduction of smooth_r_data
-#     (which averages 6-7 points and leaves the error untouched).  Measured on
-#     GC_SRM3600_0131 by reducing two disjoint halves of the raw points
-#     independently and comparing them -- the one estimator the smoothing's
-#     correlation cannot fool -- true/quoted at the SMR stage is:
+# The per-PSO-interval variance of a current I (pA) measured for t seconds is
 #
-#         switch 1 on, this off :  1.34 / 0.87 / 0.90   (Q decades 1e-3..1)
-#         switch 1 on, this on  :  0.42 / 0.27 / 0.29   -> 3x too conservative
+#     sigma^2 = upd_sigma^2 / (N * values_per_read)     electronic floor
+#             + FX4_SHOT_CHARGE_PC * max(I - dark, 0) / t   shot-like term
 #
-#     So the two unpropagated effects currently cancel, and the honest fix is
-#     to carry an effective sample count through smoothing and rebinning and
-#     then enable this.  Until then, leave it off.
-FX4_USE_EFFECTIVE_SAMPLES = False
+# with N = total/mean the number of reads in the interval.
+#
+# * The floor: the electrometer's per-interval spread `upd_sigma` behaves as the
+#   spread of N*values_per_read independent raw samples, not N.  Dividing by
+#   sqrt(N) alone overstated the weak-signal error by ~sqrt(10).
+# * The shot-like term is invisible to `upd_sigma` and dominates from ~1 pA net
+#   upward.  Its effective charge per photon came out the same at 12, 21, 24 and
+#   28 keV (5-9e-4 pC, central 6.5e-4) even though E/3.65 eV would change by 2.3x
+#   over that range, so one energy-independent constant is used.  Diode
+#   absorption efficiency does not enter: the term is in measured current.
+FX4_SHOT_CHARGE_PC = 6.5e-4
 
-# (3) The FX4 fly scan has no per-point amplifier range (the reading is
+# Smoothing averages w raw points, so it divides the error by sqrt(w); a rebin
+# bin of n such points is then only worth max(n/w, 1) independent points.  Both
+# are applied in supportFunctions (smooth_r_data / rebin_log_data) for FX4.
+
+# A remainder of ~0.1% of I survives all averaging on very strong signal
+# (beam/analyser stability).  Added once, to the final SMR error, after rebin.
+FX4_RELATIVE_ERROR_FLOOR = 1e-3
+
+# Signal-derived smoothing range. The FX4 fly scan has no per-point amplifier range (the reading is
 #     gain-independent and `upd_lurange` is written once, after the scan), so
 #     every point would get the slowest smoothing time.  Derive a pseudo-range
 #     from the signal level instead: on the scaler chain the amplifier range
@@ -124,6 +121,40 @@ def signal_derived_range_index(upd_current,
     for level, range_index in sorted(thresholds, key=lambda t: t[0]):
         index[upd > level] = float(range_index)
     return index
+
+
+def current_sigma(sigma, total, mean, values_per_read, net_current, channel_time):
+    """Uncertainty of one FX4 interval mean, in pA (see FX4_SHOT_CHARGE_PC).
+
+    Args:
+        sigma: per-interval spread recorded by the electrometer, pA.
+        total, mean: recorded total and mean, so N = total/mean reads.
+        values_per_read: raw samples behind each read (``values_per_read``).
+        net_current: dark-subtracted current, pA; negative values give no
+            shot-like contribution.
+        channel_time: length of each interval, s.
+
+    Returns:
+        Array of uncertainties, pA.  Non-finite entries are left for the caller
+        to replace, so it can log how many there were.
+    """
+    samples = mean_of_samples(total, mean)
+    if samples is None:
+        samples = np.ones_like(np.asarray(mean, dtype=float))
+    vpr = max(float(values_per_read), 1.0)
+    floor_sq = np.asarray(sigma, dtype=float) ** 2 / (samples * vpr)
+    t = np.asarray(channel_time, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        shot_sq = FX4_SHOT_CHARGE_PC * np.clip(net_current, 0.0, None) / t
+    shot_sq = np.where(np.isfinite(shot_sq), shot_sq, 0.0)
+    return np.sqrt(floor_sq + shot_sq)
+
+
+def add_relative_floor(intensity, error, floor=FX4_RELATIVE_ERROR_FLOOR):
+    """Return ``sqrt(error^2 + (floor*intensity)^2)`` (FX4_RELATIVE_ERROR_FLOOR)."""
+    intensity = np.asarray(intensity, dtype=float)
+    error = np.asarray(error, dtype=float)
+    return np.sqrt(error ** 2 + (floor * intensity) ** 2)
 
 
 def as_scalar(value):

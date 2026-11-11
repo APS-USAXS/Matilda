@@ -1,6 +1,6 @@
 """
-matilda.gui.data_reduction.technique_detector
-=============================================
+matilda.technique_detector
+==========================
 Heuristic detection of USAXS/SAXS/WAXS technique from an HDF5 file.
 
 Detection priority:
@@ -10,6 +10,9 @@ Detection priority:
   4. Parent-folder name suffix (_saxs, _waxs, _usaxs, FLyscans, StepScans).
 
 Returns one of: 'Flyscan', 'StepScan', 'SAXS', 'WAXS', 'Unknown'.
+
+Lives in core (not gui/) so the batch reprocessing in matilda.py can sort
+step scans from fly scans; it needs only h5py, never Qt.
 """
 
 import os

@@ -22,7 +22,7 @@ from .._qt import (
     Qt, Signal, QColor, QBrush,
 )
 
-from .technique_detector import detect_technique
+from matilda.technique_detector import detect_technique
 
 # File extensions considered HDF5 data files
 _HDF5_EXTS = {".h5", ".hdf", ".hdf5", ".nxs"}

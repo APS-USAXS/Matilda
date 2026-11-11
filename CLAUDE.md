@@ -33,7 +33,7 @@ paths — it is deliberately excluded from collection. Don't wire it into CI.
 Tiled server (HTTP/REST)
         │  FindLastScanData() / FindLastBlankScan()
         ▼
-matilda.py  ── 15-second polling loop
+matilda.py  ── polling loop (5 s sleep between cycles)
         ├── convertFlyscan.py   USAXS flyscan  → I(Q)
         ├── convertUSAXS.py     USAXS step-scan → I(Q)
         ├── convertSWAXS.py     SAXS/WAXS 2-D   → I(Q) via pyFAI
@@ -52,6 +52,7 @@ matilda.py  ── 15-second polling loop
 | `matilda/readfromtiled.py` | Tiled queries |
 | `matilda/supportFunctions.py` | Shared helpers; re-exports HDF5 helpers (`F401` allowed) |
 | `matilda/supportNikaFunctions.py` | Nika-derived 2-D routines |
+| `matilda/technique_detector.py` | Fly/step/SAXS/WAXS detection (h5py only; GUI + batch) |
 | `matilda/plotData.py` | matplotlib JPEG plots (target for pyqtgraph replacement) |
 | `matilda/gui/_qt.py` | Single Qt import point for `gui/` — import Qt names from here |
 | `matilda/gui/data_reduction/` | Interactive reduction GUI |
@@ -120,7 +121,7 @@ is the end-to-end guard — keep it passing. Tests must not need Tiled or a disp
 | Working on sample plates | `docs/sample-plate-setup.md` |
 | Deploying or debugging the daemon | `docs/service.md`, `docs/operations.md`, `serv_matilda.sh`, `matilda_server.service` |
 | Installing | `docs/installation.md` |
-| Looking for planned work | `PLAN.md` |
+| Looking for open work | `TODO.md` (open items), `PLAN.md` (design history / notes) |
 
 `ControlData/`, `TestData/` and `IgorExample/` are fixtures and references, not
 shipped code; `CodeFragments`, `IgorExample` and `docs` are excluded from ruff.

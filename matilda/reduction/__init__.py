@@ -30,13 +30,9 @@ use relative imports.  Suggested target names:
 
 Migration note
 --------------
-All current imports in those modules are bare (e.g. ``from hdf5code import …``).
-Before moving files here, every import must be converted to either:
-  * absolute:  ``from matilda.io.hdf5 import …``
-  * relative:  ``from ..io.hdf5 import …``
-
-The service entry-point (matilda/matilda.py run directly as a script) adds
-the matilda/ directory to sys.path, which makes bare imports work today but
-will conflict with a proper package install.  See the bug register in
-matilda/__init__.py.
+The flat modules already use relative imports (``from .hdf5code import …``),
+so a move only needs those paths adjusted (e.g. ``from ..hdf5code import …``)
+and the console-script entry point in pyproject.toml left pointing at
+matilda.matilda:main.  The split is an open follow-up in PLAN.md; nothing
+lives in this subpackage yet.
 """

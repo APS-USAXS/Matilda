@@ -59,6 +59,8 @@ from logging.handlers import RotatingFileHandler
 import os
 import subprocess
 
+import h5py
+
 
 from .readfromtiled import FindLastScanData, FindLastBlankScan, FindLastTuneScans
 from .convertFlyscan import processFlyscan
@@ -66,6 +68,8 @@ from .convertUSAXS import processStepscan
 from .convertSWAXS import process2Ddata
 from .convertTune import getTuneResults, TUNE_PLAN_NAMES, NumberOfTunesToShow, NumberOfDaysToLookBackTunes
 from .supportFunctions import findProperBlankScan
+from .hdf5code import find_matching_groups
+from .technique_detector import detect_technique
 from .plotData import plotUSAXSResults, plotSWAXSResults, plotTuneResults
 
 
@@ -95,19 +99,62 @@ _MERGED_FOLDER_SUFFIX = '_merged'
 # tracker (calibration, pyirena analysis, merges).  Large enough to cover
 # user transitions without growing without bound.
 _MAX_TRACKED_FILES = 100
+# External-tool jobs (pynika, pyirena analysis, merges) are retried when they
+# fail, but at most this many attempts per file per session: a file that
+# always fails must not cost a 300 s `conda run` on every polling cycle.
+_MAX_TOOL_ATTEMPTS = 3
+# Tracker value for a job that succeeded (a failed one stores its attempt count).
+_JOB_DONE = None
 
 
-def _remember_file(tracked, key, maxlen=_MAX_TRACKED_FILES):
+def _remember_file(tracked, key, maxlen=_MAX_TRACKED_FILES, value=_JOB_DONE):
     """Record *key* in an ordered 'already processed' tracker (dict used as
     an ordered set), evicting the OLDEST entries when the bound is exceeded.
 
     Plain set.pop() removes an *arbitrary* element — possibly the key just
     added — which could cause files to be re-processed. Dicts preserve
-    insertion order, giving proper FIFO eviction.
+    insertion order, giving proper FIFO eviction.  *value* is _JOB_DONE for
+    a finished job, or the number of failed attempts so far.
     """
-    tracked[key] = None
+    tracked.pop(key, None)      # re-insert so the newest entry is evicted last
+    tracked[key] = value
     while len(tracked) > maxlen:
         tracked.pop(next(iter(tracked)))
+
+
+def _job_settled(tracked, key):
+    """True when *key* succeeded, or failed _MAX_TOOL_ATTEMPTS times already."""
+    if key not in tracked:
+        return False
+    state = tracked[key]
+    return state is _JOB_DONE or state >= _MAX_TOOL_ATTEMPTS
+
+
+def _record_job(tracked, key, success, label):
+    """Record the outcome of one external-tool attempt for *key*."""
+    if success:
+        _remember_file(tracked, key)
+        return
+    previous = tracked.get(key, 0)
+    attempts = (previous if isinstance(previous, int) else 0) + 1
+    _remember_file(tracked, key, value=attempts)
+    if attempts >= _MAX_TOOL_ATTEMPTS:
+        logging.error(f"{label}: failed {attempts} times; not retrying this session.")
+
+
+def _has_nxcansas_entry(filepath):
+    """True if *filepath* already holds a reduced (NXcanSAS) entry.
+
+    Used to hold a merge back until both partners are reduced.  Any error
+    (missing file, file still being written) counts as "not yet".
+    """
+    try:
+        with h5py.File(filepath, 'r') as f:
+            return bool(find_matching_groups(
+                f, {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'},
+                {'definition': 'NXcanSAS'}))
+    except Exception:
+        return False
 
 # Regex pattern to detect AgBehenateLaB6 calibrant files (any capitalisation)
 _CALIBRANT_PATTERN = re.compile(r'agbehenatelab6', re.IGNORECASE)
@@ -160,13 +207,13 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
     instrument_type : str
         'SAXS' or 'WAXS' — passed to pynika --instrument flag.
     calibrated_set : dict
-        Ordered dict used as a bounded FIFO set of (path, filename) tuples
-        already processed this session.  Updated in-place on success to
-        prevent re-running the same file.
+        Bounded FIFO tracker of (path, filename) tuples (see _record_job):
+        a success is not repeated, a failure is retried up to
+        _MAX_TOOL_ATTEMPTS times this session.
     """
     file_key = (path, filename)
-    if file_key in calibrated_set:
-        logging.info(f"Pynika calibration already run for {filename}, skipping.")
+    if _job_settled(calibrated_set, file_key):
+        logging.info(f"Pynika calibration already run (or given up) for {filename}, skipping.")
         return
 
     filepath = os.path.join(path, filename)
@@ -177,6 +224,7 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
     logging.info(f"Running pynika calibration: {filepath} [{instrument_type}]")
     cmd = [CONDA_EXECUTABLE, 'run', '--no-capture-output', '-p', PYNIKA_CONDA_ENV_PATH,
            'pynika', '--file', filepath, '--instrument', instrument_type, '--auto-fit', '--save-to-pvs']
+    success = False
     try:
         result = subprocess.run(
             cmd,
@@ -186,8 +234,7 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
         )
         if result.returncode == 0:
             logging.info(f"Pynika calibration succeeded for {filename}")
-            # Bounded FIFO tracker — evicts oldest entries, never the newest
-            _remember_file(calibrated_set, file_key)
+            success = True
         else:
             logging.error(
                 f"Pynika calibration failed for {filename} "
@@ -197,6 +244,7 @@ def _runPynikaCalibration(path, filename, instrument_type, calibrated_set):
         logging.error(f"Pynika calibration timed out for {filename}")
     except Exception as e:
         logging.error(f"Pynika calibration error for {filename}: {e}", exc_info=True)
+    _record_job(calibrated_set, file_key, success, f"Pynika calibration of {filename}")
 
 
 def _checkAndRunPynikaCalibration(ListOfScans, instrument_type, calibrated_set):
@@ -224,17 +272,16 @@ def _runPyirenaAnalysis(path, filename, analyzed_set):
     filename : str
         HDF5 filename of the reduced scan.
     analyzed_set : dict
-        Ordered dict used as a bounded FIFO set of (path, filename) tuples
-        already analyzed this session.  Updated in-place on success to
-        prevent re-running the same file.  Bounded to _MAX_TRACKED_FILES
-        entries to limit memory use.
+        Bounded FIFO tracker of (path, filename) tuples (see _record_job):
+        a success is not repeated, a failure is retried up to
+        _MAX_TOOL_ATTEMPTS times this session.
     """
     # Blanks are not analyzed.
     if 'blank' in filename.lower():
         return
 
     file_key = (path, filename)
-    if file_key in analyzed_set:
+    if _job_settled(analyzed_set, file_key):
         return
 
     config_file = os.path.join(path, _PYIRENA_CONFIG_FILENAME)
@@ -254,12 +301,12 @@ def _runPyirenaAnalysis(path, filename, analyzed_set):
     )
     cmd = [CONDA_EXECUTABLE, 'run', '--no-capture-output', '-p', PYIRENA_CONDA_ENV_PATH,
            'python', '-c', python_snippet]
+    success = False
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0:
             logging.info(f"Pyirena analysis succeeded for {filename}")
-            # Bounded FIFO tracker — evicts oldest entries, never the newest
-            _remember_file(analyzed_set, file_key)
+            success = True
         else:
             logging.error(
                 f"Pyirena analysis failed for {filename} "
@@ -269,6 +316,7 @@ def _runPyirenaAnalysis(path, filename, analyzed_set):
         logging.error(f"Pyirena analysis timed out for {filename}")
     except Exception as e:
         logging.error(f"Pyirena analysis error for {filename}: {e}", exc_info=True)
+    _record_job(analyzed_set, file_key, success, f"Pyirena analysis of {filename}")
 
 
 def _checkAndRunPyirenaAnalysis(ListOfScans, analyzed_set):
@@ -378,8 +426,9 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
     Merge a USAXS+SAXS file pair using pyirena merge_data().
 
     USAXS is always file1 (lower Q, absolute scale), SAXS is file2
-    (higher Q).  On both success and failure the merge key is added to
-    *merged_set* so the pair is not retried this session.
+    (higher Q).  The outcome is recorded in *merged_set* (see _record_job):
+    a merged pair is not repeated, a failed one is retried up to
+    _MAX_TOOL_ATTEMPTS times this session.
 
     Parameters
     ----------
@@ -390,8 +439,7 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
     config_file : str
         Full path to the merge_config.json file.
     merged_set : dict
-        Ordered dict used as a bounded FIFO set of merge keys already
-        processed this session.
+        Bounded FIFO tracker of merge keys (see _record_job).
 
     Returns
     -------
@@ -439,9 +487,8 @@ def _runMergeData(usaxs_path, usaxs_filename, saxs_path, saxs_filename,
             exc_info=True,
         )
 
-    # Always record the pair so it is not retried this session.
-    # Bounded FIFO tracker — evicts oldest entries, never the newest.
-    _remember_file(merged_set, merge_key)
+    _record_job(merged_set, merge_key, success,
+                f"Merge of {usaxs_filename} + {saxs_filename}")
 
     return success
 
@@ -492,13 +539,22 @@ def _checkAndRunMerge(ListOfScans, technique, merged_set, analyzed_merged_set):
         usaxs_file = os.path.join(usaxs_path, usaxs_filename)
         saxs_file = os.path.join(saxs_path, saxs_filename)
         merge_key = (usaxs_file, saxs_file)
-        if merge_key in merged_set:
+        if _job_settled(merged_set, merge_key):
             continue
 
         # Check for merge_config.json in the parent data folder.
         parent_dir = os.path.dirname(usaxs_path)
         config_file = os.path.join(parent_dir, _MERGE_CONFIG_FILENAME)
         if not os.path.isfile(config_file):
+            continue
+
+        # Merge only once both partners are reduced.  The USAXS block runs
+        # before the SAXS block in each cycle, so the SAXS partner often is
+        # not reduced yet when the USAXS scan arrives; the SAXS block then
+        # triggers the merge.  Not an attempt, so nothing is recorded.
+        if not (_has_nxcansas_entry(usaxs_file) and _has_nxcansas_entry(saxs_file)):
+            logging.info(f"Merge of {usaxs_filename} + {saxs_filename} postponed: "
+                         "partner not reduced yet.")
             continue
 
         success = _runMergeData(usaxs_path, usaxs_filename,
@@ -527,7 +583,7 @@ def processUSAXSFolder(path):
     the standard APS folder layout produced by the Bluesky acquisition system:
 
         <path>/
-            <name>_usaxs/   — USAXS flyscan files (.h5)
+            <name>_usaxs/   — USAXS fly-scan and step-scan files (.h5)
             <name>_saxs/    — SAXS area-detector files (.hdf)
             <name>_waxs/    — WAXS area-detector files (.hdf)
 
@@ -569,11 +625,18 @@ def processUSAXSFolder(path):
         return data_files, blank_files
 
     if usaxs_folder is not None:
-        logging.info("Processing USAXS Flyscans")
+        # A _usaxs folder can hold both fly and step scans; each goes to its
+        # own reducer, and a scan is only paired with a blank of its own kind.
+        usaxs_path = os.path.join(path, usaxs_folder)
         usaxs_files, usaxs_blanks = _list_sorted_files(usaxs_folder, '.h5')
-        ListOfScans = [(os.path.join(path, usaxs_folder), file) for file in usaxs_files]
-        ListOfBlanks = [(os.path.join(path, usaxs_folder), file) for file in usaxs_blanks]
-        processFlyscans(ListOfScans, ListOfBlanks, recalculateAllData=True)
+        is_step = {file: detect_technique(usaxs_path, file) == "StepScan" for file in usaxs_files}
+        for label, want_step, processor in (("Flyscans", False, processFlyscans),
+                                            ("Step scans", True, processStepscans)):
+            ListOfScans = [(usaxs_path, file) for file in usaxs_files if is_step[file] == want_step]
+            ListOfBlanks = [(usaxs_path, file) for file in usaxs_blanks if is_step[file] == want_step]
+            if ListOfScans:
+                logging.info(f"Processing USAXS {label}")
+                processor(ListOfScans, ListOfBlanks, recalculateAllData=True)
     else:
         logging.warning(f"No *_usaxs folder found in {path}; skipping USAXS processing.")
 
@@ -768,89 +831,100 @@ def main():
         # only re-download and re-plot when a new tune scan appears.
         listOfTunesOld = {pn: [] for pn in TUNE_PLAN_NAMES}
         while True:
-            logging.info("New round of processing started at : %s", datetime.datetime.now()) 
+            logging.info("New round of processing started at : %s", datetime.datetime.now())
 
+            # Each technique block is isolated: an exception in one (plotting,
+            # an unexpected file) is logged and the loop goes on, instead of
+            # ending the daemon and relying on systemd to restart it.  The
+            # "already seen" list is updated BEFORE the work, so a block that
+            # keeps failing is not re-run every cycle; it runs again when the
+            # list of scans changes.
             logging.info("Processing the Flyscans")
-            ListOfScans = FindLastScanData("Flyscan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            #need to check, if we have same list as before and if yes, skip everything
-            if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
-                logging.info('No new Flyscan data found')
-            else:
-                #path, filename = ListOfScans[-1]
-                listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks) 
-                #listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack) 
-                logging.info(f'Got list : {ListOfScans}')
-                logging.info(f'Got blank list : {listOfBlanks}')
-                results = processFlyscans(ListOfScans, listOfBlanks)
-                plotUSAXSResults(results, imagePath, isFlyscan=True)
-                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedFlyscanFiles)
-                _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
-                listofFlyscansOld = ListOfScans
-            
+            try:
+                ListOfScans = FindLastScanData("Flyscan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
+                if ListOfScans == listofFlyscansOld or len(ListOfScans) == 0:
+                    logging.info('No new Flyscan data found')
+                else:
+                    listofFlyscansOld = ListOfScans
+                    listOfBlanks = FindLastBlankScan("Flyscan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                    logging.info(f'Got list : {ListOfScans}')
+                    logging.info(f'Got blank list : {listOfBlanks}')
+                    results = processFlyscans(ListOfScans, listOfBlanks)
+                    plotUSAXSResults(results, imagePath, isFlyscan=True)
+                    _checkAndRunPyirenaAnalysis(ListOfScans, analyzedFlyscanFiles)
+                    _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
+            except Exception as e:
+                logging.error(f"Flyscan block failed: {e}", exc_info=True)
 
             logging.info("Processing the Step scans")
-            ListOfScans = FindLastScanData("uascan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            #need to check, if we have same list as before and if yes, skip everything
-            if ListOfScans == listofStepScansOld or len(ListOfScans) == 0:
-                logging.info('No new Step scans data found')
-            else:
-                #path, filename = ListOfScans[-1]
-                listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
-                #listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
-                logging.info(f'Got list : {ListOfScans}')
-                logging.info(f'Got blank list : {listOfBlanks}')
-                results = processStepscans(ListOfScans, listOfBlanks)
-                plotUSAXSResults(results, imagePath, isFlyscan=False)
-                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedStepFiles)
-                _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
-                listofStepScansOld = ListOfScans
-    
+            try:
+                ListOfScans = FindLastScanData("uascan",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
+                if ListOfScans == listofStepScansOld or len(ListOfScans) == 0:
+                    logging.info('No new Step scans data found')
+                else:
+                    listofStepScansOld = ListOfScans
+                    listOfBlanks = FindLastBlankScan("uascan",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                    logging.info(f'Got list : {ListOfScans}')
+                    logging.info(f'Got blank list : {listOfBlanks}')
+                    results = processStepscans(ListOfScans, listOfBlanks)
+                    plotUSAXSResults(results, imagePath, isFlyscan=False)
+                    _checkAndRunPyirenaAnalysis(ListOfScans, analyzedStepFiles)
+                    _checkAndRunMerge(ListOfScans, "USAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
+            except Exception as e:
+                logging.error(f"Step-scan block failed: {e}", exc_info=True)
+
             #process SAXS and WAXS data
             logging.info("Processing the SAXS")
-            ListOfScans = FindLastScanData("SAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            if ListOfScans == listofSAXSOld or len(ListOfScans) == 0:
-                logging.info('No new SAXS data found')
-            else:
-                listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
-                #listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
-                logging.info(f'Got list : {ListOfScans}')
-                logging.info(f'Got blank list : {listOfBlanks}')
-                _checkAndRunPynikaCalibration(ListOfScans, "SAXS", calibratedSAXSFiles)
-                results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS=True)
-                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedSAXSFiles)
-                _checkAndRunMerge(ListOfScans, "SAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
-                listofSAXSOld = ListOfScans
+            try:
+                ListOfScans = FindLastScanData("SAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
+                if ListOfScans == listofSAXSOld or len(ListOfScans) == 0:
+                    logging.info('No new SAXS data found')
+                else:
+                    listofSAXSOld = ListOfScans
+                    listOfBlanks = FindLastBlankScan("SAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                    logging.info(f'Got list : {ListOfScans}')
+                    logging.info(f'Got blank list : {listOfBlanks}')
+                    _checkAndRunPynikaCalibration(ListOfScans, "SAXS", calibratedSAXSFiles)
+                    results = processADscans(ListOfScans, listOfBlanks)
+                    plotSWAXSResults(results, imagePath, isSAXS=True)
+                    _checkAndRunPyirenaAnalysis(ListOfScans, analyzedSAXSFiles)
+                    _checkAndRunMerge(ListOfScans, "SAXS", mergedUSAXSSAXSFiles, analyzedMergedFiles)
+            except Exception as e:
+                logging.error(f"SAXS block failed: {e}", exc_info=True)
 
             logging.info("Processing the WAXS")
-            ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
-            if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
-                 #if len(ListOfScans) == 0:
-                logging.info('No new WAXS data found')
-            else:
-                listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
-                #listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBack)
-                logging.info(f'Got list : {ListOfScans}')
-                logging.info(f'Got blank list : {listOfBlanks}')
-                _checkAndRunPynikaCalibration(ListOfScans, "WAXS", calibratedWAXSFiles)
-                results = processADscans(ListOfScans, listOfBlanks)
-                plotSWAXSResults(results, imagePath, isSAXS=False)
-                _checkAndRunPyirenaAnalysis(ListOfScans, analyzedWAXSFiles)
-                listOfWAXSOld = ListOfScans
+            try:
+                ListOfScans = FindLastScanData("WAXS",NumberOfImagesInGraphs,NumberOfDaysToLookBack)
+                if ListOfScans == listOfWAXSOld or len(ListOfScans) == 0:
+                    logging.info('No new WAXS data found')
+                else:
+                    listOfWAXSOld = ListOfScans
+                    listOfBlanks = FindLastBlankScan("WAXS",path=None, NumScans=NumberOfImagesInGraphs, lastNdays=NumberOfDaysToLookBackBlanks)
+                    logging.info(f'Got list : {ListOfScans}')
+                    logging.info(f'Got blank list : {listOfBlanks}')
+                    _checkAndRunPynikaCalibration(ListOfScans, "WAXS", calibratedWAXSFiles)
+                    results = processADscans(ListOfScans, listOfBlanks)
+                    plotSWAXSResults(results, imagePath, isSAXS=False)
+                    _checkAndRunPyirenaAnalysis(ListOfScans, analyzedWAXSFiles)
+            except Exception as e:
+                logging.error(f"WAXS block failed: {e}", exc_info=True)
 
             # Process live tuning scans (tune_ar, tune_mr, tune_a2rp).
             # These have no HDF5 file; data comes from Tiled only.  Safe against
             # a missing/offline server: FindLastTuneScans returns [] and we skip.
             logging.info("Processing the Tune scans")
             for pn in TUNE_PLAN_NAMES:
-                tuneMeta = FindLastTuneScans(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
-                uidList = [m["uid"] for m in tuneMeta]
-                if uidList == listOfTunesOld[pn] or len(uidList) == 0:
-                    logging.info(f'No new {pn} tune data found')
-                    continue
-                results = getTuneResults(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
-                plotTuneResults(results, imagePath, pn)
-                listOfTunesOld[pn] = uidList
+                try:
+                    tuneMeta = FindLastTuneScans(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                    uidList = [m["uid"] for m in tuneMeta]
+                    if uidList == listOfTunesOld[pn] or len(uidList) == 0:
+                        logging.info(f'No new {pn} tune data found')
+                        continue
+                    listOfTunesOld[pn] = uidList
+                    results = getTuneResults(pn, NumberOfTunesToShow, NumberOfDaysToLookBackTunes)
+                    plotTuneResults(results, imagePath, pn)
+                except Exception as e:
+                    logging.error(f"Tune block ({pn}) failed: {e}", exc_info=True)
 
             logging.info('Sleeping for 5 seconds')
             time.sleep(5)                   #delay between tries to prevent overload 

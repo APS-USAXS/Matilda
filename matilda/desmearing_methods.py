@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import zlib
 
 import numpy as np
 
@@ -533,6 +534,14 @@ def _abel_core(q, y, err, slit_length, *, auto_smooth=True, smooth_w=0.05,
         # The inversion is linear in Ismr, so Monte Carlo over the measured
         # points (the high-Q extension is held fixed) propagates the smoothing
         # as well, which no analytic shortcut does.
+        # Seeded from the data unless a seed is given: the same input then
+        # always gives the same error bars (unseeded, two identical runs
+        # differed by up to 2x point by point with 20 draws), while different
+        # samples still get independent draws.
+        if seed is None:
+            seed = zlib.crc32(np.ascontiguousarray(q).tobytes()
+                              + np.ascontiguousarray(y).tobytes()
+                              + np.ascontiguousarray(err).tobytes())
         rng = np.random.default_rng(seed)
         tail = Ise[n0:]
         draws = np.empty((int(num_mc), n0))

@@ -1,7 +1,7 @@
-"""Unit tests for the GUI technique detector.
+"""Unit tests for the technique detector (matilda/technique_detector.py).
 
-The module is loaded directly from its file to avoid importing the GUI
-package __init__ (which requires PySide6/PyQt6).
+The module is loaded directly from its file, so the test needs only h5py
+(it used to live under matilda/gui/, whose package __init__ needs Qt).
 """
 
 import importlib.util
@@ -14,7 +14,7 @@ h5py = pytest.importorskip("h5py")
 
 _MODULE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "matilda", "gui", "data_reduction", "technique_detector.py",
+    "matilda", "technique_detector.py",
 )
 
 

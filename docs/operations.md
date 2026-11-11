@@ -9,7 +9,7 @@
 
 ## Overview
 
-Matilda runs as a 15-second polling loop on `usaxscontrol.xray.aps.anl.gov`.
+Matilda runs as a polling loop (5 s sleep between cycles) on `usaxscontrol.xray.aps.anl.gov`.
 Every cycle it queries the Tiled server for new scan data, reduces any new files
 to calibrated I(Q) curves, and saves JPEG summary plots to a web-visible directory.
 

@@ -23,10 +23,6 @@ from .fx4support import (CHAIN_FX4, CHAIN_SCALER, FX4_RELATIVE_CURRENT_ERROR,
                          mean_of_samples, range_indexed_array, ratio_error,
                          signal_derived_range_index, warn_ring_overflows)
 
-#this is to enable graphs in R data clacualtion for debugging. 
-debugme = 0
-#recalculateAllData = False
-
 MinQMinFindRatio = 1.05
 
 # CONFIRMED 2026-07-08 (JIL): the flyscan MCA gets a dedicated 1e6 Hz clock
@@ -325,9 +321,56 @@ def findProperBlankScan(scan_path, scan_filename, ListOfBlanks):
 
 # Version of the reduction cached in a blank file under entry/blankData.  Bump
 # it whenever the blank-side reduction changes, so stale caches are recomputed.
+# Shared by fly-scan and step-scan blanks (getBlankStepscan in convertUSAXS).
 #   2 (2026-11): FX4 noise model, linear smoothing with propagated error,
 #                negative-intensity lift moved after smoothing.
-BLANK_CACHE_VERSION = 2
+#   3 (2026-11): blank records its counting chain ("chain") so a sample is
+#                never calibrated against a blank from the other chain;
+#                step-scan blanks are versioned too.
+BLANK_CACHE_VERSION = 3
+
+
+def loadCachedBlank(hdf_file, location, blankFilename, recalculateAllData=False):
+    """Return the blank cached at *location* if it is current, else None.
+
+    A cached blank is reused only when it carries the current
+    BLANK_CACHE_VERSION.  When *recalculateAllData* is set, or the cache is
+    stale, the group is deleted so the caller recomputes and rewrites it.
+    """
+    if location not in hdf_file:
+        return None
+    if recalculateAllData:
+        del hdf_file[location]
+        logging.info(f"Deleted existing group '{location}' in {blankFilename}.")
+        return None
+    cached = load_dict_from_hdf5(hdf_file, location)
+    try:
+        cached_version = int(np.ravel(cached.get("BlankCacheVersion", 0))[0])
+    except (TypeError, ValueError, IndexError):
+        cached_version = 0
+    if cached_version == BLANK_CACHE_VERSION:
+        logging.info(f"Used existing Blank data from {blankFilename}")
+        return cached
+    del hdf_file[location]
+    logging.info(f"Cached Blank data in {blankFilename} is version "
+                 f"{cached_version}, current is {BLANK_CACHE_VERSION}; recalculating.")
+    return None
+
+
+def checkBlankChain(Sample):
+    """Raise if the sample and its blank were counted with different chains.
+
+    The scaler chain gives counts/gain, the FX4 chain gain-independent
+    picoamps; subtracting one from the other is meaningless.  convertSWAXS
+    makes the same check for area-detector frames.
+    """
+    chain = Sample["RawData"].get("chain", CHAIN_SCALER)
+    blank_chain = Sample["BlankData"].get("chain", CHAIN_SCALER)
+    if chain != blank_chain:
+        raise ValueError(
+            f"{Sample['RawData'].get('filename', '?')} was counted with the {chain} chain "
+            f"but the blank {Sample['BlankData'].get('blankname', '?')} with {blank_chain}. "
+            "They are not comparable: one is in counts, the other in picoamps.")
 
 
 def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
@@ -338,29 +381,13 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
     location = 'entry/blankData/'
     Filepath = os.path.join(blankPath, blankFilename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-            # Check if the group 'location' exists, if yes, either delete if asked for or use. 
-            if recalculateAllData:
-                if location in hdf_file:
-                    # Delete the group is exists and requested
-                    del hdf_file[location]
-                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
-
-            if location in hdf_file:
-                # Reuse the cached blank only if it was made by this reduction
-                # version; otherwise recompute it, so a blank cached before a
-                # change to the blank-side reduction is never silently mixed
-                # with a sample reduced the new way.
-                cached = load_dict_from_hdf5(hdf_file, location)
-                try:
-                    cached_version = int(np.ravel(cached.get("BlankCacheVersion", 0))[0])
-                except (TypeError, ValueError, IndexError):
-                    cached_version = 0
-                if cached_version == BLANK_CACHE_VERSION:
-                    logging.info(f"Used existing Blank data from {blankFilename}")
-                    return cached
-                del hdf_file[location]
-                logging.info(f"Cached Blank data in {blankFilename} is version "
-                             f"{cached_version}, current is {BLANK_CACHE_VERSION}; recalculating.")
+            # Reuse the cached blank only if it was made by this reduction
+            # version; otherwise recompute it, so a blank cached before a
+            # change to the blank-side reduction is never silently mixed
+            # with a sample reduced the new way.
+            cached = loadCachedBlank(hdf_file, location, blankFilename, recalculateAllData)
+            if cached is not None:
+                return cached
             Blank = dict()
             Blank["RawData"]=importFlyscan(blankPath, blankFilename)         #import data
             (BlTransCounts, BlTransGain,
@@ -381,6 +408,7 @@ def getBlankFlyscan(blankPath, blankFilename, recalculateAllData=False):
                                                     replaceNans=True, time_base=1.0,
                                                     fx4_noise_model=Blank["RawData"].get("chain") == CHAIN_FX4))
             Blank["BlankData"]["BlankCacheVersion"] = BLANK_CACHE_VERSION
+            Blank["BlankData"]["chain"] = Blank["RawData"].get("chain", CHAIN_SCALER)
             # we need to return just the BlankData part 
             BlankData=dict()
             BlankData=Blank["BlankData"]
@@ -545,7 +573,8 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     if qmin_override is not None and qmin_override > 0:
         override_idx = int(np.searchsorted(SMR_Qvec, float(qmin_override)))
         largest_value = override_idx
-        logging.info(f"Using Qmin override {qmin_override:.4e} 1/A (auto Qmin was {calculated_qmin:.4e}).")
+        auto_txt = f"{calculated_qmin:.4e} 1/A" if calculated_qmin is not None else "not found"
+        logging.info(f"Using Qmin override {qmin_override:.4e} 1/A (auto Qmin: {auto_txt}).")
     else:
         largest_value = auto_largest_value
     # Ensure the start_index is within bounds and there's data to slice
@@ -841,7 +870,6 @@ def _calculatePD_FlyScaler(data_dict):
         # create the gains array and corrects UPD for it.
         # Masks deadtimes and range changes
         # get the needed data from dictionary
-    ARangles = data_dict["RawData"]["ARangles"]
     AmpGain = data_dict["RawData"]["AmpGain"]
     AmpReqGain = data_dict["RawData"]["AmpReqGain"]
     Channel = data_dict["RawData"]["Channel"]
@@ -934,21 +962,6 @@ def _calculatePD_FlyScaler(data_dict):
     PD_Intensity = ((UPD_array-TimeInSec*updBkg)/(Frequency*Gains)) / (Monitor/I0Gain)
     # Igor fixes negative intensities here by removing oversubtraction...
     PD_Intensity = _fixNegativeFlyIntensities(PD_Intensity)
-
-    if debugme:
-        import matplotlib.pyplot as plt  # lazy import — only needed for debug plots
-        plt.figure()
-        plt.plot(ARangles, np.log10(UPD_array), label='UPD_array')
-        plt.plot(ARangles, np.log10(TimeInSec*updBkg), label='TimeInSec*updBkg')
-        #plt.plot(ARangles, np.log10(TimeInSec), label='TimeInSec')
-        #plt.plot(ARangles, np.log10(Monitor), label='Monitor')
-        plt.plot(ARangles, np.log10(PD_Intensity), label='PD_Intensity')
-        plt.xlabel('ARangles')
-        plt.ylabel('Log10 Value')
-        plt.title('Debug Plot of Raw Data Components')
-        plt.legend()
-        plt.show()
-
 
     PD_error = 0.01*PD_Intensity   #this is fake error for QR conversion,recalculated in calculatePDerror
     # Igor has code to avoid 0 uncertainties. Not needed here, this is recalculated anyway. 
@@ -1237,6 +1250,7 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
     
     #we need to find i where qvector > 0.0003
     startIndex = find_crossing_index(qvector, 0.0003)
+    bad_time_points = 0
 
     for i in range(startIndex, len(intensity)):
         # 0-based range index mapping (ranges are 0-4 in this code base:
@@ -1256,7 +1270,12 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
             # range 4, or NaN (masked point)
             tmp_time = rwave_smooth_times[4]
 
-        if meas_time_sec[i] > tmp_time:
+        if not (meas_time_sec[i] > 0):
+            # zero, negative or NaN dwell time: the window length cannot be
+            # computed (inf/NaN -> OverflowError); leave the point unsmoothed.
+            bad_time_points += 1
+            smooth_intensity[i] = temp_int[i]
+        elif meas_time_sec[i] > tmp_time:
             smooth_intensity[i] = temp_int[i]
         else:
             start_points = int(np.ceil(tmp_time / meas_time_sec[i])) + 1
@@ -1296,6 +1315,10 @@ def smooth_r_data(intensity, qvector, UPD_gainsIndx, r_error, meas_time,
                     n_eff = _trapezoid_effective_points(len(temp_r))
                     r_error[i] /= np.sqrt(n_eff)
                     window[i] = n_eff
+
+    if bad_time_points:
+        logging.warning(f"smooth_r_data: {bad_time_points} points have a non-positive or "
+                        "missing measurement time; left unsmoothed.")
 
     if fx4_noise_model:
         intensity = _fixNegativeFlyIntensities(smooth_intensity)
@@ -1439,6 +1462,21 @@ def modifiedGauss(xvar, a, x0, sigma, exponent):
 '''
 
 
+def point_spacing_dQ(Q):
+    """dQ of un-rebinned data: the spacing to the previous point (first = second).
+
+    This is the dQ rebin_QRSdata has always given the points it leaves
+    un-rebinned (Q < 0.0002); fly scans too short to be rebinned use it for
+    the whole curve.
+    """
+    Q = np.asarray(Q, dtype=float)
+    dQ = np.zeros(len(Q))
+    if len(Q) > 1:
+        dQ[1:] = Q[1:] - Q[:-1]
+        dQ[0] = dQ[1]
+    return dQ
+
+
 def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, smooth_window=None):
     '''
     Rebin data based on the condition Q < 0.0002 and Q > 0.0002.
@@ -1453,10 +1491,7 @@ def rebin_QRSdata(Wx, Wy, Ws, NumberOfPoints, smooth_window=None):
     independent points it really holds.  Without it the bin keeps the RMS of
     its inputs, the historical scaler-chain behaviour.
     '''
-    # create Wdx array based on Wx
-    Wdx = np.zeros(len(Wx))
-    Wdx[1:] = Wx[1:] - Wx[:-1]
-    Wdx[0] = Wdx[1]  # Set the first element to the same value as the second element        
+    Wdx = point_spacing_dQ(Wx)
     # Split arrays based on the condition Q < 0.0002
     mask_less = Wx < 0.0002
     Wx_less = Wx[mask_less]

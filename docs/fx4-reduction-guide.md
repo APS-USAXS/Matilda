@@ -682,7 +682,14 @@ raise an error rather than producing a silently wrong result.
 `/entry/Metadata/FX4_RingOverflows` — same meaning and same warn-don't-refuse
 treatment as §3.9.
 
-### 5.8 Absolute intensity is provisional — read this
+### 5.8 Absolute intensity — resolved at the beamline (2026-11)
+
+**Status:** `I_scaling` has been recalibrated against SRM 3600 for the FX4
+monitor and stored in every instrument energy profile, so FX4 frames written
+since then carry the correct constant and both codes simply use the recorded
+`I_scaling`. No warning is emitted any more. The commissioning frames in
+`TestData/FX4Set/` predate the recalibration and are **not** on absolute
+scale. The background below is kept for reference.
 
 `I_scaling` (`/entry/Metadata/I_scaling`) is the SAXS/WAXS absolute-intensity
 constant. Its value was determined against the **old** monitor, `I0_cts/I0_gain`
@@ -694,9 +701,8 @@ roughly **10 orders of magnitude**.
 The curve **shape is unaffected** — diode/I0 is a ratio and the error is common
 to every pixel — so only the absolute level is wrong. Until a new constant is
 determined from glassy carbon SRM 3600, reduce FX4 frames with the recorded
-`I_scaling` and emit a warning. The Igor implementation should carry the same
-override hook (`convertSWAXS.FX4_I_SCALING` is the Python equivalent) so both
-codes can be corrected with one number.
+`I_scaling`. `convertSWAXS.FX4_I_SCALING` remains as an optional override
+hook (e.g. to re-reduce commissioning data); it is `None` in normal use.
 
 ---
 
@@ -801,11 +807,13 @@ chi^2 against `SMR_Error`, so an inflated error makes it over-smooth.
 
 ## 7. Deliberately uncalibrated constants
 
-Two numbers are placeholders. Both should be fixed in Igor and Python together.
+One number is still a placeholder (`FX4_RELATIVE_CURRENT_ERROR`); `FX4_I_SCALING`
+is resolved by recalibrating `I_scaling` at the beamline and kept only as an
+override hook.
 
 | constant | Python location | current | what it affects |
 |---|---|---|---|
-| `FX4_I_SCALING` | `convertSWAXS.py` | `None` ⇒ use recorded `I_scaling` | SAXS/WAXS **absolute intensity**, off by ~1e10 (§5.8) |
+| `FX4_I_SCALING` | `convertSWAXS.py` | `None` ⇒ use recorded `I_scaling` (recalibrated, correct since 2026-11) | override hook only (§5.8) |
 | `FX4_RELATIVE_CURRENT_ERROR` | `fx4support.py` | `0.01` | **Error bars only**, never intensities (§3.7, §4.6) |
 
 The fly-scan noise constants (`FX4_SHOT_CHARGE_PC`, `FX4_RELATIVE_ERROR_FLOOR`)

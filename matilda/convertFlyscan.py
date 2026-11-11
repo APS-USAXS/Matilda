@@ -8,7 +8,6 @@ Main entry point
 processFlyscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
 
 processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)
-        For example of use see: test_matildaLocal() at the end of this file. 
         Does:
         Convert Flyscan USAXS data from the HDF5 format to the 1Ddata
         If Background is None, return only reduced data, no calibration or subtraction.
@@ -48,10 +47,10 @@ saveNXcanSAS() / readMyNXcanSAS() — cache results in the original HDF5 file
 
 Notes
 -----
-* matplotlib is imported but currently only used for optional/debug plots
-  (all plt.show() calls are commented out).  Target for removal when GUI
-  work begins.
-* pprint is imported twice (as pprint and as pp); one import is redundant.
+* Fly scans with more than 800 points after subtraction are rebinned to
+  num_points; shorter ones keep their points (SMR_dQ = point spacing).
+* Handles both counting chains (scaler counts and FX4 picoamps); see
+  fx4support.  A sample is never calibrated against a blank of the other chain.
 """
 import h5py
 import os
@@ -60,12 +59,12 @@ import logging
 
 
 # rebinData lives in supportFunctions (was imported via convertUSAXS re-export)
-from .supportFunctions import rebinData
+from .supportFunctions import rebinData, point_spacing_dQ
 from .hdf5code import load_dict_from_hdf5, save_dict_to_hdf5, saveNXcanSAS, readMyNXcanSAS
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
-from .supportFunctions import _fixNegativeFlyIntensities
+from .supportFunctions import _fixNegativeFlyIntensities, checkBlankChain
 from .fx4support import CHAIN_FX4, add_relative_floor
 from .supportFunctions import empty_calibrated_data
 from .desmearing_methods import desmear_dispatch
@@ -162,12 +161,17 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                 and "blank" not in filename.lower()
             ):
                 Sample["BlankData"]=getBlankFlyscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
+                checkBlankChain(Sample)                                                # counts vs picoamps must not mix
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density, transmission_override=transmission_override, qmin_override=qmin_override))
                 SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                 if len(SMR_Qvec) > 50:  # some data were found. Call this success? 
                     if len(SMR_Qvec) > 800:  # if we have enough data, then rebin and desmear
                         Sample["CalibratedData"].update(rebinData(Sample, num_points=num_points, isSMRData=True))         #Rebin data
+                    else:
+                        # Too few points to rebin (short scan or a Qmin override):
+                        # rebinData is what creates SMR_dQ, so supply it here.
+                        Sample["CalibratedData"]["SMR_dQ"] = point_spacing_dQ(SMR_Qvec)
                     if is_fx4:
                         # ~0.1% of I survives all averaging on strong signal;
                         # added once, after rebinning (fx4support).
@@ -237,86 +241,3 @@ def reduceFlyscanToQR(path, filename, recalculateAllData=False):
                 save_dict_to_hdf5(Sample, location, hdf_file)
                 logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
                 return Sample
-
-
-def test_matildaLocal():
-
-    #does the file exists?
-    # e = os.path.isfile("C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/USAXS.h5")
-    # if not e:
-    #     print("File not found")
-    #     return
-    # else:
-    #     print("File found")
-    #open the file
-    #samplePath = "C:/Users/ilavsky/Documents/GitHub/Matilda/TestData/TestSet/02_21_Megan_usaxs"
-    #samplePath = "Z:/Experiments/USAXS_data/2025/2025-07/07_20_Tifani/07_20_Tifani_usaxs"
-    samplePath = "/home/parallels/Desktop/testdata/hematite/hematite_usaxs"
-    samplename="hematite_48C_98min_0050.h5"
-    blankPath=samplePath 
-    blankFilename="CapillaryBlank_0006.h5"
-    # assign to `Sample` if you re-enable the debug plotting below
-    processFlyscan(samplePath,samplename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=True)
-    #Sample = processFlyscan(samplePath,blankFilename,blankPath=blankPath,blankFilename=blankFilename,recalculateAllData=False)    
-    
-    # # this is for testing save/restore from Nexus file... 
-    # testme=False 
-
-    # if (testme):
-    #     # Specify the path and filename
-    #     #file_path = 'C:/Users/ilavsky/Desktop/TestNexus.hdf'  # Replace with your actual file path
-    #     file_path = r'\\Mac\Home\Desktop\Data\set1\TestNexus.hdf'  # Replace with your actual file path
-    #     # Check if the file exists before attempting to delete it
-    #     if os.path.exists(file_path):
-    #         try:
-    #             # Delete the file
-    #             os.remove(file_path)
-    #             print(f"File '{file_path}' has been deleted successfully.")
-    #         except Exception as e:
-    #             print(f"An error occurred while trying to delete the file: {e}")
-    #     else:
-    #         print(f"The file '{file_path}' does not exist.")
-    #     #removed file
-    #     saveNXcanSAS(Sample,r"\\Mac\Home\Desktop\Data\set1", "TestNexus.hdf")
-
-    #Sample = {}
-    #Sample = readMyNXcanSAS(r"\\Mac\Home\Desktop\Data\set1", samplename)
-    #pprint.pprint(Data)
-    #Sample['CalibratedData']=Data
-    # Q = Sample["reducedData"]["Q"]
-    # UPD = Sample["reducedData"]["Intensity"]
-    # Error = Sample["reducedData"]["Error"]
-    # plt.figure(figsize=(6, 12))
-    # plt.plot(Q, UPD, linestyle='-')  # You can customize the marker and linestyle
-    # #plt.plot(Q, Intensity, linestyle='-')  # You can customize the marker and linestyle
-    # plt.title('Plot of Intensity vs. Q')
-    # plt.xlabel('log(Q) [1/A]')
-    # plt.ylabel('Intensity')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.grid(True)
-    # plt.show() 
-    # SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"] 
-    # SMR_Int =Sample["CalibratedData"]["SMR_Int"] 
-    # #SMR_Error =Sample["CalibratedData"]["SMR_Error"] 
-    # DSM_Qvec =Sample["CalibratedData"]["Q"]        # used by debug plot below
-    # DSM_Int =Sample["CalibratedData"]["Intensity"]
-    #DSM_Error =Sample["CalibratedData"]["Error"]
-    # Debug plot (requires matplotlib; commented out for production):
-    # import matplotlib.pyplot as plt
-    # plt.figure(figsize=(6, 12))
-    # plt.plot(DSM_Qvec, DSM_Int, linestyle='-')
-    # plt.title('Plot of Intensity vs. Q')
-    # plt.xlabel('log(Q) [1/A]')
-    # plt.ylabel('Intensity')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.grid(True)
-    # plt.show()
-
-
-
-
-if __name__ == "__main__":
-    #test_matilda()
-    test_matildaLocal()

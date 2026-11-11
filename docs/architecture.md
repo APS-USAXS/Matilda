@@ -8,7 +8,7 @@ Tiled server (HTTP/REST)
         │  FindLastScanData()
         │  FindLastBlankScan()
         ▼
-matilda.py  ─── 15-second polling loop
+matilda.py  ─── polling loop (5 s sleep between cycles)
         │
         ├── convertFlyscan.py   (USAXS flyscan → I(Q))
         ├── convertUSAXS.py     (USAXS step-scan → I(Q))
@@ -32,7 +32,7 @@ matilda.py  ─── 15-second polling loop
 ### Orchestrator
 
 **`matilda/matilda.py`**
-Main 15-second polling loop.  Queries Tiled for new scans, compares to the
+Main polling loop (5 s sleep between cycles).  Queries Tiled for new scans, compares to the
 previous list, dispatches reduction and plotting.
 
 Entry point: `main()` — called by the `matilda` console script and by
@@ -87,10 +87,11 @@ and `detect_counting_chain` checks all of them:
 | SAXS / WAXS frame | `/entry/counting_chain` |
 | step scan | `/entry/instrument/bluesky/metadata/counting_chain` |
 
-Reference: `bits_usaxs/docs/FX4_data_formats.md`. Two knobs are deliberately
-left for calibration against a standard reference material:
-`convertSWAXS.FX4_I_SCALING` (SAXS/WAXS absolute intensity) and
-`fx4support.FX4_RELATIVE_CURRENT_ERROR` (step-scan error bars).
+Reference: `bits_usaxs/docs/FX4_data_formats.md`. One knob is still a
+placeholder: `fx4support.FX4_RELATIVE_CURRENT_ERROR` (step-scan error bars;
+see TODO.md). SAXS/WAXS absolute intensity uses the recorded `I_scaling`,
+recalibrated at the beamline for FX4; `convertSWAXS.FX4_I_SCALING` is only an
+override hook.
 
 For the full per-technique description of the FX4 reduction — dataset paths,
 arrays, formulas, transmission terms and validation numbers, written so the
@@ -148,6 +149,11 @@ Nika → Fit2D → pyFAI PONI geometry conversion.
 
 Key function: `convert_Nika_to_Fit2D(*, SSD, pix_size, BCX, BCY, HorTilt, VertTilt, wavelength)`
 
+**`matilda/technique_detector.py`**
+Flyscan / StepScan / SAXS / WAXS detection from file content (h5py only, no
+Qt).  Used by the GUI and by `processUSAXSFolder`, which sends each scan in a
+`_usaxs` folder to the fly-scan or step-scan reducer accordingly.
+
 ---
 
 ### I/O
@@ -160,6 +166,22 @@ Key functions: `saveNXcanSAS`, `readMyNXcanSAS`, `readGenericNXcanSAS`,
 
 The `Matilda_version` attribute in saved files is read from
 `importlib.metadata.version('Matilda')` at write time.
+
+**Cached results.** Each group `saveNXcanSAS` writes carries a
+`matilda_reduction_version` attribute (`hdf5code.REDUCTION_VERSION`).
+`clearAndCheckCachedReduction` (shared by all three converters) treats a
+missing or different value as a cache miss, so results written by an older
+reduction are recomputed rather than served.  Bump `REDUCTION_VERSION`
+whenever a change alters reduced numbers.  Cached USAXS blanks
+(`entry/blankData`, fly and step) are versioned the same way by
+`supportFunctions.BLANK_CACHE_VERSION` and record their counting chain; a
+sample is never calibrated against a blank from the other chain.
+
+**Entry name.** The NXcanSAS subentry is `/entry/<sample name>` (and
+`<sample name>_SMR`).  If that path is an existing raw-data group (a sample
+named `sample`, `metadata`, `data`…), a reserved name, or the sample name is
+empty, the entry is written under a safe name instead (`<name>_NXcanSAS`, or
+the file stem) and a warning is logged.  Raw data are never overwritten.
 
 **`matilda/readfromtiled.py`**
 Tiled server REST API queries.
@@ -286,6 +308,7 @@ Matilda/
 │   ├── fx4support.py           # Counting-chain detection, FX4 helpers
 │   ├── supportFunctions.py     # Shared numerical helpers
 │   ├── supportNikaFunctions.py # Geometry conversion (Nika → pyFAI)
+│   ├── technique_detector.py   # Fly/step/SAXS/WAXS detection (GUI + batch)
 │   ├── hdf5code.py             # NXcanSAS HDF5 I/O
 │   ├── plotData.py             # Headless JPEG plot export
 │   └── gui/

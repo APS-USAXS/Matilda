@@ -10,7 +10,7 @@ End users who only need the desktop GUI tools should see
 
 ## What the daemon does
 
-The `matilda` daemon runs as a systemd user service. Every 15 seconds it:
+The `matilda` daemon runs as a systemd user service. In each polling cycle (5 s sleep between cycles) it:
 
 1. Queries the Tiled server for new scan data.
 2. Reduces any new files to calibrated 1-D I(Q) curves.

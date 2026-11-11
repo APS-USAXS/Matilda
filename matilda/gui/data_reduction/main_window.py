@@ -31,7 +31,7 @@ from .parameter_tabs import ParameterTabWidget
 from .graph_panel import GraphPanel
 from .reduction_worker import ReductionWorker
 from .ascii_exporter import AsciiExportWorker
-from .technique_detector import detect_technique
+from matilda.technique_detector import detect_technique
 
 _SESSION_FILE = os.path.expanduser("~/.matilda_gui_session.json")
 _WINDOW_TITLE  = "Matilda — Data Reduction"

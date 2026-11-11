@@ -15,7 +15,7 @@ saveNXcanSAS(Sample, path, filename)
     Write processed I(Q) data as an NXcanSAS-compliant NXsubentry into the
     original scan HDF5 file.
 
-readMyNXcanSAS(path, filename)
+readMyNXcanSAS(path, filename, isUSAXS=False)
     Read back the NXcanSAS entry written by saveNXcanSAS().
 
 readGenericNXcanSAS(path, filename)
@@ -26,11 +26,13 @@ find_matching_groups(hdf_file, required_attributes, required_items)
     Search an open HDF5 file for groups matching a set of attribute and
     dataset criteria; returns a list of matching group paths.
 
+clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated)
+    Cache bookkeeping shared by all three converters (REDUCTION_VERSION aware).
+
 Notes
 -----
-* The 'six' library is imported (line 8) as a Python 2/3 compatibility shim.
-  It appears unused in Python 3 code — the import can likely be removed once
-  verified.  The original author flagged this with '#what is this for???'.
+* saveNXcanSAS writes /entry/<sample name>; it never overwrites a group that
+  is not its own NXcanSAS subentry (see _nxcansas_entry_name).
 * All functions expect the HDF5 file to follow the NeXus / NXcanSAS
   conventions used by the APS USAXS Bluesky acquisition system.
 """
@@ -86,6 +88,96 @@ USAXS_METADATA_KEYS = [
     'counting_chain', 'sample_time', 'values_per_read', 'upd_lurange',
     'ring_overflows', 'ring_overflows_I0',
 ]
+
+# Version of the reduction that produced a cached result.  saveNXcanSAS stamps
+# it on every group it writes (attribute REDUCTION_VERSION_ATTR), and
+# clearAndCheckCachedReduction treats a missing or different stamp as a cache
+# miss, so results written by an older reduction are recomputed instead of
+# being served silently.  Bump it whenever a change alters reduced numbers.
+#   1 (2026-11): first stamped version.  Covers the November 2026 FX4 error
+#                fix and the removal of "SMR_Error *= PeakToPeakTransmission";
+#                everything written before carries no stamp (= version 0).
+REDUCTION_VERSION = 1
+REDUCTION_VERSION_ATTR = 'matilda_reduction_version'
+
+# Groups saveNXcanSAS (or the reduction caches) write directly under /entry
+# under fixed names; an NXcanSAS entry named after the sample must not take
+# one of these names.
+_RESERVED_ENTRY_NAMES = {'QRS_data', 'Blank_data', 'blankData', 'displayData',
+                         'reducedData', 'definition'}
+
+
+def _attr_text(value):
+    """HDF5 attribute as str (attributes may come back as bytes or numpy str)."""
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='replace')
+    return None if value is None else str(value)
+
+
+def _is_nxcansas_subentry(obj):
+    """True if *obj* is a group written by saveNXcanSAS (a SASentry subentry)."""
+    return (isinstance(obj, h5py.Group)
+            and _attr_text(obj.attrs.get('canSAS_class')) == 'SASentry'
+            and _attr_text(obj.attrs.get('NX_class')) == 'NXsubentry')
+
+
+def _nxcansas_entry_name(h5file, samplename, filename):
+    """Name of the /entry/<name> subentry saveNXcanSAS may (over)write.
+
+    Normally this is the sample name, which is where pyirena, DataReporter and
+    Irena expect the data.  The sample name comes from user input, though, and
+    saveNXcanSAS deletes whatever already sits at the target path.  To keep
+    raw data safe:
+
+    * an empty name falls back to the file's stem;
+    * '/' (which would create nested groups) is replaced by '_';
+    * if /entry/<name> or /entry/<name>_SMR exists and is NOT an NXcanSAS
+      subentry (e.g. a sample named 'sample', 'metadata' or 'data', which are
+      raw groups), the name gets a '_NXcanSAS' suffix (then '_NXcanSAS2', ...).
+
+    The choice is deterministic, so a re-reduction overwrites the same entry.
+    """
+    name = '' if samplename is None else str(samplename).strip().replace('/', '_')
+    if name in ('', '.', '..'):
+        name = os.path.splitext(os.path.basename(filename))[0] or 'sample'
+        logging.warning(f"{filename}: sample name is empty; writing NXcanSAS data "
+                        f"under /entry/{name} instead.")
+
+    def _free_or_ours(candidate):
+        if candidate in _RESERVED_ENTRY_NAMES:
+            return False
+        for path in ('entry/' + candidate, 'entry/' + candidate + '_SMR'):
+            if path in h5file and not _is_nxcansas_subentry(h5file[path]):
+                return False
+        return True
+
+    candidates = [name, name + '_NXcanSAS'] + [f'{name}_NXcanSAS{i}' for i in range(2, 100)]
+    for candidate in candidates:
+        if _free_or_ours(candidate):
+            if candidate != name:
+                logging.warning(f"{filename}: /entry/{name} is an existing raw-data group "
+                                f"(or a reserved name); writing NXcanSAS data under "
+                                f"/entry/{candidate} so the raw data are not overwritten.")
+            return candidate
+    raise ValueError(f"{filename}: could not find a free NXcanSAS entry name for sample '{name}'.")
+
+
+def _replace_group(h5file, path, filename):
+    """Delete *path* if present (caller has checked it is ours) and recreate it."""
+    if path in h5file:
+        logging.warning(f"NXcanSAS group {path} already exists in file {filename}. Overwriting.")
+        del h5file[path]
+    group = h5file.create_group(path)
+    group.attrs[REDUCTION_VERSION_ATTR] = REDUCTION_VERSION
+    return group
+
+
+def cached_reduction_version(group):
+    """Reduction version stamped on a cached group; 0 when unstamped."""
+    try:
+        return int(np.ravel(group.attrs.get(REDUCTION_VERSION_ATTR, 0))[0])
+    except (TypeError, ValueError, IndexError):
+        return 0
 
 
 def readGenericNXcanSAS(path, filename):
@@ -360,8 +452,10 @@ def saveNXcanSAS(Sample,path, filename):
     blankname = Sample["CalibratedData"]["blankname"] if "blankname" in Sample["CalibratedData"] else None
     thickness = Sample["CalibratedData"]["thickness"] if "thickness" in Sample["CalibratedData"] else None
     label = Sample["RawData"]["filename"]
-    timeStamp = Sample["RawData"]["metadata"]["timeStamp"]
-    samplename = Sample["RawData"]["sample"]["name"]
+    # timeStamp is informational only (file_time attribute); a file without it
+    # must not fail here, after the whole reduction has run.
+    timeStamp = Sample["RawData"].get("metadata", {}).get("timeStamp")
+    samplename = Sample["RawData"].get("sample", {}).get("name")
     if isinstance(samplename, bytes):
         samplename = samplename.decode('utf-8')
 
@@ -433,7 +527,8 @@ def saveNXcanSAS(Sample,path, filename):
         f.attrs['default']          = 'entry'   #our files have one entry input.
         # these are hopefully optional and useful. 
         f.attrs['file_name']        = filename
-        f.attrs['file_time']        = timeStamp 
+        if timeStamp is not None:
+            f.attrs['file_time']    = timeStamp
         f.attrs['instrument']       = '12IDE USAXS'
         f.attrs['creator']          = 'Matilda NeXus writer'
         try:
@@ -450,9 +545,12 @@ def saveNXcanSAS(Sample,path, filename):
             nxentry = f.create_group('entry')    
         
         nxentry = f['entry']
+        # Name of our subentry; never the name of a raw-data group (see helper).
+        title = samplename if samplename else os.path.splitext(filename)[0]
+        entryname = _nxcansas_entry_name(f, samplename, filename)
         nxentry.attrs['NX_class'] = 'NXentry'
         nxentry.attrs['canSAS_class'] = 'SASentry'
-        nxentry.attrs['default']  = samplename   #modify with the most reduced data.
+        nxentry.attrs['default']  = entryname   #modify with the most reduced data.
         
         #add definition as NXsas - this is location of raw AND reduced data
         # Check if 'definition' dataset exists in the entry group and delete it if present
@@ -464,20 +562,16 @@ def saveNXcanSAS(Sample,path, filename):
         if Intensity is not None:
             logging.info(f"Wrote Desmeared NXcanSAS group for file {filename}. ")
             # create the NXsubentry group for Desmeared reduced data. 
-            newDataPath = "entry/"+samplename
-            if newDataPath in f:
-                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
-                del f[newDataPath]
-            
-            nxDataEntry = f.create_group(newDataPath)
+            newDataPath = "entry/"+entryname
+            nxDataEntry = _replace_group(f, newDataPath, filename)
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
             nxDataEntry.attrs['default'] = 'sasdata'
-            nxDataEntry.attrs['title'] = samplename
+            nxDataEntry.attrs['title'] = title
             #add definition as NXcanSas
             nxDataEntry.create_dataset('definition', data='NXcanSAS')
             #add title as NXcanSas
-            nxDataEntry.create_dataset('title', data=samplename)
+            nxDataEntry.create_dataset('title', data=title)
             #add run (compulsory)
             nxDataEntry.create_dataset('run', data="run_identifier")
 
@@ -523,7 +617,7 @@ def saveNXcanSAS(Sample,path, filename):
 
             # NXcanSAS metadata groups for desmeared entry
             _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength)
-            _write_SASsample(nxDataEntry, samplename, sample_thickness)
+            _write_SASsample(nxDataEntry, title, sample_thickness)
             _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
                                 fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
 
@@ -531,20 +625,16 @@ def saveNXcanSAS(Sample,path, filename):
             logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
             # add the SMR data
             # create the NXsubentry group for Desmeared reduced data. 
-            newDataPath = "entry/"+samplename+"_SMR"
-            if newDataPath in f:
-                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
-                del f[newDataPath]
-
-            nxDataEntry = f.create_group(newDataPath)
+            newDataPath = "entry/"+entryname+"_SMR"
+            nxDataEntry = _replace_group(f, newDataPath, filename)
             nxDataEntry.attrs['NX_class'] = 'NXsubentry'
             nxDataEntry.attrs['canSAS_class'] = 'SASentry'
             nxDataEntry.attrs['default'] = 'sasdata'
-            nxDataEntry.attrs['title'] = samplename
+            nxDataEntry.attrs['title'] = title
             #add definition as NXcanSas
             nxDataEntry.create_dataset('definition', data='NXcanSAS')
             #add title as NXcanSas
-            nxDataEntry.create_dataset('title', data=samplename)
+            nxDataEntry.create_dataset('title', data=title)
             #add run (compulsory)
             nxDataEntry.create_dataset('run', data="run_identifier")
 
@@ -594,18 +684,14 @@ def saveNXcanSAS(Sample,path, filename):
 
             # NXcanSAS metadata groups for SMR entry
             _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength)
-            _write_SASsample(nxDataEntry, samplename, sample_thickness)
+            _write_SASsample(nxDataEntry, title, sample_thickness)
             _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
                                 fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
 
         if R_Int is not None:
             logging.info(f"Wrote QRS group for file {filename}. ")
             newDataPath = "entry/"+"QRS_data"
-            if newDataPath in f:
-                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
-                del f[newDataPath]
-
-            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry = _replace_group(f, newDataPath, filename)
             # R_Int axis data
             ds = nxDataEntry.create_dataset('Intensity', data=R_Int)
             ds.attrs['units'] = 'arb'
@@ -622,11 +708,7 @@ def saveNXcanSAS(Sample,path, filename):
         if BL_R_Int is not None:
             logging.info(f"Wrote Blank data group for file {filename}. ")
             newDataPath = "entry/"+"Blank_data"
-            if newDataPath in f:
-                logging.warning(f"NXcanSAS group {newDataPath} already exists in file {filename}. Overwriting.")
-                del f[newDataPath]
-
-            nxDataEntry = f.create_group(newDataPath)
+            nxDataEntry = _replace_group(f, newDataPath, filename)
             # R_Int axis data
             ds = nxDataEntry.create_dataset('Intensity', data=BL_R_Int)
             ds.attrs['units'] = 'arb'
@@ -774,6 +856,8 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
                 lambda_val = _get_h5_value(f, trans_location + 'lambda')
                 if T_val is not None:
                     Sample['CalibratedData']['transmission'] = float(T_val[0]) if hasattr(T_val, '__len__') else float(T_val)
+                    # same key a fresh USAXS reduction uses (GUI, saveNXcanSAS)
+                    Sample['CalibratedData']['MeasuredTransmission'] = Sample['CalibratedData']['transmission']
                 if lambda_val is not None:
                     Sample['CalibratedData']['wavelength'] = float(lambda_val[0]) if hasattr(lambda_val, '__len__') else float(lambda_val)
 
@@ -897,6 +981,11 @@ def clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, require
        * requireCalibrated=True  — the desmeared NXcanSAS entry must exist
          (used when a blank is provided, i.e. full calibration expected)
        * requireCalibrated=False — the QRS_data group is enough
+       In both cases the group must carry the current REDUCTION_VERSION; an
+       older (or missing) stamp is a cache miss and the file is re-reduced,
+       which overwrites the stale groups.
+
+    Shared by processFlyscan, processStepscan and process2Ddata.
     """
     required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
     required_items = {'definition': 'NXcanSAS'}
@@ -916,7 +1005,14 @@ def clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, require
         location = next((e + '/' for e in SASentries if '_SMR' not in e), None)
     else:
         location = 'entry/QRS_data/'
-    return location is not None and location in hdf_file
+    if location is None or location not in hdf_file:
+        return False
+    cached_version = cached_reduction_version(hdf_file[location])
+    if cached_version != REDUCTION_VERSION:
+        logging.info(f"Cached reduction in {filename} is version {cached_version}, "
+                     f"current is {REDUCTION_VERSION}; recalculating.")
+        return False
+    return True
 
 
 def writeThicknessOverride(hdf_file, thick_path, thickness_override, filename):

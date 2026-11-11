@@ -1,6 +1,6 @@
 '''
-    convertSWAXScalibrated.py
-        New, calibrated SAXS/WAXS code. 
+    convertSWAXS.py
+        Calibrated SAXS/WAXS reduction (area detector -> pyFAI -> I(Q)).
     use: 
     process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
 
@@ -31,8 +31,8 @@ from .fx4support import (CHAIN_FX4, CHAIN_SCALER, detect_counting_chain,
                          warn_ring_overflows)
 from .supportFunctions import read_group_to_dict, filter_nested_dict
 from .supportNikaFunctions import convert_Nika_to_Fit2D
-from .hdf5code import save_dict_to_hdf5, load_dict_from_hdf5, saveNXcanSAS, readMyNXcanSAS, find_matching_groups
-from .hdf5code import writeThicknessOverride, AD_METADATA_KEYS
+from .hdf5code import saveNXcanSAS, readMyNXcanSAS
+from .hdf5code import writeThicknessOverride, clearAndCheckCachedReduction, AD_METADATA_KEYS
 
 # ── FX4 absolute scale ────────────────────────────────────────────────────────
 # I_scaling (/entry/Metadata/I_scaling) is the SAXS/WAXS absolute-intensity
@@ -43,11 +43,14 @@ from .hdf5code import writeThicknessOverride, AD_METADATA_KEYS
 # I0_cts_gated = 1.1e8.  The recorded I_scaling therefore under-scales FX4
 # frames by ~10 orders of magnitude.
 #
-# The curve SHAPE is unaffected — diode/I0 is a ratio and the error is common
-# to every pixel — so only the absolute level is wrong.  Set this constant to
-# the value determined from a standard reference material (glassy carbon
-# SRM 3600); until then FX4 frames are reduced with the recorded I_scaling and
-# a warning, i.e. correct in shape, provisional in absolute level.
+# RESOLVED at the beamline (2026-11): I_scaling is recalibrated against SRM
+# 3600 for the FX4 monitor and stored in every instrument energy profile, so
+# FX4 frames written since then carry the right constant and are reduced with
+# the recorded I_scaling.  (The FX4 commissioning frames in TestData/FX4Set
+# predate this and are NOT on absolute scale.)
+#
+# FX4_I_SCALING stays as an override hook only: set it to force one constant
+# for every FX4 frame, e.g. to re-reduce commissioning data.
 FX4_I_SCALING = None
 
 
@@ -57,12 +60,9 @@ def _correction_factor(metadata_dict, chain, filename):
     if chain != CHAIN_FX4:
         return corrFactor
     if FX4_I_SCALING is not None:
+        logging.info(f"{filename}: FX4 frame scaled with the override "
+                     f"FX4_I_SCALING = {FX4_I_SCALING:g} instead of the recorded I_scaling.")
         return FX4_I_SCALING
-    logging.warning(
-        f"{filename}: FX4 frame reduced with the recorded I_scaling "
-        f"({float(np.ravel(corrFactor)[0]):.3g}), which was calibrated against the old "
-        "I0_cts/I0_gain monitor. The curve shape is right but the ABSOLUTE LEVEL is "
-        "not; set convertSWAXS.FX4_I_SCALING from a standard reference material.")
     return corrFactor
 
 
@@ -129,8 +129,8 @@ def _geometry_from_dicts(instrument_dict, metadata_dict):
 def _build_mask(my2DRAWdata, usingWAXS, metadata_dict):
     """Build the bad-pixel/gap mask for azimuthal integration.
 
-    Single source of truth — the inline copies in ImportAndReduceAD and
-    reduceADData had diverged before this was factored out.
+    Single source of truth — the inline copies in the old ImportAndReduceAD
+    and reduceADData had diverged before this was factored out.
 
     Detector geometry has changed over time: WAXS masks branch by detector
     size, SAXS masks by acquisition year (StartTime metadata).  The >1e7 /
@@ -192,41 +192,20 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                    use_mu=False, mu=None, per_gram=False, density=None,
                    transmission_override=None):
     # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    location = 'entry/reducedData/'    #we need to make sure we have separate NXcanSAS data here. Is it still entry? 
     Filepath = os.path.join(path, filename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-        # Check if the group 'location' exists, if yes, bail out as this is all needed. 
-        required_attributes = {'canSAS_class': 'SASentry', 'NX_class': 'NXsubentry'}
-        required_items = {'definition': 'NXcanSAS'}
-        SASentries =  find_matching_groups(hdf_file, required_attributes, required_items)
-        if recalculateAllData:
-            # Delete the groups which may have een created by previously run saveNXcanSAS
-            location = 'entry/QRS_data/'
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/QRS_data' for file {filename}. ")
-            location = SASentries[0] if len(SASentries) > 0 else None
-            if location is not None and location in hdf_file:
-                # Delete the group
-                del hdf_file[location]
-                logging.info(f"Deleted existing NXcanSAS group for file {filename}. ")
-
-
-        NXcanSASentry = SASentries[0] if len(SASentries) > 0 else None
-        if blankFilename is not None and blankPath is not None:
-            location = NXcanSASentry                 # require we have calibrated data
-        else:
-            location = 'entry/QRS_data/'            # all we want here are QRS data
-
-        if location is not None and location in hdf_file:
-            # exists, so lets reuse the data from the file
-            Sample = dict()
+        # Cache bookkeeping shared with the USAXS converters: with a blank we
+        # require the calibrated NXcanSAS entry, otherwise QRS_data is enough.
+        # Blank files never get a calibrated entry, so they only need QRS_data
+        # (requiring the calibrated entry re-integrated every blank on every
+        # daemon cycle).  Stale (older reduction version) caches are a miss.
+        requireCalibrated = (blankFilename is not None and blankPath is not None
+                             and "blank" not in filename.lower())
+        if clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, requireCalibrated):
             Sample = readMyNXcanSAS(path, filename)
             logging.info(f"Using existing processed data from file {filename}.")
             return Sample
-        
-        
+
         else:
             Sample = dict()
             if thickness_override is not None:
@@ -288,94 +267,6 @@ def fixOversubtractedData(Sample):
     if minIntVal < 0:
         Sample["CalibratedData"]["Intensity"] = Sample["CalibratedData"]["Intensity"] - 1.1*minIntVal
     return Sample
-
-def reduceADToQR(path, filename):
-        tempFilename= os.path.splitext(filename)[0]
-        tempSample = {"RawData":{"filename": tempFilename}}
-        # label = data_dict["RawData"]["filename"]
-        # Q_array = data_dict["reducedData"]["Q_array"]
-        # Intensity = data_dict["reducedData"]["PD_intensity"]
-        tempSample["reducedData"]=ImportAndReduceAD(path, filename)
-        #pp.pprint(tempSample)
-        #pp.pprint(tempSample["RawData"]["filename"])
-        return tempSample
-
-
-## main code here
-def ImportAndReduceAD(path, filename, recalculateAllData=False):
-    # Open the HDF5 file and read its content, parse content in numpy arrays and dictionaries
-    location = 'entry/displayData/'
-    with h5py.File(os.path.join(path, filename), 'r+') as hdf_file:
-        # Check if the group 'displayData' exists
-        if recalculateAllData:
-            # Delete the group
-            if location in hdf_file:
-                del hdf_file[location]
-                logging.info(f"Deleted existing group 'entry/displayData' in {filename}.")
-
-        if location in hdf_file:
-            # exists, so lets reuse the data from the file
-            Sample = dict()
-            Sample = load_dict_from_hdf5(hdf_file, location)
-            logging.info(f"Used existing QR data from {filename}")
-            q = Sample["reducedData"]["Q_array"]
-            intensity = Sample["reducedData"]["Intensity"]
-            result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}  
-            return result
-        
-        
-        else:
-            Sample = dict()
-            #read various data sets
-            logging.info(f"Read file :{filename}")
-            dataset = hdf_file['/entry/data/data'] 
-            my2DData = np.array(dataset)
-            #sample
-            sample_group = hdf_file['/entry/sample']
-            sample_dict = read_group_to_dict(sample_group)
-            #instrument
-            instrument_group = hdf_file['/entry/instrument']
-            instrument_dict = read_group_to_dict(instrument_group)
-            del instrument_dict['detector']['data'] #this is original of 2-d data, we do not need to cary it here second time. 
-            #metadata
-            keys_to_keep = AD_METADATA_KEYS
-            metadata_group = hdf_file['/entry/Metadata']
-            metadata_dict = read_group_to_dict(metadata_group)
-            metadata_dict = filter_nested_dict(metadata_dict, keys_to_keep)
-            #need to append these structures to RAW data so we can optionally save them in Igor
-            Sample["RawData"]=dict()
-            Sample["RawData"]["metadata"]= metadata_dict
-            Sample["RawData"]["instrument"]= instrument_dict
-            Sample["RawData"]["sample"]= sample_dict
-        # geometry + mask via the shared helpers (single source of truth)
-        my_poni, usingWAXS = _geometry_from_dicts(instrument_dict, metadata_dict)
-        mask = _build_mask(my2DData, usingWAXS, metadata_dict)
-
-        ai = _get_integrator(my_poni)
-
-        #   You can specify the number of bins for the integration
-        #   set npt to larger of dimmension of my2DData
-        #   error_model= “azimuthal” or “poisson” (variance = I), “azimuthal” (variance = (I-<I>)^2)
-
-        if usingWAXS:
-            npt = max(my2DData.shape)
-            q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask, error_model= "azimuthal", correctSolidAngle=True, unit="q_A^-1")
-        else:
-            npt=200 
-            # using azimuth_range=(-30,30) should limit the range of data to what Nika is using for SAXS. 
-            q, intensity, sigma = ai.integrate1d(my2DData, npt, mask=mask,azimuth_range=(-30,30), error_model= "azimuthal", correctSolidAngle=True, unit="q_A^-1")
-
-        Sample["reducedData"] = dict()
-        Sample["reducedData"]["Q_array"] = q
-        Sample["reducedData"]["Intensity"] = intensity
-        Sample["reducedData"]["Error"] = sigma
-        save_dict_to_hdf5(Sample, location, hdf_file)
-        logging.info(f"Appended new QR data to 'entry/displayData' in {filename}.")
-        result = {"Intensity":np.ravel(intensity), "Q_array":np.ravel(q)}
-        return result
-
-
-
 
 def importADData(path, filename):
     Filepath = os.path.join(path, filename)
@@ -626,55 +517,6 @@ def reduceADData(Sample, useRawData=True, npts=None, per_gram=False, density=Non
             result["Error"] = result["Error"] / density
             result["units"] = "[cm2/g]"
         return result
-
-def PlotResults(data_dict):
-    # result = {"Int_raw":np.ravel(intensity), 
-    #           "Q_raw":np.ravel(q),
-    #           "Error_raw":np.ravel(error),
-    #           "Intensity":np.ravel(intcalib),
-    #           "Q":np.ravel(qcalib),
-    #           "Error":np.ravel(errcalib),
-    #           }  
-    pass    # debug-only function; body is fully commented out below
-    # Q_red = data_dict["reducedData"]["Q"]              # used by debug plot below
-    # Int_red = data_dict["reducedData"]["Intensity"]
-    # Q = data_dict["CalibratedData"]["Q"]
-    # Intensity = data_dict["CalibratedData"]["Intensity"]
-    # Debug plot (requires matplotlib; commented out for production):
-    # import matplotlib.pyplot as plt
-    # plt.figure(figsize=(6, 12))
-    # plt.plot(Q_red, Int_red, linestyle='-')
-    # plt.plot(Q, Intensity, linestyle='-')
-    # plt.title('Plot of Intensity vs. Q')
-    # plt.xlabel('log(Q) [1/A]')
-    # plt.ylabel('Intensity')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.grid(True)
-    # plt.show()
-
-    # # Plot ydata against xdata
-    # plt.figure(figsize=(6, 12))
-    # plt.plot(Q_array, Intensity, linestyle='-')  # You can customize the marker and linestyle
-    # plt.title('Plot of Intensity vs. Q')
-    # plt.xlabel('log(Q) [1/A]')
-    # plt.ylabel('Intensity')
-    # plt.xscale('linear')
-    # plt.yscale('linear')
-    # plt.grid(True)
-    # plt.show()
-
-
-if __name__ == "__main__":
-    Sample = dict()
-    Sample = ImportAndReduceAD("//Mac/Home/Desktop/Test", "R6016ACT_T4_H_1081.hdf", recalculateAllData=True)
-    ##Sample=process2Ddata("./TestData/TestSet/02_21_Megan_waxs","PU_25C_2_0063.hdf")
-    #PlotResults(Sample)
-    #Sample["reducedData"]=test("/home/parallels/Github/Matilda/TestData","LaB6_45deg.tif")
-    #pp.pprint(Sample)
-    #PlotResults(Sample)
-
-
 
 # (historical tilt-test scaffolding for GSAXS-II LaB6 tiff data removed 2026-07;
 #  see git history or CodeFragments/ if needed again)

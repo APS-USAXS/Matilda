@@ -78,6 +78,7 @@ gui = [
 dev = [
     "pytest",
     "pytest-cov",
+    "ruff",      # CLAUDE.md: `ruff check matilda/`
 ]
 # Install everything for a full local development setup:
 #   pip install -e .[gui,dev]

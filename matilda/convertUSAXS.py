@@ -7,31 +7,22 @@ Main entry point
 ----------------
 processStepscan(path, filename, blankPath=None, blankFilename=None, recalculateAllData=False)
 
-Also exports
-------------
-rebinData(Q, Intensity, Error, numBins)   — used by convertFlyscan.py
-
 Data flow
 ---------
-importFlyscan() from supportFunctions    — read raw arrays (step and fly share format)
-calculatePD_Fly() / beamCenterCorrection()
-calibrateAndSubtractFlyscan()
+importStepScan()                         — read the Bluesky step-scan layout (either chain)
+createUPDGainsAndBkgErrArrays() / CorrectUPDGainsStep()
+beamCenterCorrection() / calculatePDErrorStep()
+getBlankStepscan()                       — blank, cached in entry/blankData (versioned)
+normalizeByTransmission() / calibrateAndSubtractFlyscan() / calculatedQStep()
 desmear_dispatch()
-saveNXcanSAS() / readMyNXcanSAS()         — cache in HDF5
+saveNXcanSAS() / readMyNXcanSAS()        — cache in the original HDF5 file
 
 Notes
 -----
-* Despite the module name, the reduction pipeline is nearly identical to
-  convertFlyscan.py because step-scan and fly-scan share the same NXsas
-  file format at USAXS.
-* matplotlib is imported; plt.show() calls are all commented out.
-  Target for removal when GUI work begins.
-* rebinData() is also called by convertFlyscan — it lives here due to
-  historical code organisation but logically belongs in supportFunctions.
-
-TODO: fix calibration and saving (original TODO from module creation).
-TODO: reduceStepScanToQR and reduceFlyscanToQR mentioned in original header
-      may be legacy names — verify against current function names.
+* The pipeline mirrors convertFlyscan.processFlyscan, but step scans have
+  their own importer and are not rebinned (every collected point is kept).
+* FX4 step-scan error bars are still the flat FX4_RELATIVE_CURRENT_ERROR
+  placeholder (fx4support): the step-scan file records no per-point sigma.
 """
 
 import os
@@ -39,17 +30,17 @@ import re
 import h5py
 import numpy as np
 import logging
-from .fx4support import (CHAIN_FX4, FX4_RELATIVE_CURRENT_ERROR, as_scalar,
+from .fx4support import (CHAIN_FX4, CHAIN_SCALER, FX4_RELATIVE_CURRENT_ERROR, as_scalar,
                          detect_counting_chain, range_indexed_array, ratio_error)
 from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arrays_same_length
 from .supportFunctions import beamCenterCorrection
-from .supportFunctions import calibrateAndSubtractFlyscan, load_dict_from_hdf5, save_dict_to_hdf5
+from .supportFunctions import calibrateAndSubtractFlyscan, save_dict_to_hdf5
 from .hdf5code import saveNXcanSAS, readMyNXcanSAS
 from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
 from .supportFunctions import empty_calibrated_data
 from .supportFunctions import normalizeByTransmission, transmissionTerms
+from .supportFunctions import loadCachedBlank, checkBlankChain, BLANK_CACHE_VERSION
 from .desmearing_methods import desmear_dispatch
-from .plotData import plotUSAXSResults
 
 
 # CONFIRMED 2026-07-08 (JIL): 1e7 Hz = Joerger scaler internal clock, correct
@@ -147,6 +138,7 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                 # pass recalculateAllData through so a forced reprocess also
                 # invalidates the cached blank (was hardcoded False before)
                 Sample["BlankData"]=getBlankStepscan(blankPath, blankFilename,recalculateAllData=recalculateAllData)
+                checkBlankChain(Sample)                                                # counts vs picoamps must not mix
                 Sample["reducedData"].update(normalizeByTransmission(Sample))          # Normalize sample by dividing by transmission for subtraction
                 Sample["CalibratedData"]=(calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=minQMinFindRatio, thickness_override=thickness_override, use_mu=use_mu, mu=mu, per_gram=per_gram, density=density, transmission_override=transmission_override, qmin_override=qmin_override))
                 Sample["CalibratedData"].update(calculatedQStep(Sample))
@@ -190,46 +182,39 @@ def getBlankStepscan(blankPath, blankFilename, recalculateAllData=False):
     location = 'entry/blankData/'
     Filepath = os.path.join(blankPath, blankFilename)
     with h5py.File(Filepath, 'r+') as hdf_file:
-            # Check if the group 'location' exists, if yes, either delete if asked for or use. 
-            if recalculateAllData:
-                if location in hdf_file:
-                    # Delete the group is exists and requested
-                    del hdf_file[location]
-                    logging.info(f"Deleted existing group 'entry/blankData' in {blankFilename}.")
-
-            if location in hdf_file:
-                # exists, so lets reuse the data from the file
-                Blank = dict()
-                Blank = load_dict_from_hdf5(hdf_file, location)
-                logging.info(f"Used existing Blank data from {blankFilename}")
-                return Blank
-            else:
-                Blank = dict()
-                Blank["RawData"]=importStepScan(blankPath, blankFilename)         #import data
-                (BlTransCounts, BlTransGain,
-                 BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
-                Blank["BlankData"]= (createUPDGainsAndBkgErrArrays(Blank))  
-                Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
-                Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
-                Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
-                Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
-                Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
-                Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
-                Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
-                Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
-                # Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
-                #                                         Blank["BlankData"]["Q"], 
-                #                                         Blank["BlankData"]["UPD_gains"], 
-                #                                         Blank["BlankData"]["Error"], 
-                #                                         Blank["RawData"]["TimePerPoint"],
-                #                                         replaceNans=True )) 
-                # we need to return just the BlankData part 
-                BlankData=dict()
-                BlankData=Blank["BlankData"]
-                # Create the group and dataset for the new data inside the hdf5 file for future use. 
-                save_dict_to_hdf5(BlankData, location, hdf_file)
-                logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
-                return BlankData
+            # Same version check as fly-scan blanks (supportFunctions):
+            # a stale or forced-recalculation cache is deleted and rebuilt.
+            cached = loadCachedBlank(hdf_file, location, blankFilename, recalculateAllData)
+            if cached is not None:
+                return cached
+            Blank = dict()
+            Blank["RawData"]=importStepScan(blankPath, blankFilename)         #import data
+            (BlTransCounts, BlTransGain,
+             BlI0Counts, BlI0Gain) = transmissionTerms(Blank['RawData'])
+            Blank["BlankData"]= (createUPDGainsAndBkgErrArrays(Blank))  
+            Blank["BlankData"].update(CorrectUPDGainsStep(Blank))       # Creates Intensity with corrected gains and background subtraction
+            Blank["BlankData"].update(calculatePDErrorStep(Blank, isBlank=True))          # Calculate UPD error, mostly the same as in Igor                
+            Blank["BlankData"].update(beamCenterCorrection(Blank,useGauss=0, isBlank=True)) #Beam center correction
+            Blank["BlankData"].update({"blankname":blankFilename})      # add the name of the blank file
+            Blank["BlankData"].update({"BlTransCounts":BlTransCounts})  # add the BlTransCounts
+            Blank["BlankData"].update({"BlTransGain":BlTransGain})      # add the BlTransGain
+            Blank["BlankData"].update({"BlI0Counts":BlI0Counts})        # add the BlI0Counts
+            Blank["BlankData"].update({"BlI0Gain":BlI0Gain})            # add the BlTransGain
+            Blank["BlankData"]["BlankCacheVersion"] = BLANK_CACHE_VERSION
+            Blank["BlankData"]["chain"] = Blank["RawData"].get("chain", CHAIN_SCALER)
+            # Blank["BlankData"].update(smooth_r_data(Blank["BlankData"]["Intensity"],     #smooth data data
+            #                                         Blank["BlankData"]["Q"], 
+            #                                         Blank["BlankData"]["UPD_gains"], 
+            #                                         Blank["BlankData"]["Error"], 
+            #                                         Blank["RawData"]["TimePerPoint"],
+            #                                         replaceNans=True )) 
+            # we need to return just the BlankData part 
+            BlankData=dict()
+            BlankData=Blank["BlankData"]
+            # Create the group and dataset for the new data inside the hdf5 file for future use. 
+            save_dict_to_hdf5(BlankData, location, hdf_file)
+            logging.info(f"Appended new Blank data to 'entry/blankData' in {blankFilename}.")
+            return BlankData
 
 
 def createUPDGainsAndBkgErrArrays(Sample):
@@ -662,34 +647,3 @@ def _CorrectUPDGainsStepScaler(data_dict):
 
 # (legacy commented-out reduceStepScanToQR / PlotResults removed 2026-07;
 #  see git history if needed again)
-
-
-if __name__ == "__main__":
-    Sample = dict()
-    Samples = []
-
-    # "\\Mac\Home\Desktop\TestData\uascan"
-    Sample = processStepscan("/Users/ilavsky/Desktop/Test440", "T07_04_440_4min_1025.h5", blankPath="/Users/ilavsky/Desktop/Test440", blankFilename="center_BLANK_1022.h5", recalculateAllData=True)
-    Samples.append(Sample)
-    plotUSAXSResults(Samples, "/Users/ilavsky/Desktop/Test440", isFlyscan=False)
-    #Sample = reduceStepScanToQR("/home/parallels/Github/Matilda/TestData","USAXS_step.h5")
-   # Sample = reduceStepScanToQR(r"C:\Users\ilavsky\Documents\GitHub\Matilda\TestData","USAXS_step.h5")
-    #Sample["RawData"]=ImportStepScan("/home/parallels/Github/Matilda","USAXS_step.h5")
-        #pp.pprint(Sample)
-        #Sample["reducedData"]= CorrectUPDGainsStep(Sample)
-        #Sample["reducedData"].update(BeamCenterCorrection(Sample))
-        #pp.pprint(Sample["reducedData"])
-    #PlotResults(Sample)
-    #flyscan
-    #Sample = dict()
-    #Sample = reduceFlyscanToQR("./TestData","USAXS.h5",recalculateAllData=True)
-    # Sample["RawData"]=ImportFlyscan("/home/parallels/Github/Matilda","USAXS.h5")
-    # #pp.pprint(Sample)
-    # Sample["reducedData"]= CorrectUPDGainsFly(Sample)
-    # Sample["reducedData"].update(BeamCenterCorrection(Sample))
-    # #pp.pprint(Sample["reducedData"])
-    #PlotResults(Sample)
-
-  
-    
-    

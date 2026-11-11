@@ -16,7 +16,7 @@ import os
 
 from .._qt import QThread, Signal
 
-from .technique_detector import detect_technique
+from matilda.technique_detector import detect_technique
 
 from matilda.convertFlyscan import processFlyscan
 from matilda.convertUSAXS import processStepscan

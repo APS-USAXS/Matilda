@@ -12,11 +12,12 @@ web-visible directory for live monitoring.
 
 Service entry-point
 -------------------
-    serv_matilda.sh  →  python matilda/matilda.py
+    serv_matilda.sh  →  python -m matilda.matilda   (same as the ``matilda`` console script)
 
-The script is run *directly* (not as ``python -m matilda``), which adds the
-``matilda/`` directory to sys.path.  This allows bare module imports
-(``from convertFlyscan import …``) to work.  See the Bug Register below.
+All intra-package imports are relative (``from .convertFlyscan import …``),
+so the package must be installed (``pip install -e .``) or run as
+``python -m matilda.matilda``; running matilda/matilda.py as a bare script
+no longer works.
 
 Architecture overview
 ---------------------
@@ -39,6 +40,11 @@ matilda/matilda.py
         Triggered when filename contains 'AgBehenateLaB6' (case-insensitive).
         Calls pynika via ``conda run -p <env_path> pynika --auto-fit --save-to-pvs``.
 
+    pyirena integration (subprocess via ``conda run``, never imported):
+        _runPyirenaAnalysis()  — fit_pyirena when pyirena_config.json is present
+        _runMergeData()        — USAXS+SAXS merge when merge_config.json is present
+        Failed external jobs are retried at most _MAX_TOOL_ATTEMPTS times.
+
 Data-reduction modules (current flat layout, future: matilda/reduction/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 matilda/convertFlyscan.py
@@ -48,8 +54,7 @@ matilda/convertFlyscan.py
               calibrateAndSubtractFlyscan → desmear_dispatch → saveNXcanSAS.
 
 matilda/convertUSAXS.py
-    USAXS step-scan: same pipeline as flyscan (identical file format).
-    Also exports rebinData() used by convertFlyscan.
+    USAXS step-scan: same pipeline as flyscan, own importer (Bluesky layout).
 
 matilda/convertSWAXS.py
     SAXS / WAXS area-detector: HDF5 → pyFAI azimuthal integration → I(Q).
@@ -101,6 +106,10 @@ matilda/supportNikaFunctions.py
     Nika → Fit2D → pyFAI PONI geometry conversion.
     Key function: convert_Nika_to_Fit2D(*, SSD, pix_size, BCX, BCY, HorTilt, VertTilt, wavelength)
 
+matilda/technique_detector.py
+    Flyscan / StepScan / SAXS / WAXS detection from file content (h5py only).
+    Used by the GUI and by processUSAXSFolder.
+
 Plotting (future: matilda/plots/)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 matilda/plotData.py
@@ -109,30 +118,28 @@ matilda/plotData.py
     NOTE: matplotlib use is intentional here for headless/server output.
           All interactive GUI plotting must use pyqtgraph (see matilda/gui/).
 
-GUI subpackage (planned — matilda/gui/)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GUI subpackage (matilda/gui/, needs the [gui] extra)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 matilda/gui/_qt.py
     Single Qt import point for the whole gui/ subpackage (PySide6, PyQt6
     fallback).  GUI modules import Qt names from here, never from PySide6
-    directly.
+    directly.  Nothing on the reduction path imports matilda.gui.
 
-matilda/gui/__init__.py
-    Placeholder.  Future PySide6 / pyqtgraph GUI tools:
-    - reduction_gui  : interactive 2-D → 1-D reduction with parameter control
-    - survey_tool    : scan browser / overview
-    - analysis_gui   : pyirena analysis launcher
+matilda/gui/data_reduction/
+    ``matilda-gui``: interactive reduction (see docs/matilda-gui.md).
 
-Future integrations
--------------------
-pynika (issue #28 — implemented)
-    https://github.com/jilavsky/pynika
+matilda/gui/sample_plate_setup.py
+    ``matilda-sample-plates``: sample-plate position editor.
+
+External tools (subprocesses, own conda environments)
+-----------------------------------------------------
+pynika   https://github.com/jilavsky/pynika
     Geometry auto-calibration from AgBehenateLaB6 standard patterns.
     Conda env: /home/beams/USAXS/.conda/envs/pynika
 
-pyirena (planned)
-    https://github.com/jilavsky/pyirena
-    Post-reduction data analysis (model fitting, size distributions, etc.).
-    Will be called after data reduction, similar to the pynika pattern.
+pyirena  https://github.com/jilavsky/pyirena
+    Post-reduction analysis (fit_pyirena) and USAXS+SAXS merging (merge_data).
+    Conda env: /home/beams/USAXS/.conda/envs/pyirena
 
 Data dictionary schema
 ----------------------
@@ -182,7 +189,7 @@ All processXxx() functions return a list of result dicts with this structure::
         },
     }
 
-Known bugs / technical debt (do not fix without review)
+Bug register (historical — all fixed; kept for reference)
 ---------------------------------------------------------
 BUG-01  FIXED (feature/30-documentation).
         Bare module imports converted to relative imports (``from .xxx import``).
@@ -214,8 +221,8 @@ BUG-07  FIXED (feature/30-documentation).
         matplotlib imports removed from convertFlyscan.py, convertUSAXS.py,
         convertSWAXS.py, and supportFunctions.py.  Active debug plt calls
         commented out (re-enable by uncommenting and adding the local import).
-        supportFunctions.py: ``import matplotlib.pyplot as plt`` moved inside
-        the ``if debugme:`` block so it is only loaded when debugging.
+        supportFunctions.py: the ``if debugme:`` debug-plot block was removed
+        later (2026-11).
 
 BUG-08  FIXED (feature/30-documentation).
         ``matilda/runTests.py`` deleted; tests/manual_test.py is the replacement.
@@ -232,7 +239,7 @@ BUG-10  FIXED (feature/30-documentation).
 
 Public processing API (importable after ``pip install -e .``)
 -------------------------------------------------------------
-BUG-01 is now fixed, so all imports below work directly::
+::
 
     from matilda.matilda import processFlyscans, processStepscans, processADscans
     from matilda.matilda import processUSAXSFolder

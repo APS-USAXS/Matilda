@@ -7,6 +7,76 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Fixed — November 2026 code review (Matilda side; Igor items excluded)
+
+Reduced intensities, Q and SMR data are bit-identical to before on all bundled
+test files (scaler and FX4 fly, step, SAXS, WAXS). Only the desmeared Abel
+error bars differ, because their Monte Carlo is now seeded (see below).
+
+- **Raw data could be deleted by `saveNXcanSAS`.** A sample named after a raw
+  group (`sample`, `metadata`, `data`…), a reserved name such as `QRS_data`,
+  or an empty name replaced that group or the whole `/entry`. The entry is now
+  overwritten only if it is Matilda's own NXcanSAS subentry; otherwise it is
+  written as `<name>_NXcanSAS` (empty name → file stem) with a warning. `/` in
+  a name becomes `_`. Normal names keep the usual `/entry/<sample name>`.
+- **Stale cached reductions are recomputed.** Every group `saveNXcanSAS`
+  writes carries `matilda_reduction_version` (`hdf5code.REDUCTION_VERSION = 1`);
+  a missing or different stamp is a cache miss in all three converters, so
+  files reduced before the November error fix are re-reduced on next access.
+  Additive attribute only; downstream readers are unaffected.
+- **Step-scan blanks are versioned** like fly-scan blanks; `BLANK_CACHE_VERSION`
+  is now 3 and cached blanks record their counting chain.
+- **USAXS sample and blank must share a counting chain** (fly and step), as
+  SAXS/WAXS already required: counts and picoamps are never mixed.
+- **`KeyError: 'SMR_dQ'`** for fly scans with 51–800 SMR points (short scans,
+  Qmin override): un-rebinned data get the point spacing as dQ, the same
+  convention `rebin_QRSdata` already uses below Q = 2e-4.
+- **`TypeError`** when a Qmin override was used and auto Qmin was not found.
+- **SAXS/WAXS blanks were re-integrated every daemon cycle**; `process2Ddata`
+  now uses the shared `clearAndCheckCachedReduction`.
+- **Abel desmeared error bars are reproducible**: the Monte Carlo is seeded
+  from the data (same input → same errors). Statistically unchanged.
+- `saveNXcanSAS` no longer requires `metadata['timeStamp']`; `smooth_r_data`
+  leaves points with a non-positive or missing dwell time unsmoothed instead of
+  raising; a cached USAXS result now also carries `MeasuredTransmission`.
+
+### Changed — daemon robustness
+
+- pynika, pyirena analysis and USAXS+SAXS merges share one retry policy: a
+  success is not repeated, a failure is retried up to 3 times per session
+  (merges used to be blocked forever after one failure; pyirena retried a
+  failing file on every list change).
+- A merge waits until both partners hold an NXcanSAS entry.
+- Each technique block in `main()` has its own exception handler, so an error
+  in plotting or tune handling no longer ends the daemon.
+- `processUSAXSFolder` sends step scans to the step-scan reducer (it sent every
+  `.h5` to the fly-scan reducer) and pairs each scan with a blank of its kind.
+  `technique_detector` moved from `matilda/gui/data_reduction/` to
+  `matilda/technique_detector.py` (h5py only) so the core can use it.
+
+### Removed
+
+- Dead code: `reduceADToQR`, `ImportAndReduceAD`, `PlotResults`
+  (convertSWAXS), `test_matildaLocal` (convertFlyscan), the `__main__` blocks
+  with personal paths (convertFlyscan, convertSWAXS, convertUSAXS), the
+  `debugme` plotting block (supportFunctions).
+
+### Changed — FX4 SAXS/WAXS absolute scale
+
+- `I_scaling` is now recalibrated for the FX4 monitor at the beamline and stored
+  in every instrument energy profile, so FX4 frames are reduced with the
+  recorded value and the per-frame "absolute level is not right" warning is
+  gone. `FX4_I_SCALING` remains as an optional override (logged when used).
+  The FX4 commissioning test frames predate the recalibration.
+
+### Docs
+
+- `TODO.md` added for open work; the November 2026 review document was folded
+  into it and into this changelog.
+- Polling interval corrected to 5 s in CLAUDE.md, architecture, operations
+  and service docs; stale module headers and package docstrings updated;
+  `ruff` added to the `dev` extra.
+
 ### Fixed — Abel auto smoothing over-smoothed localized features
 
 The automatic smoothing width of the truncated-Abel desmearing used one robust

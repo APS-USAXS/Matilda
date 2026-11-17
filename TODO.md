@@ -47,8 +47,9 @@ pieces live in `PLAN.md` / `plans/`. Igor-side FX4 work is tracked separately.
 2. **Persist reduction parameters** per folder (session file stores only the
    folder and splitter sizes).
 3. **Warnings vs errors** in the log panel and final status; list failed files.
-4. **Confirm batch overrides**: "Process All" with Override ticked writes the
-   same thickness/transmission to every file — ask first, naming the count.
+4. **Confirm batch overrides**: "Process All" with Override ticked reduces
+   every file with the same thickness/transmission (recorded in each reduced
+   entry; raw files untouched) — ask first, naming the count.
 5. **Blank overlay and chain**: re-enable the blank curve overlay by reading
    `entry/Blank_data` directly; show sample and blank counting chain.
 6. **GUI smoke test in CI**: one offscreen test that builds the main window

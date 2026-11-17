@@ -38,10 +38,11 @@ offline installations never crash.
 
 Tiled server
 ------------
-Target: http://usaxscontrol.xray.aps.anl.gov:8000
-Catalog: usaxs_MongoDB
-Hostname detection: if running on usaxscontrol itself, 'localhost' is used
-to avoid proxy/firewall issues.
+Default target: http://usaxscontrol.xray.aps.anl.gov:8000, catalog
+usaxs_MongoDB; set tiled_server / tiled_port / tiled_catalog in the site
+config (~/.matilda/config.json, see matilda.config) to use another one.
+With tiled_server "auto" (default), 'localhost' is used when running on
+usaxscontrol itself to avoid proxy/firewall issues.
 
 Method based on:
     https://github.com/BCDA-APS/bdp-tiled/blob/main/demo_client.ipynb
@@ -60,9 +61,10 @@ import requests
 import datetime
 import re
 import time
-import socket
 import logging
 from typing import Any, Optional
+
+from .config import SITE_CONFIG, resolve_tiled_server
 
 
 def iso_to_ts(isotime):
@@ -73,16 +75,14 @@ def ts_to_iso(time):
     """Convert a POSIX timestamp (float seconds) to a local ISO-8601 string."""
     return datetime.datetime.fromtimestamp(time).isoformat()
 
-current_hostname = socket.gethostname()
-if current_hostname in ('usaxscontrol', 'usaxscontrol.xray.aps.anl.gov'):
-    server = "localhost"   # avoid proxy/firewall issues when running on the same machine
-else:
-    server = "usaxscontrol.xray.aps.anl.gov"
-
-port = 8000
-#catalog = "raw"
-catalog = "usaxs_MongoDB"
-TILED_TIMEOUT = 10  # seconds
+# Server, port, catalog and timeout come from the site config
+# (~/.matilda/config.json, see matilda.config).  tiled_server "auto" keeps the
+# old rule: localhost on usaxscontrol itself (avoids proxy/firewall issues),
+# usaxscontrol.xray.aps.anl.gov elsewhere.
+server = resolve_tiled_server(SITE_CONFIG)
+port = SITE_CONFIG['tiled_port']
+catalog = SITE_CONFIG['tiled_catalog']
+TILED_TIMEOUT = SITE_CONFIG['tiled_timeout_s']  # seconds
 
 select_metadata = ",".join([
     "plan_name:start.plan_name",

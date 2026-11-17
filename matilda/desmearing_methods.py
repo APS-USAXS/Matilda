@@ -496,8 +496,12 @@ def _abel_invert(qe, Is, sl, n_orig, nu=64):
 
 def _abel_core(q, y, err, slit_length, *, auto_smooth=True, smooth_w=0.05,
                num_mc=20, extrap_method="PowerLaw w flat", extrap_qstart=None,
-               nu=64, n_ext=24, seed=None):
-    """Truncated-Abel desmearing end to end. Returns (q, I, Error)."""
+               nu=64, n_ext=24, seed=None, info=None):
+    """Truncated-Abel desmearing end to end. Returns (q, I, Error).
+
+    When *info* is a dict, the smoothing width actually used (``abel_smooth_w``,
+    ln q) and its chi2 (``abel_chi2``, NaN for a fixed width) are stored in it.
+    """
     q = np.asarray(q, float)
     y = np.asarray(y, float)
     err = np.asarray(err, float) if err is not None else np.full(q.shape, np.nan)
@@ -522,6 +526,9 @@ def _abel_core(q, y, err, slit_length, *, auto_smooth=True, smooth_w=0.05,
         w, chi2 = _abel_find_smooth_width(q, y, err)
     else:
         w, chi2 = float(smooth_w), np.nan
+    if info is not None:
+        info["abel_smooth_w"] = float(w)
+        info["abel_chi2"] = float(chi2)
     use_log = bool(np.all(y > 0))
     Is = _abel_smooth_local_linear(q, y, w, use_log=use_log) if w > 0 else y.copy()
     logging.info(f"Abel desmearing: smoothing width {w:.4f} (ln q), chi2 {chi2:.2f}, "
@@ -575,21 +582,46 @@ def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
                      method="abel", length_scale_decades=0.5, kernel="matern32",
                      sigma_log=4.0, extrap_method="PowerLaw w flat",
                      extrap_qstart=None, max_iter=20,
-                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20):
+                     abel_auto_smooth=True, abel_smooth_w=0.05, abel_num_mc=20,
+                     info=None):
     """Desmear with the selected method. Returns (DSM_Qvec, DSM_Int, DSM_Error,
-    DSM_dQ). method='lake' reproduces the historical Matilda behaviour exactly."""
+    DSM_dQ). method='lake' reproduces the historical Matilda behaviour exactly.
+
+    *info*, when a dict, is filled with the parameters that shaped the result
+    (method, extrapolation, smoothing width actually used, ...) for the
+    reduction provenance written by saveNXcanSAS.  The return value is
+    unchanged either way.
+    """
     if SMR_Int is None or len(SMR_Int) == 0 or slitLength is None:
         return None, None, None, None
 
     method = (method or "abel").lower()
+    if info is None:
+        info = {}
+    info["desmear_method"] = method
+    info["desmear_extrap_method"] = extrap_method
+    info["desmear_extrap_qstart"] = extrap_qstart
 
     if method in ("abel", "truncated_abel", "huang_abel"):
         q, I, E = _abel_core(
             SMR_Qvec, SMR_Int, SMR_Error, slitLength,
             auto_smooth=abel_auto_smooth, smooth_w=abel_smooth_w,
             num_mc=abel_num_mc, extrap_method=extrap_method,
-            extrap_qstart=extrap_qstart)
+            extrap_qstart=extrap_qstart, info=info)
+        info["abel_auto_smooth"] = bool(abel_auto_smooth)
+        info["abel_num_mc"] = int(abel_num_mc or 0)
         return q, I, E, _match_dq(SMR_dQ, SMR_Qvec, q)
+
+    if method in ("lake", "strobl", "lake_smooth", "smoothed_lake",
+                  "gp_lake_mean", "gp_lake"):
+        info["desmear_max_iter"] = int(max_iter)
+    if method in ("gp", "gp_matern", "gp_rbf",
+                  "huang", "huang_gp", "gp_lake_mean", "gp_lake"):
+        info["gp_length_scale"] = float(length_scale_decades)
+    if method in ("gp", "gp_matern", "huang", "huang_gp", "gp_lake_mean", "gp_lake"):
+        info["gp_kernel"] = kernel
+    elif method == "gp_rbf":
+        info["gp_kernel"] = "rbf"
 
     if method in ("lake", "strobl", ""):
         from .desmearing import desmearData
@@ -607,6 +639,7 @@ def desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=None, *,
                                       slitLength=slitLength, ExtrapMethod=extrap_method,
                                       ExtrapQstart=extrap_qstart, MaxNumIter=max_iter)
         win = length_scale_decades if length_scale_decades and length_scale_decades > 0 else 0.3
+        info["lake_smooth_decades"] = float(win)
         return lq, _smooth_curve(lq, lI, decades=win), lE, ldQ
 
     if method in ("gp", "gp_matern", "gp_rbf", "huang", "huang_gp"):

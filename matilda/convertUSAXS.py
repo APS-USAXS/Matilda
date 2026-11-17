@@ -36,8 +36,8 @@ from .supportFunctions import read_group_to_dict, filter_nested_dict, check_arra
 from .supportFunctions import beamCenterCorrection
 from .supportFunctions import calibrateAndSubtractFlyscan, save_dict_to_hdf5
 from .hdf5code import saveNXcanSAS, readMyNXcanSAS
-from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
-from .supportFunctions import empty_calibrated_data
+from .hdf5code import clearAndCheckCachedReduction
+from .supportFunctions import empty_calibrated_data, reduction_provenance
 from .supportFunctions import normalizeByTransmission, transmissionTerms
 from .supportFunctions import loadCachedBlank, checkBlankChain, BLANK_CACHE_VERSION
 from .desmearing_methods import desmear_dispatch
@@ -113,10 +113,9 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
 
         else:
             Sample = dict()
-            if thickness_override is not None:
-                writeThicknessOverride(hdf_file,
-                                       '/entry/instrument/bluesky/metadata/sample_thickness_mm',
-                                       thickness_override, filename)
+            # A thickness override is NOT written into the raw file; it is used
+            # by calibrateAndSubtractFlyscan and recorded in the reduced entry
+            # (sasdata/I 'thickness', sassample, sasprocess).
             Sample["RawData"]=importStepScan(path, filename)                #import data
             Sample["reducedData"]=(createUPDGainsAndBkgErrArrays(Sample))
             Sample["reducedData"].update(CorrectUPDGainsStep(Sample))    # Correct UPD gains=CorrectUPDGainsStep(Sample)    # Correct UPD gains, this is the first step in data reduction
@@ -150,7 +149,8 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc)
+                    desmear_info = {}
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc, info=desmear_info)
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,
@@ -159,6 +159,12 @@ def processStepscan(path, filename, blankPath=None, blankFilename=None, recalcul
                         "units":Sample["CalibratedData"]["units"],
                         }
                     Sample["CalibratedData"].update(desmearedData)
+                    Sample["provenance"] = reduction_provenance(
+                        "StepScan", Sample, thickness_override=thickness_override,
+                        transmission_override=transmission_override,
+                        qmin_override=qmin_override, minQMinFindRatio=minQMinFindRatio,
+                        use_mu=use_mu, mu=mu, per_gram=per_gram, density=density,
+                        desmear_info=desmear_info, num_points=None)
                 else:
                     logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
                                     "Skipping desmearing and rebinning steps. ")

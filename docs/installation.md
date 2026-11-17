@@ -161,6 +161,12 @@ for details.
 | pyirena | Model fitting and USAXS+SAXS merging | https://github.com/jilavsky/pyirena |
 | pynika | Detector geometry calibration from calibrant scans | https://github.com/jilavsky/pynika |
 
+The daemon finds conda, these environments, the Tiled server and the web-plot
+folder through `~/.matilda/config.json`, which it creates with the 12-ID-E
+defaults on first start (`python -m matilda.config` creates it without
+starting the daemon). Edit it to run off the beamline; see
+[configuration.md](configuration.md).
+
 ---
 
 ## Beamline server install (USAXS staff only)

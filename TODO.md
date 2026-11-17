@@ -21,36 +21,23 @@ pieces live in `PLAN.md` / `plans/`. Igor-side FX4 work is tracked separately.
   do not switch at those levels (tracked in the Bluesky code). Revisit
   `FX4_SMOOTHING_RANGE_THRESHOLDS` in Matilda afterwards. Side cleanup:
   `np.polyfit` can replace `curve_fit` for the straight-line fit.
-- **One dark current for the whole fly scan.** `upd_lurange` is recorded once,
-  after the scan, and that range's dark current is subtracted everywhere.
-  Confirm once from the five `upd_bkg` values that the other ranges' dark
-  currents are negligible where those ranges are active; a per-point range in
-  the fly-scan file would remove the assumption.
 
 ## Backend
 
-1. **Reduction provenance in the NXcanSAS entry** (`sasprocess` group):
-   counting chain, desmearing method and smoothing width, Qmin and whether it
-   was overridden, transmission override, μ mode. `run` is the literal
-   `"run_identifier"` and `Tdev` is always 0. This also makes cached results
-   complete: a cached `Sample` still lacks `MSAXSCorrection`,
-   `calculated_qmin`, `calculated_mu` and most of `reducedData`.
-   Additive only — never rename existing fields (pyirena, DataReporter, Irena).
-2. **Stop mutating raw files for overrides.** Thickness override rewrites
-   `/entry/sample/thickness` in the raw file (original kept once). With
-   provenance in place, keep the override in the reduced entry only.
-3. **Site configuration.** `imagePath`, conda paths, Tiled server/catalog and
-   look-back windows are module constants; one config file with the current
-   values as defaults would make the package usable off the beamline.
-4. **Daemon subprocesses off the main loop.** pynika / pyirena / merge run
+1. **Daemon subprocesses off the main loop.** pynika / pyirena / merge run
    synchronously with a 300 s timeout each and can stall live reduction.
    (Per-block exception isolation and bounded retries are done.)
-5. **One pipeline for fly and step.** `processFlyscan` / `processStepscan`,
+   Develop on a branch and test on the beamline machine before merging.
+2. **One pipeline for fly and step.** `processFlyscan` / `processStepscan`,
    the two `getBlank*` functions and the two scaler error functions are near
    copies; the counting chain adds a third axis.
-6. **Package split** into `reduction/` + `io/` (placeholder
+3. **Package split** into `reduction/` + `io/` (placeholder
    `matilda/reduction/__init__.py`).
-7. **Live-server check** of the July Tiled query changes (`readfromtiled.py`).
+4. **Live-server check** of the July Tiled query changes (`readfromtiled.py`).
+5. **Transmission uncertainty.** `sastransmission_spectrum/Tdev` is written as
+   NaN ("not estimated"). Estimate it per chain: Poisson on the scaler
+   counts, and the FX4 current sigma for picoamps. Then store it in `Tdev`
+   and in `sasprocess`.
 
 ## GUI
 
@@ -89,3 +76,6 @@ pieces live in `PLAN.md` / `plans/`. Igor-side FX4 work is tracked separately.
   string is not allowed in sample names.
 - HDF5 files grow on each re-reduction (deleted groups are not reclaimed);
   accepted, re-reduction is rare.
+- FX4 fly scans record one dark current (`upd_lurange`, the highest-gain
+  range); the other ranges' dark currents are 0. Tested and sufficient — a
+  per-point dark current is not needed.

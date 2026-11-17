@@ -55,6 +55,83 @@ def empty_calibrated_data():
             "slitLength": None,
             }
 
+def reduction_provenance(technique, Sample, *, thickness_override=None,
+                         transmission_override=None, qmin_override=None,
+                         minQMinFindRatio=None, use_mu=False, mu=None,
+                         per_gram=False, density=None, desmear_info=None,
+                         num_points=None):
+    """Collect the reduction provenance that saveNXcanSAS writes to ``sasprocess``.
+
+    Called by the converters after calibration.  Returns a flat dict of
+    scalars (None values are skipped when written; units are in
+    hdf5code.PROVENANCE_UNITS).  Computed values are taken from
+    Sample["CalibratedData"] (USAXS) or Sample["calib2DData"] (SAXS/WAXS),
+    so the record states what the reduction actually used, not only what
+    was requested.
+
+    Additive only: names here end up in NXcanSAS files read by pyirena,
+    DataReporter and Igor Irena.
+    """
+    cd = Sample.get("CalibratedData") or {}
+    c2 = Sample.get("calib2DData") or {}
+    raw = Sample.get("RawData") or {}
+
+    def pick(key):
+        value = cd.get(key)
+        return c2.get(key) if value is None else value
+
+    t_override = (float(transmission_override)
+                  if transmission_override is not None and transmission_override > 0 else None)
+    q_override = float(qmin_override) if qmin_override is not None and qmin_override > 0 else None
+    mu_mode = bool(use_mu and mu is not None and mu > 0)
+    transmission_used = cd.get("MeasuredTransmission")
+    if transmission_used is None:
+        transmission_used = c2.get("transmission")
+
+    prov = {
+        "technique": technique,
+        "counting_chain": raw.get("chain"),
+        "blank_file": pick("blankname"),
+        # transmission
+        "transmission_used": transmission_used,
+        "transmission_measured": pick("transmission_measured"),
+        "transmission_override": t_override,
+        "transmission_overridden": t_override is not None,
+        "PeakToPeakTransmission": cd.get("PeakToPeakTransmission"),
+        "MSAXSCorrection": cd.get("MSAXSCorrection"),
+        # thickness
+        "thickness_used": pick("thickness"),
+        "thickness_file": pick("thickness_file"),
+        "thickness_override": float(thickness_override) if thickness_override is not None else None,
+        # True only when the override is what the calibration used (in mu mode
+        # it is just the fallback for a transmission outside (0, 1)).
+        "thickness_overridden": bool(
+            thickness_override is not None and pick("thickness") is not None
+            and np.isclose(float(pick("thickness")), float(thickness_override))),
+        # mu mode: thickness from T and mu
+        "mu_mode": mu_mode,
+        "mu": float(mu) if mu_mode else None,
+        "calculated_mu": pick("calculated_mu"),
+        "per_gram": bool(per_gram and density is not None and density > 0),
+        "density": float(density) if per_gram and density is not None and density > 0 else None,
+        "units": cd.get("units"),
+    }
+    if technique in ("Flyscan", "StepScan"):
+        prov.update({
+            "qmin_used": cd.get("qmin_used"),
+            "calculated_qmin": cd.get("calculated_qmin"),
+            "qmin_override": q_override,
+            "qmin_overridden": q_override is not None,
+            "minQMinFindRatio": minQMinFindRatio,
+            "num_points": num_points,
+            "desmeared": bool(desmear_info),
+        })
+        prov.update(desmear_info or {})
+    else:
+        prov["num_points"] = num_points
+    return prov
+
+
 ## support stuff here
 
 
@@ -529,6 +606,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
     # find point where the IntRatio is larger than 1.05 = MinQMinFindRatio, after Q dependent correction
 
     MeasuredTransmission = ((SaTransCounts/SaTransGain)/(SaI0Counts/SaI0Gain))/((BlTransCounts /BlTransGain )/(BlI0Counts/BlI0Gain))
+    transmission_measured = float(MeasuredTransmission)   # before any override (provenance)
     if transmission_override is not None and transmission_override > 0:
         logging.info(f"Using transmission override {transmission_override:.4f} (measured: {MeasuredTransmission:.4f}).")
         MeasuredTransmission = float(transmission_override)
@@ -592,6 +670,7 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
         SMR_Int = np.array([])
         SMR_Error = np.array([])
         SMR_Window = None
+    qmin_used = float(SMR_Qvec[0]) if len(SMR_Qvec) else None   # provenance
     # now calibration... 
     metadata_dict = Sample["RawData"]["metadata"]
     for key in ('detector_distance', 'UPDsize'):
@@ -656,6 +735,11 @@ def calibrateAndSubtractFlyscan(Sample, minQMinFindRatio=1.05, thickness_overrid
             "calculated_mu":calculated_mu,
             "calculated_qmin":calculated_qmin,
             "SMR_SmoothWindow":SMR_Window,
+            # provenance only (saveNXcanSAS -> sasprocess); not used in the math
+            "transmission_measured":transmission_measured,
+            "PeakToPeakTransmission":float(PeakToPeakTransmission),
+            "qmin_used":qmin_used,
+            "thickness_file":Sample["RawData"]["sample"].get('thickness'),
             }
 
 

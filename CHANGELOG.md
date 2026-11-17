@@ -7,6 +7,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Added — reduction provenance, site configuration
+
+Reduced I(Q), Q, errors and SMR data are bit-identical to before. The only
+changes to saved files are additions, plus the `run` and `Tdev` values below.
+`REDUCTION_VERSION` is unchanged, so existing caches stay valid; they simply
+lack the new group until they are re-reduced.
+
+- **Provenance in every NXcanSAS subentry** (`<name>` and `<name>_SMR`): a new
+  `sasprocess` group (NXprocess / SASprocess) records the technique, the
+  counting chain and the blank. It also records the transmission used and
+  measured and whether it was overridden, the thickness used, from the file,
+  and overridden, μ mode, Qmin used, auto and overridden, the desmearing
+  method, and the Abel smoothing width that was actually used. All of it is
+  under `sasprocess/sasnote`; the key list is in `docs/architecture.md`.
+  Additive only.
+  `desmear_dispatch(..., info=dict)` reports the desmearing parameters.
+- **Cached results are complete.** `readMyNXcanSAS` reads the provenance
+  back, so a cached Sample now carries `MSAXSCorrection`, `calculated_qmin`,
+  `calculated_mu`, and `reducedData` `PeakToPeakTransmission` / `FWHM` /
+  `Center` / `Chi-Square` / `wavelength`, like a fresh reduction.
+- **NXcanSAS `run`** is the Bluesky uid (`/entry/entry_identifier`), or the
+  file stem, instead of the literal `"run_identifier"`.
+  `sastransmission_spectrum/Tdev` is NaN (attribute
+  `note = "not estimated by Matilda"`) instead of a misleading 0.
+- **Site configuration file** `~/.matilda/config.json` (or `$MATILDA_CONFIG`),
+  read by the new `matilda/config.py`. It holds the web-plot folder, the conda
+  and environment paths, the Tiled server, port, catalog and timeout, the
+  look-back windows and the plot counts. Without the file the built-in
+  12-ID-E defaults apply, unchanged. The daemon writes the defaults on first
+  start; so does `python -m matilda.config`, which also prints the values in
+  force. Bad keys, types or JSON are logged and the defaults are used.
+  `MATILDA_IMAGE_PATH` still overrides `image_path`. See
+  `docs/configuration.md`.
+
+### Changed — overrides no longer modify raw files
+
+- A thickness override is no longer written into the raw file
+  (`/entry/sample/thickness`, or the step-scan `sample_thickness_mm`, with the
+  original kept as `<path>_original`). It is used in the reduction and
+  recorded only in the reduced entry (`sasdata/I@thickness`,
+  `sassample/thickness`, `sasprocess`). `writeThicknessOverride` is removed.
+  Consequence: an override is no longer "sticky". A later re-reduction
+  without the override uses the measured thickness again. Files edited by
+  earlier versions keep their edited value.
+- SAXS/WAXS `CalibratedData["thickness"]` (and `sassample/thickness`) is the
+  thickness the calibration actually used. Before, it was the file value, or
+  the override through the raw-file write. In μ mode it is now the thickness
+  derived from T and μ, as for USAXS.
+
 ### Fixed — November 2026 code review (Matilda side; Igor items excluded)
 
 Reduced intensities, Q and SMR data are bit-identical to before on all bundled

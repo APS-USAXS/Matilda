@@ -24,6 +24,9 @@ they are activated by configuration files placed in the data folders:
 
 ---
 
+> Site settings (web-plot folder, conda paths, Tiled server, look-back windows)
+> are in `~/.matilda/config.json`; see [configuration.md](configuration.md).
+>
 > For starting / stopping the service, log files, and configuration constants,
 > see [service.md](service.md).
 

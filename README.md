@@ -143,8 +143,10 @@ journalctl --user -q -f -u matilda_server
 ```
 
 See [docs/service.md](docs/service.md) for installation and operation of
-the daemon, and [docs/operations.md](docs/operations.md) for the
-pynika and pyirena integrations.
+the daemon, [docs/configuration.md](docs/configuration.md) for the site
+settings in `~/.matilda/config.json`, and
+[docs/operations.md](docs/operations.md) for the pynika and pyirena
+integrations.
 
 ---
 
@@ -159,6 +161,7 @@ matilda/                Python package
 ├── desmearing.py       Lake/Strobl slit desmearing
 ├── supportFunctions.py Shared numerical helpers
 ├── hdf5code.py         NXcanSAS read/write
+├── config.py           Site configuration (~/.matilda/config.json)
 ├── plotData.py         Headless JPEG plot export
 └── gui/
     ├── data_reduction/ matilda-gui application

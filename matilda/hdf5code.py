@@ -33,9 +33,14 @@ Notes
 -----
 * saveNXcanSAS writes /entry/<sample name>; it never overwrites a group that
   is not its own NXcanSAS subentry (see _nxcansas_entry_name).
+* Each subentry carries a ``sasprocess`` group (NXprocess / SASprocess) with
+  the reduction provenance in ``sasprocess/sasnote`` (see PROVENANCE_UNITS);
+  readMyNXcanSAS reads it back so a cached result is complete.  Files written
+  before it existed simply lack the group.
 * All functions expect the HDF5 file to follow the NeXus / NXcanSAS
   conventions used by the APS USAXS Bluesky acquisition system.
 """
+import datetime
 import h5py
 import os
 import numpy as np
@@ -105,6 +110,30 @@ REDUCTION_VERSION_ATTR = 'matilda_reduction_version'
 # one of these names.
 _RESERVED_ENTRY_NAMES = {'QRS_data', 'Blank_data', 'blankData', 'displayData',
                          'reducedData', 'definition'}
+
+# Units of the provenance values saveNXcanSAS writes to sasprocess/sasnote
+# (stored as the dataset's 'units' attribute).  Keys absent here are
+# dimensionless, flags (0/1) or text.  Additive only: pyirena, DataReporter
+# and Igor Irena may read these names, so never rename one.
+PROVENANCE_UNITS = {
+    'qmin_used': '1/angstrom',
+    'calculated_qmin': '1/angstrom',
+    'qmin_override': '1/angstrom',
+    'desmear_extrap_qstart': '1/angstrom',
+    'thickness_used': 'mm',
+    'thickness_file': 'mm',
+    'thickness_override': 'mm',
+    'mu': '1/cm',
+    'calculated_mu': '1/cm',
+    'density': 'g/cm3',
+    'abel_smooth_w': 'ln(1/angstrom)',
+    'gp_length_scale': 'decades',
+    'lake_smooth_decades': 'decades',
+}
+
+# Provenance values that readMyNXcanSAS copies back into CalibratedData, so a
+# cached Sample has the same keys as a freshly reduced one.
+_PROVENANCE_TO_CALIBRATED = ('MSAXSCorrection', 'calculated_qmin', 'calculated_mu')
 
 
 def _attr_text(value):
@@ -341,9 +370,11 @@ def _write_SAStransmission_spectrum(nxDataEntry, transmission, wavelength, name=
     ds.attrs['units'] = 'dimensionless'
     ds.attrs['long_name'] = 'Transmission'
 
-    ds = nxtrans.create_dataset('Tdev', data=np.array([0.0]))
+    # Not estimated yet.  NaN, not 0: 0 would claim an exact transmission.
+    ds = nxtrans.create_dataset('Tdev', data=np.array([np.nan]))
     ds.attrs['units'] = 'dimensionless'
     ds.attrs['long_name'] = 'Transmission uncertainty'
+    ds.attrs['note'] = 'not estimated by Matilda'
 
     ds = nxtrans.create_dataset('lambda', data=np.array([float(wavelength)]))
     ds.attrs['units'] = 'angstrom'
@@ -439,8 +470,100 @@ def _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
             nxnote.create_dataset('chi_square', data=float(chi_square))
 
 
+def _matilda_version():
+    try:
+        return _pkg_version('Matilda')
+    except _PkgNotFoundError:
+        return 'unknown'
+
+
+def _run_identifier(h5file, filename):
+    """NXcanSAS ``run``: the Bluesky uid when the raw file records one
+    (/entry/entry_identifier), otherwise the file name without extension."""
+    value = _get_h5_value(h5file, 'entry/entry_identifier')
+    if value is not None:
+        value = np.ravel(value)[0] if np.ndim(value) else value
+        text = _attr_text(value)
+        if text and text.strip():
+            return text.strip()
+    return os.path.splitext(os.path.basename(filename))[0]
+
+
+def _write_SASprocess(nxDataEntry, provenance):
+    """Write the reduction provenance as an NXcanSAS SASprocess group.
+
+    Layout (inside the SASentry subentry)::
+
+        sasprocess/            NXprocess, canSAS_class SASprocess
+            name, date, description, Matilda_version, reduction_version
+            sasnote/           NXnote, canSAS_class SASnote
+                <key>          one dataset per provenance value
+
+    Values that are None are skipped; booleans are stored as 0/1 integers
+    (readable by Igor), strings as strings, numbers as float64.  Units come
+    from PROVENANCE_UNITS.
+    """
+    grp_name = 'sasprocess'
+    if grp_name in nxDataEntry:
+        del nxDataEntry[grp_name]
+    nxproc = nxDataEntry.create_group(grp_name)
+    nxproc.attrs['NX_class'] = 'NXprocess'
+    nxproc.attrs['canSAS_class'] = 'SASprocess'
+    nxproc.create_dataset('name', data='Matilda')
+    nxproc.create_dataset('date', data=datetime.datetime.now().isoformat(timespec='seconds'))
+    nxproc.create_dataset('description', data='APS 12-ID-E USAXS/SAXS/WAXS data reduction')
+    nxproc.create_dataset('Matilda_version', data=_matilda_version())
+    nxproc.create_dataset('reduction_version', data=int(REDUCTION_VERSION))
+
+    nxnote = nxproc.create_group('sasnote')
+    nxnote.attrs['NX_class'] = 'NXnote'
+    nxnote.attrs['canSAS_class'] = 'SASnote'
+    for key, value in (provenance or {}).items():
+        if value is None:
+            continue
+        if isinstance(value, (bool, np.bool_)):
+            data = int(value)
+        elif isinstance(value, (str, bytes)):
+            data = value
+        elif isinstance(value, (int, float, np.integer, np.floating)):
+            data = float(value)
+        else:
+            logging.debug(f"Provenance value {key!r} of type {type(value)} not written.")
+            continue
+        ds = nxnote.create_dataset(key, data=data)
+        if key in PROVENANCE_UNITS:
+            ds.attrs['units'] = PROVENANCE_UNITS[key]
+
+
+def _read_SASprocess(h5file, entry_location):
+    """Provenance dict written by _write_SASprocess, or {} when absent."""
+    loc = entry_location.rstrip('/') + '/sasprocess/sasnote'
+    if loc not in h5file:
+        return {}
+    provenance = {}
+    for key, ds in h5file[loc].items():
+        if not isinstance(ds, h5py.Dataset):
+            continue
+        value = ds[()]
+        if isinstance(value, bytes):
+            value = value.decode('utf-8', errors='replace')
+        elif isinstance(value, np.generic):
+            value = value.item()
+        provenance[key] = value
+    return provenance
+
+
 def saveNXcanSAS(Sample,path, filename):
-    
+    """Write the reduced data as NXcanSAS subentries into the raw HDF5 file.
+
+    Writes /entry/<sample> (desmeared or calibrated I(Q)), /entry/<sample>_SMR
+    (USAXS slit-smeared), /entry/QRS_data and /entry/Blank_data, each when the
+    data exist.  Sample["provenance"] (built by the converters with
+    supportFunctions.reduction_provenance) goes into a ``sasprocess`` group of
+    each subentry.
+    """
+    provenance = Sample.get("provenance")
+
     #read stuff from the data dictionary
     Intensity = Sample["CalibratedData"]["Intensity"]
     Q = Sample["CalibratedData"]["Q"]
@@ -531,11 +654,7 @@ def saveNXcanSAS(Sample,path, filename):
             f.attrs['file_time']    = timeStamp
         f.attrs['instrument']       = '12IDE USAXS'
         f.attrs['creator']          = 'Matilda NeXus writer'
-        try:
-            _matilda_ver = _pkg_version('Matilda')
-        except _PkgNotFoundError:
-            _matilda_ver = 'unknown'
-        f.attrs['Matilda_version']  = _matilda_ver
+        f.attrs['Matilda_version']  = _matilda_version()
         f.attrs['NeXus_version']    = '4.3.0' #2025-5-9 4.3.0 is rc, it is current. 
         f.attrs['HDF5_version']     = h5py.version.hdf5_version
         f.attrs['h5py_version']     = h5py.version.version
@@ -545,6 +664,7 @@ def saveNXcanSAS(Sample,path, filename):
             nxentry = f.create_group('entry')    
         
         nxentry = f['entry']
+        run_id = _run_identifier(f, filename)
         # Name of our subentry; never the name of a raw-data group (see helper).
         title = samplename if samplename else os.path.splitext(filename)[0]
         entryname = _nxcansas_entry_name(f, samplename, filename)
@@ -573,7 +693,7 @@ def saveNXcanSAS(Sample,path, filename):
             #add title as NXcanSas
             nxDataEntry.create_dataset('title', data=title)
             #add run (compulsory)
-            nxDataEntry.create_dataset('run', data="run_identifier")
+            nxDataEntry.create_dataset('run', data=run_id)
 
             # create the NXdata group for I(Q) for the avergaed data
             nxdata = nxDataEntry.create_group('sasdata')
@@ -620,6 +740,7 @@ def saveNXcanSAS(Sample,path, filename):
             _write_SASsample(nxDataEntry, title, sample_thickness)
             _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
                                 fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
+            _write_SASprocess(nxDataEntry, provenance)
 
         if SMR_Int is not None:
             logging.info(f"Wrote SMR NXcanSAS group for file {filename}. ")
@@ -636,7 +757,7 @@ def saveNXcanSAS(Sample,path, filename):
             #add title as NXcanSas
             nxDataEntry.create_dataset('title', data=title)
             #add run (compulsory)
-            nxDataEntry.create_dataset('run', data="run_identifier")
+            nxDataEntry.create_dataset('run', data=run_id)
 
             # create the NXdata group for I(Q) for the avergaed data
             nxdata = nxDataEntry.create_group('sasdata')
@@ -687,6 +808,7 @@ def saveNXcanSAS(Sample,path, filename):
             _write_SASsample(nxDataEntry, title, sample_thickness)
             _write_SASinstrument(nxDataEntry, wavelength, detector_distance,
                                 fwhm=fwhm, beam_center=beam_center, chi_square=chi_square)
+            _write_SASprocess(nxDataEntry, provenance)
 
         if R_Int is not None:
             logging.info(f"Wrote QRS group for file {filename}. ")
@@ -879,6 +1001,26 @@ def readMyNXcanSAS(path, filename, isUSAXS = False):
                 sdd_val = _get_h5_value(f, instr_location + 'sasdetector/SDD')
                 if sdd_val is not None:
                     Sample['RawData']['metadata']['detector_distance'] = float(sdd_val)
+                # USAXS beam-centre fit, as a fresh reduction has it in reducedData
+                reduced = Sample.setdefault('reducedData', {})
+                if source_wl is not None:
+                    reduced.setdefault('wavelength', float(source_wl))
+                for key, h5name in (('FWHM', 'FWHM'), ('Center', 'beam_center'),
+                                    ('Chi-Square', 'chi_square')):
+                    val = _get_h5_value(f, instr_location + 'sasnote/' + h5name)
+                    if val is not None:
+                        reduced.setdefault(key, float(val))
+
+            # Reduction provenance (sasprocess); absent in older files.
+            provenance = _read_SASprocess(f, parent_location)
+            if provenance:
+                Sample['provenance'] = provenance
+                for key in _PROVENANCE_TO_CALIBRATED:
+                    if key in provenance:
+                        Sample['CalibratedData'][key] = provenance[key]
+                if 'PeakToPeakTransmission' in provenance:
+                    Sample.setdefault('reducedData', {})['PeakToPeakTransmission'] = \
+                        provenance['PeakToPeakTransmission']
 
         else:
             Sample["RawData"]["filename"] = filename
@@ -1014,20 +1156,6 @@ def clearAndCheckCachedReduction(hdf_file, filename, recalculateAllData, require
         return False
     return True
 
-
-def writeThicknessOverride(hdf_file, thick_path, thickness_override, filename):
-    """Write a user-supplied thickness override into the raw data file.
-
-    NOTE: this permanently modifies the raw data file; the original value is
-    preserved once at ``<thick_path>_original``.
-    """
-    orig_path = thick_path + '_original'
-    if thick_path in hdf_file:
-        if orig_path not in hdf_file:
-            hdf_file[orig_path] = hdf_file[thick_path][()]
-        del hdf_file[thick_path]
-    hdf_file[thick_path] = float(thickness_override)
-    logging.info(f"Wrote thickness override {thickness_override} mm to {thick_path} in {filename}.")
 
 def save_dict_to_hdf5(dic, location, h5file):
     """

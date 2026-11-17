@@ -50,6 +50,7 @@ matilda.py  ── polling loop (5 s sleep between cycles)
 | `matilda/desmearing*.py` | Slit desmearing (USAXS) |
 | `matilda/hdf5code.py` | All NXcanSAS HDF5 read/write |
 | `matilda/readfromtiled.py` | Tiled queries |
+| `matilda/config.py` | Site config `~/.matilda/config.json` (defaults = beamline values) |
 | `matilda/supportFunctions.py` | Shared helpers; re-exports HDF5 helpers (`F401` allowed) |
 | `matilda/supportNikaFunctions.py` | Nika-derived 2-D routines |
 | `matilda/technique_detector.py` | Fly/step/SAXS/WAXS detection (h5py only; GUI + batch) |
@@ -58,10 +59,12 @@ matilda.py  ── polling loop (5 s sleep between cycles)
 | `matilda/gui/data_reduction/` | Interactive reduction GUI |
 | `matilda/gui/sample_plate_setup.py` | Sample-plate editor |
 
-Tunable module-level constants sit near the top of `matilda.py` (`imagePath`,
-`NumberOfDaysToLookBack`, `CONDA_EXECUTABLE`, the conda env paths, and the
-config filenames `pyirena_config.json` / `merge_config.json`). See
-`docs/architecture.md` for the full table before changing any of them.
+Site settings (`imagePath`, conda paths, Tiled server/catalog, look-back
+windows) come from `matilda/config.py`, i.e. `~/.matilda/config.json`, whose
+built-in defaults are the beamline values. Change a default there, never by
+hard-coding a module constant. See `docs/configuration.md`, and
+`docs/architecture.md` for the remaining constants (`pyirena_config.json` /
+`merge_config.json` filenames).
 
 ### Invariants — do not break these
 
@@ -86,6 +89,10 @@ config filenames `pyirena_config.json` / `merge_config.json`). See
    this into an import.
 5. NXcanSAS output is consumed downstream by pyirena, DataReporter and Igor
    Irena. Changing field names or units is a breaking change for all three.
+   Reduction provenance goes in the subentry's `sasprocess/sasnote`; add
+   keys, never rename them.
+6. Raw data are never modified. Overrides (thickness, transmission, Qmin)
+   live only in the reduced NXcanSAS entry.
 
 ---
 
@@ -119,7 +126,7 @@ is the end-to-end guard — keep it passing. Tests must not need Tiled or a disp
 | Working on desmearing | `docs/desmearing-methods.md`, `docs/desmearing-paper.md` |
 | Working on the reduction GUI | `docs/matilda-gui.md` |
 | Working on sample plates | `docs/sample-plate-setup.md` |
-| Deploying or debugging the daemon | `docs/service.md`, `docs/operations.md`, `serv_matilda.sh`, `matilda_server.service` |
+| Deploying or debugging the daemon | `docs/service.md`, `docs/configuration.md`, `docs/operations.md`, `serv_matilda.sh`, `matilda_server.service` |
 | Installing | `docs/installation.md` |
 | Looking for open work | `TODO.md` (open items), `PLAN.md` (design history / notes) |
 

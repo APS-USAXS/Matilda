@@ -40,18 +40,19 @@ import logging
 import numpy as np
 
 from .readfromtiled import FindLastTuneScans, tiled_get_primary_data
+from .config import SITE_CONFIG
 
 
 # --- module parameters (the single place to tune behavior) ---
 # Number of most-recent tune curves overlaid on each plot.  Keep <= 10 so the
 # tab10 color cycle in plotData.py stays distinct.
-NumberOfTunesToShow = 5
+NumberOfTunesToShow = SITE_CONFIG['tunes_to_show']   # site config, default 5
 
 # The tuning plans handled by the live service, in display order.
 TUNE_PLAN_NAMES = ("tune_ar", "tune_mr", "tune_a2rp")
 
 # How many days back to search for tune scans.
-NumberOfDaysToLookBackTunes = 1
+NumberOfDaysToLookBackTunes = SITE_CONFIG['days_to_look_back_tunes']   # site config, default 1
 
 
 # Column-name prefixes that are never the tuning signal.  ``scaler0*`` are the

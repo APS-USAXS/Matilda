@@ -38,17 +38,23 @@ previous list, dispatches reduction and plotting.
 Entry point: `main()` — called by the `matilda` console script and by
 `python -m matilda.matilda`.
 
-Key module-level constants (configure near top of file):
+Key module-level constants.  The first seven are read from the site config
+(`matilda/config.py`, `~/.matilda/config.json`, see
+[configuration.md](configuration.md)); the built-in defaults are the
+12-ID-E values:
+
+| Constant | Config key | Purpose |
+|---|---|---|
+| `imagePath` | `image_path` (env `MATILDA_IMAGE_PATH` wins) | Directory for JPEG web plots |
+| `NumberOfDaysToLookBack` | `days_to_look_back` | Tiled query window for scans |
+| `NumberOfDaysToLookBackBlanks` | `days_to_look_back_blanks` | Tiled query window for blanks |
+| `NumberOfImagesInGraphs` | `images_in_graphs` | Max datasets per plot |
+| `CONDA_EXECUTABLE` | `conda_executable` | Path to conda for pynika/pyirena subprocesses |
+| `PYNIKA_CONDA_ENV_PATH` | `pynika_conda_env_path` | pynika environment path |
+| `PYIRENA_CONDA_ENV_PATH` | `pyirena_conda_env_path` | pyirena environment path |
 
 | Constant | Purpose |
 |---|---|
-| `imagePath` | Directory for JPEG web plots |
-| `NumberOfDaysToLookBack` | Tiled query window for scans |
-| `NumberOfDaysToLookBackBlanks` | Tiled query window for blanks |
-| `NumberOfImagesInGraphs` | Max datasets per plot |
-| `CONDA_EXECUTABLE` | Path to conda for pynika/pyirena subprocesses |
-| `PYNIKA_CONDA_ENV_PATH` | pynika environment path |
-| `PYIRENA_CONDA_ENV_PATH` | pyirena environment path |
 | `_PYIRENA_CONFIG_FILENAME` | Per-folder config that triggers pyirena analysis (`pyirena_config.json`) |
 | `_MERGE_CONFIG_FILENAME` | Per-experiment config that triggers USAXS+SAXS merging (`merge_config.json`) |
 | `_MERGED_FOLDER_NAME` | Output subfolder for merged data (`data_usaxs_merged`) |
@@ -183,12 +189,64 @@ named `sample`, `metadata`, `data`…), a reserved name, or the sample name is
 empty, the entry is written under a safe name instead (`<name>_NXcanSAS`, or
 the file stem) and a warning is logged.  Raw data are never overwritten.
 
+**Reduction provenance.** Both subentries (`<name>` and `<name>_SMR`) carry
+an NXcanSAS `sasprocess` group (`NX_class` NXprocess, `canSAS_class`
+SASprocess) holding `name` (`Matilda`), `date`, `description`,
+`Matilda_version` and `reduction_version`.  Its `sasnote` group (NXnote)
+holds one dataset per reduction parameter.  The values come from
+`supportFunctions.reduction_provenance`, called by each converter after
+calibration.  None values are skipped, flags are stored as 0/1, and the
+`units` attributes come from `hdf5code.PROVENANCE_UNITS`.
+
+| Group of keys | Datasets |
+|---|---|
+| What was reduced | `technique` (Flyscan/StepScan/SAXS/WAXS), `counting_chain` (FX4/scaler), `blank_file`, `units` |
+| Transmission | `transmission_used`, `transmission_measured` (before any override), `transmission_override`, `transmission_overridden`, `PeakToPeakTransmission`, `MSAXSCorrection` (USAXS) |
+| Thickness | `thickness_used`, `thickness_file`, `thickness_override`, `thickness_overridden` (true only when the override is what was used) |
+| μ mode | `mu_mode`, `mu`, `calculated_mu`, `per_gram`, `density` |
+| Qmin (USAXS) | `qmin_used`, `calculated_qmin` (auto), `qmin_override`, `qmin_overridden`, `minQMinFindRatio` |
+| Desmearing (USAXS) | `desmeared`, `desmear_method`, `desmear_extrap_method`, `desmear_extrap_qstart`; Abel: `abel_auto_smooth`, `abel_smooth_w` (the width actually used, ln q), `abel_chi2`, `abel_num_mc`; Lake: `desmear_max_iter`; GP: `gp_length_scale`, `gp_kernel`; smoothed Lake: `lake_smooth_decades` |
+| Binning | `num_points` |
+
+`readMyNXcanSAS` reads the group back into `Sample["provenance"]`, and copies
+`MSAXSCorrection`, `calculated_qmin` and `calculated_mu` into
+`CalibratedData`, `PeakToPeakTransmission` into `reducedData`, and the
+beam-centre fit (`FWHM`, `Center`, `Chi-Square`, `wavelength`) from
+`sasinstrument` into `reducedData`.  As a result, a cached Sample has the same
+keys as a fresh one.  The exception is the per-point arrays of
+`reducedData`, which are not stored.  Files written before this change have
+no `sasprocess` and read as before.  The record is additive only: never
+rename a key, because pyirena, DataReporter and Igor Irena read these files.
+
+The NXcanSAS `run` field is the Bluesky uid (`/entry/entry_identifier`) when
+the raw file has one; otherwise it is the file name without its extension.
+`sastransmission_spectrum/Tdev` is NaN with the attribute
+`note = "not estimated by Matilda"`, because the transmission uncertainty is
+not computed yet.
+
+**Overrides never touch raw data.** A thickness, transmission or Qmin
+override is used in the reduction and recorded only in the reduced entry:
+`sasdata/I@thickness`, `sassample/thickness` and `sasprocess`.  Before
+v0.3.0 a thickness override rewrote `/entry/sample/thickness` (or the
+step-scan `sample_thickness_mm`) in the raw file and kept the original once
+as `<path>_original`.  Files edited that way keep the overridden value.
+Matilda no longer writes or reads `_original`.
+
 **`matilda/readfromtiled.py`**
 Tiled server REST API queries.
 
 Key functions: `FindLastScanData`, `FindLastBlankScan`, `FindScanDataByName`
 
-Target server: `http://usaxscontrol.xray.aps.anl.gov:8000` / catalog: `usaxs_MongoDB`
+Default server: `http://usaxscontrol.xray.aps.anl.gov:8000` / catalog: `usaxs_MongoDB`.
+Server, port, catalog and timeout come from the site config (`tiled_*` keys).
+
+**`matilda/config.py`**
+Site configuration: `~/.matilda/config.json` (or `$MATILDA_CONFIG`), merged
+over the built-in 12-ID-E defaults (`DEFAULTS`).  Importing it only reads the
+file.  `ensure_config_file()` writes the defaults when the file is missing;
+`main()` in the daemon calls it.  Bad keys, bad types or bad JSON are logged
+and fall back to the defaults.  Standard library only.  User guide:
+[configuration.md](configuration.md).
 
 ---
 
@@ -269,7 +327,11 @@ Sample = {
         "dQ": np.ndarray,
         "units": str,           # '[cm2/cm3]'
         "blankname": str,
-        "thickness": float,     # mm
+        "thickness": float,     # mm, the value actually used (override / file / from μ)
+        "MeasuredTransmission": float,  # USAXS: transmission used
+        "MSAXSCorrection": float,       # USAXS
+        "calculated_qmin": float,       # USAXS: auto Qmin, 1/Å
+        "calculated_mu": float,         # 1/cm
         "Kfactor": float,       # USAXS only
         "OmegaFactor": float,   # USAXS only
         "SMR_Int": np.ndarray,  # USAXS: slit-smeared data
@@ -287,7 +349,10 @@ Sample = {
         "data": np.ndarray,
         "blankname": str,
         "transmission": float,
+        "thickness": float,     # mm, actually used
+        "calculated_mu": float,
     },
+    "provenance": dict,         # flat scalars written to <entry>/sasprocess/sasnote
 }
 ```
 

@@ -138,18 +138,15 @@ journalctl --user -q -f -u matilda_server
 
 ## Configuration
 
-Runtime parameters are constants near the top of `matilda/matilda.py`.
-Edit them and restart the service for changes to take effect.
+Site settings are in `~/.matilda/config.json`, which belongs to the account
+that runs the service. These settings are the web-plot folder, the conda and
+environment paths, the Tiled server and catalog, and the look-back windows.
+The daemon writes the file with the built-in defaults on first start; those
+defaults are the 12-ID-E values. Edit the file and restart the service for a
+change to take effect. Without the file, the defaults apply.
 
-| Variable | Default | Description |
-|---|---|---|
-| `imagePath` | `/home/joule/WEBUSAXS/www_live/` | JPEG summary plot directory. Set to `None` to disable. |
-| `NumberOfDaysToLookBack` | `1` | How far back (days) to search for new scans. |
-| `NumberOfDaysToLookBackBlanks` | `5` | How far back (days) to search for blank scans. |
-| `NumberOfImagesInGraphs` | `10` | Maximum datasets per summary plot. |
-| `CONDA_EXECUTABLE` | `/APSshare/miniconda/x86_64/bin/conda` | Full path to conda — used when invoking pynika and pyirena. |
-| `PYNIKA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pynika` | pynika conda environment for auto-calibration. |
-| `PYIRENA_CONDA_ENV_PATH` | `/home/beams/USAXS/.conda/envs/pyirena` | pyirena conda environment for auto-analysis and merging. |
+Full key list and behaviour: [configuration.md](configuration.md).
+`python -m matilda.config` prints the values in force.
 
 ---
 

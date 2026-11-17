@@ -29,10 +29,10 @@ import logging
 
 from .fx4support import (CHAIN_FX4, CHAIN_SCALER, detect_counting_chain,
                          warn_ring_overflows)
-from .supportFunctions import read_group_to_dict, filter_nested_dict
+from .supportFunctions import read_group_to_dict, filter_nested_dict, reduction_provenance
 from .supportNikaFunctions import convert_Nika_to_Fit2D
 from .hdf5code import saveNXcanSAS, readMyNXcanSAS
-from .hdf5code import writeThicknessOverride, clearAndCheckCachedReduction, AD_METADATA_KEYS
+from .hdf5code import clearAndCheckCachedReduction, AD_METADATA_KEYS
 
 # ── FX4 absolute scale ────────────────────────────────────────────────────────
 # I_scaling (/entry/Metadata/I_scaling) is the SAXS/WAXS absolute-intensity
@@ -208,9 +208,8 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
 
         else:
             Sample = dict()
-            if thickness_override is not None:
-                writeThicknessOverride(hdf_file, '/entry/sample/thickness',
-                                       thickness_override, filename)
+            # A thickness override is NOT written into the raw file; it is used
+            # by calibrateAD2DData and recorded in the reduced entry.
             Sample = importADData(path, filename)   #this is for sample path and blank
             Sample["reducedData"] = reduceADData(Sample, useRawData=True, npts=npts)   #this generates Int vs Q for raw data plot
                                         # q = Sample["reducedData"]["Q"]
@@ -234,6 +233,10 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                 # Propagate calculated_mu from 2D calibration into CalibratedData
                 # so the GUI can read it from a single, consistent place.
                 Sample["CalibratedData"]["calculated_mu"] = Sample["calib2DData"].get("calculated_mu")
+                # The thickness the calibration actually used (an override is
+                # no longer written into the raw file, so the file value that
+                # reduceADData copied here may not be it).
+                Sample["CalibratedData"]["thickness"] = Sample["calib2DData"]["thickness"]
                                         #returns :   
                                         # qcalib= Sample["CalibratedData"]["Q"]
                                         # dqcalib= Sample["CalibratedData"]["dQ"]
@@ -242,6 +245,13 @@ def process2Ddata(path, filename, blankPath=None, blankFilename=None, recalculat
                                         # Sample["CalibratedData"]["units"]
                                         # blankname = Sample["calib2DData"]["blankname"]
                 Sample = fixOversubtractedData(Sample)
+                technique = ("SAXS" if "pin_ccd_tilt_x" in Sample["RawData"]["metadata"]
+                             else "WAXS")
+                Sample["provenance"] = reduction_provenance(
+                    technique, Sample, thickness_override=thickness_override,
+                    transmission_override=transmission_override,
+                    use_mu=use_mu, mu=mu, per_gram=per_gram, density=density,
+                    num_points=npts)
                                         #this simply finds min for Intensity and if it is negatgive, adds to it 1.1*min value. 
             else:
                 Sample["CalibratedData"]=dict()
@@ -422,7 +432,7 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
     pixel_size = Sample["RawData"]["instrument"]["detector"]["x_pixel_size"]
 
     transmission = ((sampleTRDiode / sampleTRDiodeGain) / (sampleTRI0 / sampleTRI0gain)) / ((blankTRDiode / blankTRDiodeGain) / (blankTRI0 / blankTRI0gain))
-    #print(f"Transmission: {transmission}")
+    transmission_measured = float(transmission)   # before any override (provenance)
     if transmission_override is not None and transmission_override > 0:
         logging.info(f"Using transmission override {transmission_override:.4f} (measured: {transmission:.4f}).")
         transmission = float(transmission_override)
@@ -455,6 +465,11 @@ def calibrateAD2DData(Sample, Blank, thickness_override=None, use_mu=False, mu=N
             "blankname":blankname,
             "transmission":transmission,
             "calculated_mu":calculated_mu,
+            # thickness actually used (mm): override, file value, or from T and mu
+            "thickness":float(thickness_cm * 10),
+            # provenance only (saveNXcanSAS -> sasprocess); not used in the math
+            "transmission_measured":transmission_measured,
+            "thickness_file":Sample["RawData"]["sample"].get("thickness"),
             }
     return result
     

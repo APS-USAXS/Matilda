@@ -61,12 +61,12 @@ import logging
 # rebinData lives in supportFunctions (was imported via convertUSAXS re-export)
 from .supportFunctions import rebinData, point_spacing_dQ
 from .hdf5code import load_dict_from_hdf5, save_dict_to_hdf5, saveNXcanSAS, readMyNXcanSAS
-from .hdf5code import clearAndCheckCachedReduction, writeThicknessOverride
+from .hdf5code import clearAndCheckCachedReduction
 from .supportFunctions import importFlyscan, calculatePD_Fly, beamCenterCorrection, smooth_r_data
 from .supportFunctions import getBlankFlyscan, normalizeByTransmission,calibrateAndSubtractFlyscan,calculatePDErrorFly
 from .supportFunctions import _fixNegativeFlyIntensities, checkBlankChain
 from .fx4support import CHAIN_FX4, add_relative_floor
-from .supportFunctions import empty_calibrated_data
+from .supportFunctions import empty_calibrated_data, reduction_provenance
 from .desmearing_methods import desmear_dispatch
 
 
@@ -138,9 +138,9 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
 
         else:
             Sample = dict()
-            if thickness_override is not None:
-                writeThicknessOverride(hdf_file, '/entry/sample/thickness',
-                                       thickness_override, filename)
+            # A thickness override is NOT written into the raw file; it is used
+            # by calibrateAndSubtractFlyscan and recorded in the reduced entry
+            # (sasdata/I 'thickness', sassample, sasprocess).
             Sample["RawData"]=importFlyscan(path, filename)                         # import data
             is_fx4 = Sample["RawData"].get("chain") == CHAIN_FX4
             Sample["reducedData"]= calculatePD_Fly(Sample)                          # Creates PD_Intensity with corrected gains and background subtraction
@@ -183,7 +183,8 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                     SMR_Error =Sample["CalibratedData"]["SMR_Error"]
                     SMR_Qvec =Sample["CalibratedData"]["SMR_Qvec"]
                     SMR_dQ =Sample["CalibratedData"]["SMR_dQ"]
-                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc)
+                    desmear_info = {}
+                    DSM_Qvec, DSM_Int, DSM_Error, DSM_dQ = desmear_dispatch(SMR_Qvec, SMR_Int, SMR_Error, SMR_dQ, slitLength=slitLength, method=desmear_method, length_scale_decades=gp_length_scale, kernel=gp_kernel, extrap_method=extrap_method, extrap_qstart=extrap_qstart, max_iter=desmear_iter, abel_auto_smooth=abel_auto_smooth, abel_smooth_w=abel_smooth_w, abel_num_mc=abel_num_mc, info=desmear_info)
                     desmearedData={
                         "Intensity":DSM_Int,
                         "Q":DSM_Qvec,
@@ -192,6 +193,12 @@ def processFlyscan(path, filename, blankPath=None, blankFilename=None, recalcula
                         "units":Sample["CalibratedData"]["units"],
                         }
                     Sample["CalibratedData"].update(desmearedData)
+                    Sample["provenance"] = reduction_provenance(
+                        "Flyscan", Sample, thickness_override=thickness_override,
+                        transmission_override=transmission_override,
+                        qmin_override=qmin_override, minQMinFindRatio=minQMinFindRatio,
+                        use_mu=use_mu, mu=mu, per_gram=per_gram, density=density,
+                        desmear_info=desmear_info, num_points=num_points)
                 else:
                     logging.warning(f"Not enough data points in SMR_Qvec ({len(SMR_Qvec)}) to proceed with desmearing or rebinning. "
                                     "Skipping desmearing and rebinning steps. ")

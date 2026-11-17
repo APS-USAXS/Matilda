@@ -71,22 +71,24 @@ from .supportFunctions import findProperBlankScan
 from .hdf5code import find_matching_groups
 from .technique_detector import detect_technique
 from .plotData import plotUSAXSResults, plotSWAXSResults, plotTuneResults
+from .config import SITE_CONFIG, ensure_config_file, config_path, resolve_image_path
 
 
-#Path to save live-monitoring images.  Override with the MATILDA_IMAGE_PATH
-#environment variable; set it to the literal string "none" to disable image
+# Site settings come from ~/.matilda/config.json (matilda.config); without
+# that file the built-in APS 12-ID-E defaults apply.
+#
+#Path to save live-monitoring images.  The MATILDA_IMAGE_PATH environment
+#variable overrides the config; "none" (or null in the config) disables image
 #saving entirely (plot functions skip when imagePath is None).
-imagePath = os.environ.get('MATILDA_IMAGE_PATH', '/home/joule/WEBUSAXS/www_live/')
-if imagePath.lower() == 'none':
-    imagePath = None
+imagePath = resolve_image_path(SITE_CONFIG)
 
 # Conda setup for external tools (pynika, pyirena).
 # Full path to the conda executable used at this beamline.
-CONDA_EXECUTABLE = '/APSshare/miniconda/x86_64/bin/conda'
+CONDA_EXECUTABLE = SITE_CONFIG['conda_executable']
 # Full path to pynika's conda environment (mirrors the pynika-gui launch script).
-PYNIKA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pynika'
+PYNIKA_CONDA_ENV_PATH = SITE_CONFIG['pynika_conda_env_path']
 # Full path to pyirena's conda environment.
-PYIRENA_CONDA_ENV_PATH = '/home/beams/USAXS/.conda/envs/pyirena'
+PYIRENA_CONDA_ENV_PATH = SITE_CONFIG['pyirena_conda_env_path']
 
 # Name of the per-folder JSON config that triggers pyirena analysis.
 _PYIRENA_CONFIG_FILENAME = 'pyirena_config.json'
@@ -159,9 +161,9 @@ def _has_nxcansas_entry(filepath):
 # Regex pattern to detect AgBehenateLaB6 calibrant files (any capitalisation)
 _CALIBRANT_PATTERN = re.compile(r'agbehenatelab6', re.IGNORECASE)
 
-NumberOfDaysToLookBack = 1  # Number of days to look back for scans
-NumberOfDaysToLookBackBlanks = 5  # Number of days to look back for blanks
-NumberOfImagesInGraphs = 10  # Number of images to show in the graphs
+NumberOfDaysToLookBack = SITE_CONFIG['days_to_look_back']  # Number of days to look back for scans
+NumberOfDaysToLookBackBlanks = SITE_CONFIG['days_to_look_back_blanks']  # Number of days to look back for blanks
+NumberOfImagesInGraphs = SITE_CONFIG['images_in_graphs']  # Number of images to show in the graphs
 
 #recalculateAllData = False  # Set to True to recalculate all data, False to use existing data
     
@@ -806,6 +808,11 @@ def main():
     or directly via ``python -m matilda.matilda``.
     """
     _setup_logging()
+    # Give the user a complete file to edit (no-op when it exists or the home
+    # folder is read-only).  The values in force were read at import.
+    ensure_config_file()
+    logging.info(f"Matilda site config: {config_path()} "
+                 f"(image path {imagePath}, Tiled catalog {SITE_CONFIG['tiled_catalog']})")
     try:
         listofFlyscansOld=dict()
         listofStepScansOld=dict()

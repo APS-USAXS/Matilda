@@ -135,7 +135,13 @@ the Matilda daemon's behavior.
 The HDF5 thickness value is displayed in grey when a file is selected.
 
 - **Override checkbox**: Check to enter a custom thickness value (in mm)
-  instead of the HDF5 value.
+  instead of the HDF5 value. The override applies to the reduction and is
+  stored only in the reduced NXcanSAS entry (`sassample/thickness`, and
+  `sasprocess/sasnote/thickness_override`). The raw thickness in the file is
+  not changed, so the grey HDF5 value always shows what was measured.
+  All overrides (thickness, transmission, Qmin, μ mode) are recorded in the
+  entry's `sasprocess` group; see
+  [architecture.md](architecture.md#io).
 
 #### Calibration mode
 

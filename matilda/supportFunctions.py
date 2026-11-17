@@ -161,6 +161,33 @@ def importFlyscan(path, filename):
         return _importFlyscanScaler(file, filename)
 
 
+def fx4_flyscan_trigger_mode(fly):
+    """Return the FX4 trigger mode recorded in a /entry/flyScan group, or None.
+
+    saveFlyData writes ``fx4_trigger_mode`` (usxFX4:FX4:TriggerMode).  It is
+    read as a dataset first and as an attribute of the group second, because
+    the plan and the deployed writer disagree on which; files written before
+    the 26.10.151957 firmware have neither.
+    """
+    raw = None
+    if 'fx4_trigger_mode' in fly:
+        raw = fly['fx4_trigger_mode'][()]
+    elif 'fx4_trigger_mode' in fly.attrs:
+        raw = fly.attrs['fx4_trigger_mode']
+    value = as_scalar(raw) if raw is not None else None
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value or None
+
+
+def is_ext_trig_mode(trigger_mode):
+    """True for the FX4 "Ext. trig." mode, tolerant of case, dots and spaces."""
+    if not trigger_mode:
+        return False
+    return re.sub(r'[\s.]', '', str(trigger_mode)).lower() == 'exttrig'
+
+
 def _importFlyscanFX4(file, filename):
     """Read the FX4 (picoamp) fly-scan layout — see importFlyscan."""
     fly = file['/entry/flyScan']
@@ -170,11 +197,26 @@ def _importFlyscanFX4(file, filename):
     Monitor = np.ravel(np.array(fly['I0_current']))
     num_elements = min(len(UPD_array), len(Monitor))
 
-    # AR_PulsePositions is 8k-padded with zeros and has one extra leading
-    # point — identical handling to the scaler chain.
+    # AR_PulsePositions is 8k-padded with zeros.  How a point pairs with a
+    # position depends on the FX4 trigger mode that wrote the file:
+    #
+    # * "Ext. bulb" (and every file without fx4_trigger_mode — the firmware
+    #   before 26.10.151957): point i pairs with AR_PulsePositions[i+1], i.e.
+    #   the leading position is dropped, exactly as on the scaler chain.
+    #   Files without the marker must keep reducing bit-identically.
+    # * "Ext. trig.": a point runs from rising edge i to rising edge i+1, so
+    #   point i pairs with AR_PulsePositions[i] — the pairing shifts by one.
+    #   The box records exactly as many points as there are pulse positions,
+    #   so there is no junk tail point to drop.
+    trigger_mode = fx4_flyscan_trigger_mode(fly)
     ARangles = np.ravel(np.array(fly['AR_PulsePositions']))
-    ARangles = ARangles[1:]
+    if not is_ext_trig_mode(trigger_mode):
+        ARangles = ARangles[1:]
     ARangles = np.trim_zeros(ARangles, 'b')
+    if len(ARangles) != num_elements:
+        logging.info(f"{filename}: FX4 trigger mode {trigger_mode or 'unrecorded (bulb rule)'}: "
+                     f"{num_elements} points vs {len(ARangles)} AR positions; "
+                     "truncating to the shorter.")
     num_elements = min(num_elements, len(ARangles))
 
     def _fly_array(name):
@@ -264,6 +306,7 @@ def _importFlyscanFX4(file, filename):
             "I0_total": I0_total,
             "RangeIndex": range_index,
             "SampleTime": sample_time,
+            "TriggerMode": trigger_mode,
             "AmpGain": None,
             "Channel": None,
             "VToFFactor": None,

@@ -163,12 +163,21 @@ Geometry and transmission metadata stay in `/entry/metadata/`:
 Wavelength: `/entry/instrument/monochromator/wavelength` (0.5904016 Å).
 Thickness: `/entry/sample/thickness` (mm).
 
-### 3.2 Trimming and alignment — unchanged from the scaler chain
+### 3.2 Trimming and alignment — depends on `fx4_trigger_mode`
 
-`AR_PulsePositions` is 8k-padded with zeros and carries **one extra leading
-point**. Handle exactly as before:
+`AR_PulsePositions` is 8k-padded with zeros. Read `/entry/flyScan/fx4_trigger_mode`
+(dataset, or attribute of the `flyScan` group); it is absent on files written
+before firmware 26.10.151957.
 
-1. Drop the first element.
+* **Absent, or `Ext. bulb`** — same as the scaler chain: the array carries
+  **one extra leading point**, so point *i* pairs with `AR_PulsePositions[i+1]`.
+* **`Ext. trig.`** — a point runs from rising edge *i* to *i+1*, so point *i*
+  pairs with `AR_PulsePositions[i]` (no leading point to drop). The box
+  records exactly as many points as positions; nothing is dropped at the end.
+
+Then:
+
+1. Drop the first element (bulb / absent only).
 2. Strip trailing zeros.
 3. `n = min(len(upd_current), len(I0_current), len(AR))`.
 4. Truncate every array to `n`.

@@ -153,7 +153,8 @@ def _synthetic_ar_sweep():
 
 
 def _synthetic_fx4_flyscan(path, transmission=1.0, excess=0.0,
-                           write_metadata_group=True):
+                           write_metadata_group=True, trigger_mode=None,
+                           trigger_mode_as_attr=False):
     """Write an FX4 fly-scan file matching saveFlyData.xml v2.0.
 
     *transmission* attenuates the rocking-curve peak (so the sample/blank
@@ -164,6 +165,11 @@ def _synthetic_fx4_flyscan(path, transmission=1.0, excess=0.0,
     *write_metadata_group* False reproduces the deployed configuration, in
     which an over-long XML comment swallows the ``<group name="metadata">``
     tag so every one of those fields lands in ``/entry/flyScan`` instead.
+
+    *trigger_mode* writes ``flyScan/fx4_trigger_mode`` (as an attribute of
+    the group when *trigger_mode_as_attr*).  In "Ext. trig." the box records
+    one point per pulse position with no extra leading position; otherwise
+    (bulb, or no marker) AR_PulsePositions carries one extra leading point.
     """
     ar = _synthetic_ar_sweep()
     dtheta_deg = ar - AR_CENTER
@@ -182,8 +188,17 @@ def _synthetic_fx4_flyscan(path, transmission=1.0, excess=0.0,
         prog.attrs["counting_chain"] = "FX4"
 
         fly = f.create_group("/entry/flyScan")
-        # AR_PulsePositions carries one extra leading point and zero padding
-        fly["AR_PulsePositions"] = np.concatenate(([ar[0]], ar, np.zeros(500)))
+        if trigger_mode is not None and "trig" in trigger_mode.lower():
+            # Ext. trig.: point i pairs with AR_PulsePositions[i]
+            fly["AR_PulsePositions"] = np.concatenate((ar, np.zeros(500)))
+        else:
+            # bulb: one extra leading point, then zero padding
+            fly["AR_PulsePositions"] = np.concatenate(([ar[0] + 1e-3], ar, np.zeros(500)))
+        if trigger_mode is not None:
+            if trigger_mode_as_attr:
+                fly.attrs["fx4_trigger_mode"] = trigger_mode
+            else:
+                fly["fx4_trigger_mode"] = trigger_mode.encode()
         fly["upd_current"] = upd
         fly["I0_current"] = i0
         fly["upd_sigma"] = 0.02 * upd
@@ -240,6 +255,36 @@ def test_import_fx4_flyscan(fx4_flyscan_pair):
     assert raw["metadata"]["I0Gain"] == 1.0
     assert raw["metadata"]["detector_distance"] == 1073.0
     assert raw["RangeIndex"] == UPD_RANGE
+
+
+@pytest.mark.parametrize("mode, as_attr", [
+    (None, False),              # pre-26.10.151957 file: today's bulb rule
+    ("Ext. bulb", False),
+    ("Ext. trig.", False),
+    ("Ext. Trig.", True),       # attribute form, writer's capitalisation
+])
+def test_fx4_flyscan_point_position_pairing(tmp_path, mode, as_attr):
+    """Every point must land on its own AR position whatever the trigger mode.
+
+    Bulb drops the leading AR position; Ext. trig. keeps it (pairing shifted
+    by one) and drops no data point, since the counts match exactly.
+    """
+    from matilda.supportFunctions import importFlyscan
+    _synthetic_fx4_flyscan(tmp_path / "S_0001.h5", trigger_mode=mode,
+                           trigger_mode_as_attr=as_attr)
+    raw = importFlyscan(str(tmp_path), "S_0001.h5")
+    assert len(raw["ARangles"]) == N_POINTS
+    assert len(raw["UPD_array"]) == N_POINTS
+    assert np.array_equal(raw["ARangles"], _synthetic_ar_sweep())
+    assert raw["TriggerMode"] == mode
+
+
+def test_is_ext_trig_mode():
+    from matilda.supportFunctions import is_ext_trig_mode
+    for text in ("Ext. trig.", "Ext. Trig.", "ext trig", " EXT.TRIG "):
+        assert is_ext_trig_mode(text)
+    for text in (None, "", "Ext. bulb", "Free run", "Ext. gate"):
+        assert not is_ext_trig_mode(text)
 
 
 def test_fx4_flyscan_prefers_the_fx4_dark_currents(tmp_path):

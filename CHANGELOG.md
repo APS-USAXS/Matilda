@@ -7,6 +7,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Added — FX4 "Ext. trig." fly scans (firmware 26.10.151957)
+
+- `_importFlyscanFX4` reads `flyScan/fx4_trigger_mode` (dataset or group
+  attribute). In `Ext. trig.` a point runs from rising edge *i* to *i+1*, so
+  point *i* is paired with `AR_PulsePositions[i]` — shifted by one from the
+  bulb rule — and no point is dropped (the point count matches the pulse
+  positions exactly). Files without the marker, or in `Ext. bulb`, keep the
+  bulb rule (drop the leading position) and reduce bit-identically. The mode
+  is carried as `RawData["TriggerMode"]`.
+
 ### Added — reduction provenance, site configuration
 
 Reduced I(Q), Q, errors and SMR data are bit-identical to before. The only

@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — 0.3.0.dev0
 
+### Changed — raised buttons shared with pyIrena
+
+- Push buttons in both GUIs are drawn raised (gradient face, bevel, sunken
+  when pressed), with the same look and colour meaning as pyIrena, Bernardyn,
+  AIDA and DataReporter. Sample-plate setup: Drive to table values and
+  Export usaxs.mac are green (main action), Save current position to table is
+  orange (caution: overwrites the row), STOP MOTORS is red, Reset Tool is
+  orange (revert), Beamline Survey is blue (tool). Data reduction: "? Help"
+  stays red.
+- `matilda/gui/raised_buttons.py` is a vendored copy of pyIrena's; do not
+  edit it here, refresh it with `pyirena/scripts/sync_raised_buttons.py`.
+
 ### Added — FX4 "Ext. trig." fly scans (firmware 26.10.151957)
 
 - `_importFlyscanFX4` reads `flyScan/fx4_trigger_mode` (dataset or group

@@ -20,6 +20,7 @@ import webbrowser
 import h5py
 import numpy as np
 
+from .. import raised_buttons
 from .._qt import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QPushButton, QLabel, QProgressBar, QSizePolicy,
@@ -73,11 +74,7 @@ class MatildaReductionWindow(QMainWindow):
         tb.addWidget(spacer)
 
         btn_help = QPushButton("? Help")
-        btn_help.setStyleSheet(
-            "QPushButton { background-color: #e84040; color: white;"
-            " font-weight: bold; padding: 4px 12px; border-radius: 3px; }"
-            "QPushButton:hover { background-color: #cc3030; }"
-        )
+        raised_buttons.set_role(btn_help, "help")
         btn_help.setToolTip("Open Matilda GUI documentation in web browser")
         btn_help.clicked.connect(
             lambda: webbrowser.open(

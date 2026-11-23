@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import h5py
 
+from . import raised_buttons
 from ._qt import (
     QApplication, QMainWindow, QWidget, QTabWidget,
     QTableWidget, QTableWidgetItem, QHeaderView,
@@ -1549,12 +1550,12 @@ class BeamlineSurveyDialog(QDialog):
         # Action buttons
         act_lay = QHBoxLayout()
         btn_drive = QPushButton("Drive to table values")
-        btn_drive.setStyleSheet("background-color: #88ff88")
+        raised_buttons.set_role(btn_drive, "primary")
         btn_save = QPushButton("Save current position to table")
-        btn_save.setStyleSheet("background-color: #ff8888")
+        raised_buttons.set_role(btn_save, "caution")   # overwrites the table row
         btn_go00 = QPushButton("Go to 0, 0")
         btn_stop = QPushButton("STOP MOTORS")
-        btn_stop.setStyleSheet("background-color: red; color: white; font-weight: bold;")
+        raised_buttons.set_role(btn_stop, "stop")
         act_lay.addWidget(btn_drive)
         act_lay.addWidget(btn_save)
         act_lay.addWidget(btn_go00)
@@ -1823,7 +1824,7 @@ class SamplePlateSetupWindow(QMainWindow):
         toolbar.addWidget(self._hdf5_settings_lbl)
 
         btn_reset = QPushButton("Reset Tool")
-        btn_reset.setStyleSheet("background-color: #ffcccc;")
+        raised_buttons.set_role(btn_reset, "revert")
         btn_reset.clicked.connect(self._on_reset_tool)
         toolbar.addWidget(btn_reset)
 
@@ -1886,10 +1887,10 @@ class SamplePlateSetupWindow(QMainWindow):
         btn_preview = QPushButton("Preview Commands")
         btn_preview.clicked.connect(self._on_preview)
         btn_export = QPushButton("Export usaxs.mac")
-        btn_export.setStyleSheet("background-color: #88cc88; font-weight: bold;")
+        raised_buttons.set_role(btn_export, "primary")
         btn_export.clicked.connect(self._on_export)
         btn_survey = QPushButton("Beamline Survey")
-        btn_survey.setStyleSheet("background-color: #aaccff;")
+        raised_buttons.set_role(btn_survey, "tool")
         btn_survey.clicked.connect(self._on_beamline_survey)
         if not EPICS_AVAILABLE:
             btn_survey.setToolTip("pyepics not installed - EPICS motor control unavailable")
@@ -2093,7 +2094,7 @@ class SamplePlateSetupWindow(QMainWindow):
         # Export buttons
         exp_btns = QHBoxLayout()
         btn_exp_default = QPushButton("Export as usaxs.mac")
-        btn_exp_default.setStyleSheet("background-color: #88cc88; font-weight: bold;")
+        raised_buttons.set_role(btn_exp_default, "primary")
         btn_exp_default.clicked.connect(self._on_export)
         btn_exp_named = QPushButton("Export with custom name...")
         btn_exp_named.clicked.connect(self._on_export_named)
@@ -2790,6 +2791,7 @@ class SamplePlateSetupWindow(QMainWindow):
 def run_sample_plate_setup():
     """Launch the Setup Sample Plates GUI.  Creates QApplication if needed."""
     app = QApplication.instance() or QApplication([])
+    raised_buttons.install(app)   # shared raised-button look (vendored from pyIrena)
     win = SamplePlateSetupWindow()
     win.show()
     app.exec()

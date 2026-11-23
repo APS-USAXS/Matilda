@@ -24,9 +24,11 @@ def main():
     """Launch the Matilda data-reduction GUI."""
     import sys
 
+    from .. import raised_buttons
     from .._qt import QApplication
 
     app = QApplication.instance() or QApplication(sys.argv)
+    raised_buttons.install(app)   # shared raised-button look (vendored from pyIrena)
     window = MatildaReductionWindow()
     window.show()
     sys.exit(app.exec())
